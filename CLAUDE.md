@@ -41,8 +41,35 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 
 ## Development Commands
 
-- `sfdx force:source:deploy -p force-app/` - Deploy to Salesforce org
-- `sfdx force:apex:test:run -c -r human` - Run all Apex tests
+- `sf project deploy start --source-dir force-app` - Deploy to Salesforce org
+- `sf apex test run --code-coverage --result-format human` - Run all Apex tests
+- `sf org create scratch -f config/project-scratch-def.json -a my-scratch` - Create scratch org
+- `sf org delete scratch -o my-scratch -p` - Delete scratch org
+
+## CI/CD
+
+The project includes GitHub Actions workflows for:
+
+1. **CI Testing** (`.github/workflows/ci.yml`):
+   - Triggers on push to main and pull requests
+   - Creates a scratch org
+   - Deploys all metadata
+   - Runs Apex tests
+   - Cleans up the scratch org
+
+2. **Claude Code Integration** (`.github/workflows/claude-code.yml`):
+   - Responds to GitHub issues and comments
+   - Generates code using Claude AI
+
+### Setting up CI/CD
+
+1. Enable Dev Hub in your Salesforce org
+2. Create a connected app for CI authentication
+3. Get the SFDX auth URL:
+   ```bash
+   sf org display -o your-devhub-alias --verbose --json
+   ```
+4. Add the auth URL as a GitHub secret named `DEVHUB_SFDX_AUTH_URL`
 
 ## Coding Standards
 
