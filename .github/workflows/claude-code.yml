@@ -25,8 +25,11 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           max_iterations: 10
-          tools: |
-            - name: bash
-              description: Run bash commands
-            - name: github_cli
-              description: Use GitHub CLI commands
+          allowed_tools: |
+            bash
+            gh_cli
+          custom_instructions: |
+            You have access to the GitHub CLI (gh) command. 
+            When asked to create a pull request, use: gh pr create
+            The GH_TOKEN is already configured.
+            You can run bash commands to execute git and gh operations.
