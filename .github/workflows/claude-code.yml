@@ -24,3 +24,9 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          max_iterations: 10
+          tools: |
+            - name: bash
+              description: Run bash commands
+            - name: github_cli
+              description: Use GitHub CLI commands
