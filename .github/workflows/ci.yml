@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  scratch-org-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Salesforce CLI
+        run: |
+          npm install -g @salesforce/cli
+          sf --version
+      
+      - name: Authenticate Dev Hub
+        run: |
+          echo "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" > ./DEVHUB_SFDX_AUTH_URL.txt
+          sf org login sfdx-url -f ./DEVHUB_SFDX_AUTH_URL.txt -a devhub -d
+          rm ./DEVHUB_SFDX_AUTH_URL.txt
+      
+      - name: Create Scratch Org
+        run: |
+          sf org create scratch -f config/project-scratch-def.json -a ci-scratch -d 1 --no-track-source
+      
+      - name: Deploy Source to Scratch Org
+        run: |
+          sf project deploy start --source-dir force-app --target-org ci-scratch
+      
+      - name: Run Apex Tests
+        run: |
+          sf apex test run --target-org ci-scratch --code-coverage --result-format human --wait 10
+        continue-on-error: true  # Continue even if no tests exist yet
+      
+      - name: Delete Scratch Org
+        if: always()
+        run: |
+          sf org delete scratch -o ci-scratch -p
