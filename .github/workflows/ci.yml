@@ -19,6 +19,10 @@ jobs:
       
       - name: Authenticate Dev Hub
         run: |
+          if [ -z "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" ]; then
+            echo "ERROR: DEVHUB_SFDX_AUTH_URL secret is not set or is empty"
+            exit 1
+          fi
           echo "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" > ./DEVHUB_SFDX_AUTH_URL.txt
           sf org login sfdx-url -f ./DEVHUB_SFDX_AUTH_URL.txt -a devhub -d
           rm ./DEVHUB_SFDX_AUTH_URL.txt
