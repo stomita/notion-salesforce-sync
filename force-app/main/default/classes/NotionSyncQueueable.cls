@@ -192,7 +192,11 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             }
             when 'date' {
                 if (value instanceof Date) {
-                    return new Map<String, Object>{ 'start' => ((Date)value).format('yyyy-MM-dd') };
+                    Date dateValue = (Date)value;
+                    String formattedDate = dateValue.year() + '-' + 
+                                         String.valueOf(dateValue.month()).leftPad(2, '0') + '-' + 
+                                         String.valueOf(dateValue.day()).leftPad(2, '0');
+                    return new Map<String, Object>{ 'start' => formattedDate };
                 } else if (value instanceof DateTime) {
                     return new Map<String, Object>{ 'start' => ((DateTime)value).formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'') };
                 }
