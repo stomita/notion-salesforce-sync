@@ -367,11 +367,38 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             Retry_Count__c = 0
         );
         
+        if (status == 'Failed') {
+            log.Original_Error_Time__c = DateTime.now();
+            log.Next_Retry_Time__c = calculateInitialRetryTime(request.objectType);
+        }
+        
         try {
             insert log;
         } catch (Exception e) {
             System.debug('Failed to insert sync log: ' + e.getMessage());
         }
+    }
+    
+    private DateTime calculateInitialRetryTime(String objectType) {
+        NotionSyncRetryConfig__mdt config = getRetryConfigForObject(objectType);
+        
+        Integer delayMinutes = config != null && config.RetryDelayMinutes__c != null ? 
+                               Integer.valueOf(config.RetryDelayMinutes__c) : 5;
+        
+        return DateTime.now().addMinutes(delayMinutes);
+    }
+    
+    private NotionSyncRetryConfig__mdt getRetryConfigForObject(String objectType) {
+        List<NotionSyncRetryConfig__mdt> configs = [
+            SELECT MasterLabel, ObjectApiName__c, MaxRetryAttempts__c, RetryDelayMinutes__c,
+                   ExponentialBackoff__c, NotificationEmails__c
+            FROM NotionSyncRetryConfig__mdt
+            WHERE ObjectApiName__c = :objectType OR ObjectApiName__c = null
+            ORDER BY ObjectApiName__c DESC NULLS LAST
+            LIMIT 1
+        ];
+        
+        return configs.isEmpty() ? null : configs[0];
     }
     
     public class NotionSyncException extends Exception {}
