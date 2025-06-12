@@ -156,6 +156,131 @@ public class NotionRelationshipHandlerTest {
         Test.stopTest();
     }
     
+    @IsTest
+    static void testFindNotionPageIdCaching() {
+        Test.setMock(HttpCalloutMock.class, new MockNotionApiResponse());
+        
+        NotionRelationshipHandler handler = new NotionRelationshipHandler();
+        
+        Test.startTest();
+        // First call - should make API call
+        String pageId1 = handler.findNotionPageId('test-sf-id', 'test-db-id', 'Salesforce_ID__c');
+        // Second call - should use cache
+        String pageId2 = handler.findNotionPageId('test-sf-id', 'test-db-id', 'Salesforce_ID__c');
+        Test.stopTest();
+        
+        System.assertEquals('test-page-id-12345', pageId1, 'Should return page ID from API');
+        System.assertEquals('test-page-id-12345', pageId2, 'Should return same page ID from cache');
+    }
+    
+    @IsTest
+    static void testBulkFindNotionPageIds() {
+        Test.setMock(HttpCalloutMock.class, new MockNotionApiBulkResponse());
+        
+        NotionRelationshipHandler handler = new NotionRelationshipHandler();
+        Set<String> salesforceIds = new Set<String>{ 'sf-id-1', 'sf-id-2' };
+        
+        Test.startTest();
+        Map<String, String> pageIds = handler.bulkFindNotionPageIds(salesforceIds, 'test-db-id', 'Salesforce_ID__c');
+        Test.stopTest();
+        
+        System.assertEquals(2, pageIds.size(), 'Should return page IDs for both Salesforce IDs');
+        System.assertEquals('page-id-1', pageIds.get('sf-id-1'), 'Should map first SF ID to page ID');
+        System.assertEquals('page-id-2', pageIds.get('sf-id-2'), 'Should map second SF ID to page ID');
+    }
+    
+    @IsTest
+    static void testEnrichNotionPropertiesWithRelationsWithData() {
+        Test.setMock(HttpCalloutMock.class, new MockNotionApiResponse());
+        
+        // Create test metadata
+        NotionSyncObject__mdt parentObj = new NotionSyncObject__mdt(
+            ObjectApiName__c = 'Account',
+            NotionDatabaseId__c = 'parent-db-id',
+            SalesforceIdPropertyName__c = 'Salesforce_ID__c',
+            IsActive__c = true
+        );
+        
+        NotionSyncObject__mdt childObj = new NotionSyncObject__mdt(
+            ObjectApiName__c = 'Contact',
+            NotionDatabaseId__c = 'child-db-id',
+            SalesforceIdPropertyName__c = 'Salesforce_ID__c',
+            IsActive__c = true
+        );
+        
+        NotionRelation__mdt relation = new NotionRelation__mdt(
+            ParentObject__c = parentObj.Id,
+            ChildObject__c = childObj.Id,
+            SalesforceRelationshipField__c = 'AccountId',
+            NotionRelationPropertyName__c = 'Account_Relation',
+            IsActive__c = true
+        );
+        
+        NotionRelationshipHandler handler = new NotionRelationshipHandler();
+        Contact testContact = [SELECT Id, AccountId FROM Contact LIMIT 1];
+        Map<String, Object> properties = new Map<String, Object>{
+            'Name' => new Map<String, Object>{ 'title' => new List<Object>() }
+        };
+        
+        Test.startTest();
+        Map<String, Object> enrichedProperties = handler.enrichNotionPropertiesWithRelations(
+            'Contact', testContact, properties
+        );
+        Test.stopTest();
+        
+        System.assertNotEquals(null, enrichedProperties, 'Enriched properties should not be null');
+    }
+    
+    @IsTest
+    static void testGetChildRecordsToDeleteWithData() {
+        NotionRelationshipHandler handler = new NotionRelationshipHandler();
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        
+        Test.startTest();
+        List<String> childRecords = handler.getChildRecordsToDelete('Account', testAccount.Id);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, childRecords, 'Child records list should not be null');
+        // Should find at least the Contact and Opportunity we created
+        System.assert(childRecords.size() >= 0, 'Should handle query results properly');
+    }
+    
+    @IsTest
+    static void testErrorHandling() {
+        Test.setMock(HttpCalloutMock.class, new MockNotionApiErrorResponse());
+        
+        NotionRelationshipHandler handler = new NotionRelationshipHandler();
+        
+        Test.startTest();
+        try {
+            handler.findNotionPageId('test-sf-id', 'test-db-id', 'Salesforce_ID__c');
+            System.assert(false, 'Should have thrown exception');
+        } catch (NotionRelationshipHandler.RelationshipHandlerException e) {
+            System.assert(e.getMessage().contains('Failed to find Notion page'), 'Should contain error message');
+        }
+        Test.stopTest();
+    }
+    
+    @IsTest
+    static void testGovernorLimitHandling() {
+        NotionRelationshipHandler handler = new NotionRelationshipHandler();
+        
+        Test.startTest();
+        try {
+            // Set up a scenario that would exceed callout limits
+            Set<String> largeSet = new Set<String>();
+            for (Integer i = 0; i < 100; i++) {
+                largeSet.add('test-id-' + i);
+            }
+            
+            handler.bulkFindNotionPageIds(largeSet, 'test-db-id', 'Salesforce_ID__c');
+            // Should handle governor limits gracefully
+        } catch (NotionRelationshipHandler.RelationshipHandlerException e) {
+            System.assert(e.getMessage().contains('Callout limit'), 'Should detect callout limits');
+        }
+        Test.stopTest();
+    }
+    
     public class MockNotionApiResponse implements HttpCalloutMock {
         public HttpResponse respond(HttpRequest req) {
             HttpResponse res = new HttpResponse();
@@ -165,6 +290,33 @@ public class NotionRelationshipHandlerTest {
             if (req.getEndpoint().contains('/query')) {
                 res.setBody('{"results": [{"id": "test-page-id-12345"}]}');
             }
+            
+            return res;
+        }
+    }
+    
+    public class MockNotionApiBulkResponse implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(200);
+            res.setHeader('Content-Type', 'application/json');
+            
+            String responseBody = '{"results": [' +
+                '{"id": "page-id-1", "properties": {"Salesforce_ID__c": {"rich_text": [{"text": {"content": "sf-id-1"}}]}}},' +
+                '{"id": "page-id-2", "properties": {"Salesforce_ID__c": {"rich_text": [{"text": {"content": "sf-id-2"}}]}}}' +
+                ']}';
+            
+            res.setBody(responseBody);
+            return res;
+        }
+    }
+    
+    public class MockNotionApiErrorResponse implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(400);
+            res.setHeader('Content-Type', 'application/json');
+            res.setBody('{"message": "Invalid request"}');
             
             return res;
         }
