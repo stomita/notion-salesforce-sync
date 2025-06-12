@@ -226,9 +226,13 @@ public class NotionApiClient {
             };
         }
         
+        String formattedDate = String.valueOf(value.year()) + '-' + 
+                              String.valueOf(value.month()).leftPad(2, '0') + '-' + 
+                              String.valueOf(value.day()).leftPad(2, '0');
+        
         return new Map<String, Object>{
             'date' => new Map<String, Object>{
-                'start' => value.format()
+                'start' => formattedDate
             }
         };
     }
