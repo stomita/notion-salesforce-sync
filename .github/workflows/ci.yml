@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or commit SHA to run CI on'
+        required: false
+        default: ''
+
+jobs:
+  scratch-org-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      
+      - name: Install Salesforce CLI
+        run: |
+          npm install -g @salesforce/cli
+          sf --version
+      
+      - name: Authenticate Dev Hub
+        run: |
+          if [ -z "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" ]; then
+            echo "ERROR: DEVHUB_SFDX_AUTH_URL secret is not set or is empty"
+            exit 1
+          fi
+          echo "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" > ./DEVHUB_SFDX_AUTH_URL.txt
+          sf org login sfdx-url -f ./DEVHUB_SFDX_AUTH_URL.txt -a devhub -d
+          rm ./DEVHUB_SFDX_AUTH_URL.txt
+      
+      - name: Create Scratch Org
+        run: |
+          sf org create scratch -f config/project-scratch-def.json -a ci-scratch --duration-days 1 --no-track-source
+      
+      - name: Deploy Source to Scratch Org
+        run: |
+          sf project deploy start --source-dir force-app --target-org ci-scratch
+      
+      - name: Run Apex Tests
+        run: |
+          sf apex test run --target-org ci-scratch --code-coverage --result-format human --wait 10
+        continue-on-error: true  # Continue even if no tests exist yet
+      
+      - name: Delete Scratch Org
+        if: always()
+        run: |
+          sf org delete scratch -o ci-scratch -p

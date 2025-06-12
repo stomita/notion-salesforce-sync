@@ -1,14 +1,10 @@
-name: Claude Assistant
+name: Claude Code Generation
 
 on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
   issues:
-    types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -18,43 +14,10 @@ permissions:
 jobs:
   claude-response:
     runs-on: ubuntu-latest
-    outputs:
-      branch_created: ${{ steps.claude.outputs.branch_created }}
-      branch_name: ${{ steps.claude.outputs.branch_name }}
     steps:
       - uses: actions/checkout@v4
-      - id: claude
-        uses: anthropics/claude-code-action@beta
+      - uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           max_iterations: 10
-      
-      # Auto-create PR if Claude created a branch
-      - name: Check if branch was created
-        id: check_branch
-        if: github.event_name == 'issues' && contains(github.event.issue.body, 'create') && contains(github.event.issue.body, 'PR')
-        run: |
-          # Get the latest claude branch
-          CLAUDE_BRANCH=$(git ls-remote --heads origin | grep "claude/issue-${{ github.event.issue.number }}" | tail -1 | awk '{print $2}' | sed 's|refs/heads/||')
-          if [ ! -z "$CLAUDE_BRANCH" ]; then
-            echo "branch_name=$CLAUDE_BRANCH" >> $GITHUB_OUTPUT
-            echo "Branch found: $CLAUDE_BRANCH"
-          fi
-      
-      - name: Create Pull Request
-        if: steps.check_branch.outputs.branch_name != ''
-        run: |
-          gh pr create \
-            --base main \
-            --head "${{ steps.check_branch.outputs.branch_name }}" \
-            --title "feat: Changes from issue #${{ github.event.issue.number }}" \
-            --body "This PR was automatically created from changes made by Claude in issue #${{ github.event.issue.number }}.
-
-          ${{ github.event.issue.title }}
-
-          ---
-          🤖 Generated with [Claude Code](https://claude.ai/code)" \
-            --assignee ${{ github.event.issue.user.login }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

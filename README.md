@@ -64,6 +64,27 @@ sfdx force:source:deploy -p force-app/
 
 See [CLAUDE.md](CLAUDE.md) for detailed development guidelines and architecture documentation.
 
+### CI/CD Setup
+
+This project uses GitHub Actions for continuous integration. The CI workflow automatically:
+
+1. Creates a scratch org
+2. Deploys all metadata
+3. Runs Apex tests
+4. Deletes the scratch org
+
+#### Required Secrets
+
+To enable CI/CD, add the following secret to your GitHub repository:
+
+- `DEVHUB_SFDX_AUTH_URL`: The Salesforce DX auth URL for your Dev Hub org
+
+To get your Dev Hub auth URL:
+```bash
+sf org display -o your-devhub-alias --verbose --json
+```
+Look for the `sfdxAuthUrl` field in the output.
+
 ## License
 
 MIT
