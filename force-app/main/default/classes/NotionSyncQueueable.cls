@@ -136,6 +136,37 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         if (String.isNotBlank(notionPageId)) {
             deleteNotionPage(notionPageId);
         }
+        
+        handleCascadeDelete(request);
+    }
+    
+    private void handleCascadeDelete(SyncRequest request) {
+        List<String> childRecordIds = NotionRelationshipHandler.getChildRecordsToDelete(
+            request.objectType, 
+            request.recordId
+        );
+        
+        if (!childRecordIds.isEmpty()) {
+            List<SyncRequest> cascadeDeleteRequests = new List<SyncRequest>();
+            
+            for (String childRecordId : childRecordIds) {
+                cascadeDeleteRequests.add(new SyncRequest(
+                    childRecordId,
+                    getObjectTypeFromRecordId(childRecordId),
+                    'DELETE'
+                ));
+            }
+            
+            if (!cascadeDeleteRequests.isEmpty()) {
+                System.enqueueJob(new NotionSyncQueueable(cascadeDeleteRequests));
+            }
+        }
+    }
+    
+    private String getObjectTypeFromRecordId(String recordId) {
+        Id objId = Id.valueOf(recordId);
+        String sobjectType = objId.getSObjectType().getDescribe().getName();
+        return sobjectType;
     }
     
     private void handleCreateOrUpdateOperation(SyncRequest request, NotionSyncObject__mdt syncConfig, 

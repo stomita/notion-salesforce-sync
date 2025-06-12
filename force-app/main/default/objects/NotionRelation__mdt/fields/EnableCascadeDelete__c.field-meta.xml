@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>EnableCascadeDelete__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>When checked, deleting a parent record will also delete related child records in Notion. Default is false for safety.</description>
+    <externalId>false</externalId>
+    <label>Enable Cascade Delete</label>
+    <required>false</required>
+    <type>Checkbox</type>
+</CustomField>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ChildObject__c</fullName>
+    <description>Reference to the child NotionSyncObject__mdt that contains the detail record</description>
+    <externalId>false</externalId>
+    <label>Child Object</label>
+    <referenceTo>NotionSyncObject__mdt</referenceTo>
+    <relationshipLabel>Child Relations</relationshipLabel>
+    <relationshipName>Child_Relations</relationshipName>
+    <required>true</required>
+    <type>MetadataRelationship</type>
+    <unique>false</unique>
+</CustomField>

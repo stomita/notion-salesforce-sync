@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ParentObject__c</fullName>
+    <description>Reference to the parent NotionSyncObject__mdt that contains the master record</description>
+    <externalId>false</externalId>
+    <label>Parent Object</label>
+    <referenceTo>NotionSyncObject__mdt</referenceTo>
+    <relationshipLabel>Parent Relations</relationshipLabel>
+    <relationshipName>Parent_Relations</relationshipName>
+    <required>true</required>
+    <type>MetadataRelationship</type>
+    <unique>false</unique>
+</CustomField>

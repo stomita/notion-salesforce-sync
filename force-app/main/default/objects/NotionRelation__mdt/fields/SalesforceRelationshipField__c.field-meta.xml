@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SalesforceRelationshipField__c</fullName>
+    <description>API name of the Salesforce lookup or master-detail field that creates the relationship between parent and child objects</description>
+    <externalId>false</externalId>
+    <label>Salesforce Relationship Field</label>
+    <length>80</length>
+    <required>true</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

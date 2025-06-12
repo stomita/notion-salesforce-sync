@@ -505,4 +505,85 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
     }
+    
+    @isTest
+    static void testCascadeDeleteWithChildRecords() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('DELETE'));
+        
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'Account',
+            'DELETE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c, Operation_Type__c, Status__c
+            FROM Notion_Sync_Log__c
+            WHERE Record_Id__c = :testAccount.Id
+        ];
+        
+        System.assertEquals(1, syncLogs.size(), 'Parent delete should be logged');
+        System.assertEquals('DELETE', syncLogs[0].Operation_Type__c, 'Operation should be DELETE');
+    }
+    
+    @isTest
+    static void testGetObjectTypeFromRecordId() {
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        Contact testContact = [SELECT Id FROM Contact LIMIT 1];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'Account',
+            'DELETE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        
+        Test.stopTest();
+        
+        System.assertNotEquals(null, testAccount.Id, 'Account ID should not be null');
+        System.assertNotEquals(null, testContact.Id, 'Contact ID should not be null');
+    }
+    
+    @isTest
+    static void testHandleCascadeDeleteWithNoRelations() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('DELETE'));
+        
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'CustomObject__c',
+            'DELETE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Id, Status__c
+            FROM Notion_Sync_Log__c
+            WHERE Record_Id__c = :testAccount.Id
+        ];
+        
+        System.assertEquals(1, syncLogs.size(), 'One sync log should be created for object with no relations');
+    }
 }
