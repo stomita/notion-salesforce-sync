@@ -56,6 +56,35 @@ sfdx force:source:deploy -p force-app/
 
 ### Flow Setup
 
+#### Using Flow Templates
+
+This repository includes Flow templates to help you set up synchronization quickly:
+
+- **NotionSync_Template_CreateUpdate.flow-meta.xml**: Template for create/update operations
+- **NotionSync_Template_Delete.flow-meta.xml**: Template for delete operations  
+- **NotionSync_Account_CreateUpdate.flow-meta.xml**: Example Flow for Account object
+
+#### Setting up a New Object Sync
+
+1. **Clone a template Flow**:
+   - For create/update sync: Clone `NotionSync_Template_CreateUpdate`
+   - For delete sync: Clone `NotionSync_Template_Delete`
+
+2. **Update the object reference**:
+   - Change the `<object>` element from `Account` to your desired object API name
+   - Example: `<object>Contact</object>` for Contact records
+
+3. **Update the Object_Type__c value**:
+   - In the `Object_Type__c` field assignment, change the value from `Account` to your object API name
+   - Example: `<stringValue>Contact</stringValue>`
+
+4. **Activate the Flow**:
+   - Change `<status>Draft</status>` to `<status>Active</status>`
+
+#### Manual Flow Setup
+
+If you prefer to create Flows manually:
+
 1. Create a Record-Triggered Flow for each object you want to sync
 2. Configure triggers for Insert, Update, and Delete
 3. Add Create Records action to publish Platform Events
