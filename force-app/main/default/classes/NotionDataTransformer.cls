@@ -1,5 +1,20 @@
 public class NotionDataTransformer {
     
+    // Property type constants
+    private static final String PROPERTY_TYPE_TITLE = 'title';
+    private static final String PROPERTY_TYPE_RICH_TEXT = 'rich_text';
+    private static final String PROPERTY_TYPE_NUMBER = 'number';
+    private static final String PROPERTY_TYPE_SELECT = 'select';
+    private static final String PROPERTY_TYPE_MULTI_SELECT = 'multi_select';
+    private static final String PROPERTY_TYPE_DATE = 'date';
+    private static final String PROPERTY_TYPE_CHECKBOX = 'checkbox';
+    private static final String PROPERTY_TYPE_URL = 'url';
+    private static final String PROPERTY_TYPE_EMAIL = 'email';
+    private static final String PROPERTY_TYPE_PHONE_NUMBER = 'phone_number';
+    private static final String PROPERTY_TYPE_PEOPLE = 'people';
+    private static final String PROPERTY_TYPE_FILES = 'files';
+    private static final String PROPERTY_TYPE_RELATION = 'relation';
+    
     public class NotionPage {
         public Map<String, Object> properties { get; set; }
         public List<Map<String, Object>> children { get; set; }
@@ -13,6 +28,7 @@ public class NotionDataTransformer {
     public class TransformationException extends Exception {}
     
     public static NotionPage transformRecord(SObject record, String objectApiName) {
+        System.debug('NotionDataTransformer: Starting transformation for object: ' + objectApiName + ', record ID: ' + record.Id);
         NotionPage notionPage = new NotionPage();
         
         try {
@@ -27,6 +43,8 @@ public class NotionDataTransformer {
             if (fieldMappings.isEmpty()) {
                 throw new TransformationException('No field mappings found for object: ' + objectApiName);
             }
+            
+            System.debug('NotionDataTransformer: Found ' + fieldMappings.size() + ' field mappings');
             
             for (NotionSyncField__mdt mapping : fieldMappings) {
                 Object fieldValue = record.get(mapping.SalesforceFieldApiName__c);
@@ -43,40 +61,43 @@ public class NotionDataTransformer {
             }
             
         } catch (Exception e) {
+            System.debug('NotionDataTransformer: Error during transformation: ' + e.getMessage());
             throw new TransformationException('Error transforming record: ' + e.getMessage());
         }
         
+        System.debug('NotionDataTransformer: Transformation completed successfully with ' + notionPage.properties.size() + ' properties and ' + notionPage.children.size() + ' children');
         return notionPage;
     }
     
     private static void addProperty(NotionPage notionPage, NotionSyncField__mdt mapping, Object fieldValue) {
         String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+        System.debug('NotionDataTransformer: Adding property ' + mapping.NotionPropertyName__c + ' of type ' + propertyType + ' for field ' + mapping.SalesforceFieldApiName__c);
         Map<String, Object> propertyValue = new Map<String, Object>();
         
         switch on propertyType {
-            when 'title' {
-                propertyValue.put('title', createRichTextArray(String.valueOf(fieldValue)));
+            when PROPERTY_TYPE_TITLE {
+                propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(String.valueOf(fieldValue)));
             }
-            when 'rich_text' {
-                propertyValue.put('rich_text', createRichTextArray(String.valueOf(fieldValue)));
+            when PROPERTY_TYPE_RICH_TEXT {
+                propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(String.valueOf(fieldValue)));
             }
-            when 'number' {
+            when PROPERTY_TYPE_NUMBER {
                 if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
-                    propertyValue.put('number', fieldValue);
+                    propertyValue.put(PROPERTY_TYPE_NUMBER, fieldValue);
                 } else {
                     try {
-                        propertyValue.put('number', Decimal.valueOf(String.valueOf(fieldValue)));
+                        propertyValue.put(PROPERTY_TYPE_NUMBER, Decimal.valueOf(String.valueOf(fieldValue)));
                     } catch (TypeException e) {
                         throw new TransformationException('Invalid number value for field ' + mapping.SalesforceFieldApiName__c);
                     }
                 }
             }
-            when 'select' {
-                propertyValue.put('select', new Map<String, Object>{
+            when PROPERTY_TYPE_SELECT {
+                propertyValue.put(PROPERTY_TYPE_SELECT, new Map<String, Object>{
                     'name' => String.valueOf(fieldValue)
                 });
             }
-            when 'multi_select' {
+            when PROPERTY_TYPE_MULTI_SELECT {
                 List<Map<String, Object>> multiSelectValues = new List<Map<String, Object>>();
                 String multiSelectString = String.valueOf(fieldValue);
                 
@@ -93,44 +114,47 @@ public class NotionDataTransformer {
                     });
                 }
                 
-                propertyValue.put('multi_select', multiSelectValues);
+                propertyValue.put(PROPERTY_TYPE_MULTI_SELECT, multiSelectValues);
             }
-            when 'date' {
+            when PROPERTY_TYPE_DATE {
                 if (fieldValue instanceof Date) {
                     Date dateValue = (Date) fieldValue;
-                    propertyValue.put('date', new Map<String, Object>{
-                        'start' => dateValue.format()
+                    String formattedDate = String.valueOf(dateValue.year()) + '-' + 
+                                         String.valueOf(dateValue.month()).leftPad(2, '0') + '-' + 
+                                         String.valueOf(dateValue.day()).leftPad(2, '0');
+                    propertyValue.put(PROPERTY_TYPE_DATE, new Map<String, Object>{
+                        'start' => formattedDate
                     });
                 } else if (fieldValue instanceof DateTime) {
                     DateTime datetimeValue = (DateTime) fieldValue;
-                    propertyValue.put('date', new Map<String, Object>{
+                    propertyValue.put(PROPERTY_TYPE_DATE, new Map<String, Object>{
                         'start' => datetimeValue.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
                     });
                 } else {
-                    propertyValue.put('date', new Map<String, Object>{
+                    propertyValue.put(PROPERTY_TYPE_DATE, new Map<String, Object>{
                         'start' => String.valueOf(fieldValue)
                     });
                 }
             }
-            when 'checkbox' {
+            when PROPERTY_TYPE_CHECKBOX {
                 if (fieldValue instanceof Boolean) {
-                    propertyValue.put('checkbox', fieldValue);
+                    propertyValue.put(PROPERTY_TYPE_CHECKBOX, fieldValue);
                 } else {
                     String stringValue = String.valueOf(fieldValue).toLowerCase();
                     Boolean boolValue = stringValue == 'true' || stringValue == '1' || stringValue == 'yes';
-                    propertyValue.put('checkbox', boolValue);
+                    propertyValue.put(PROPERTY_TYPE_CHECKBOX, boolValue);
                 }
             }
-            when 'url' {
-                propertyValue.put('url', String.valueOf(fieldValue));
+            when PROPERTY_TYPE_URL {
+                propertyValue.put(PROPERTY_TYPE_URL, String.valueOf(fieldValue));
             }
-            when 'email' {
-                propertyValue.put('email', String.valueOf(fieldValue));
+            when PROPERTY_TYPE_EMAIL {
+                propertyValue.put(PROPERTY_TYPE_EMAIL, String.valueOf(fieldValue));
             }
-            when 'phone_number' {
-                propertyValue.put('phone_number', String.valueOf(fieldValue));
+            when PROPERTY_TYPE_PHONE_NUMBER {
+                propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.valueOf(fieldValue));
             }
-            when 'people' {
+            when PROPERTY_TYPE_PEOPLE {
                 List<Map<String, Object>> peopleArray = new List<Map<String, Object>>();
                 
                 if (fieldValue instanceof Id) {
@@ -149,9 +173,9 @@ public class NotionDataTransformer {
                     }
                 }
                 
-                propertyValue.put('people', peopleArray);
+                propertyValue.put(PROPERTY_TYPE_PEOPLE, peopleArray);
             }
-            when 'files' {
+            when PROPERTY_TYPE_FILES {
                 List<Map<String, Object>> filesArray = new List<Map<String, Object>>();
                 String fileUrl = String.valueOf(fieldValue);
                 
@@ -165,9 +189,9 @@ public class NotionDataTransformer {
                     });
                 }
                 
-                propertyValue.put('files', filesArray);
+                propertyValue.put(PROPERTY_TYPE_FILES, filesArray);
             }
-            when 'relation' {
+            when PROPERTY_TYPE_RELATION {
                 List<Map<String, Object>> relationArray = new List<Map<String, Object>>();
                 
                 if (fieldValue instanceof Id) {
@@ -184,10 +208,10 @@ public class NotionDataTransformer {
                     }
                 }
                 
-                propertyValue.put('relation', relationArray);
+                propertyValue.put(PROPERTY_TYPE_RELATION, relationArray);
             }
             when else {
-                propertyValue.put('rich_text', createRichTextArray(String.valueOf(fieldValue)));
+                propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(String.valueOf(fieldValue)));
             }
         }
         
