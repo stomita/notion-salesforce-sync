@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ExponentialBackoff__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Enable exponential backoff for retry delays</description>
+    <externalId>false</externalId>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Exponential Backoff</label>
+    <type>Checkbox</type>
+</CustomField>
