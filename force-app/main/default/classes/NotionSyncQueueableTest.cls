@@ -293,18 +293,25 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify all operations were processed
+        // Verify all operations were processed (all should fail due to missing metadata)
         List<Notion_Sync_Log__c> syncLogs = [
-            SELECT Operation_Type__c
+            SELECT Operation_Type__c, Record_Id__c, Status__c
             FROM Notion_Sync_Log__c
             WHERE Record_Id__c IN :new List<Id>{testAccounts[0].Id, testAccounts[1].Id, testAccounts[2].Id}
-            ORDER BY Operation_Type__c
         ];
         
         System.assertEquals(3, syncLogs.size(), 'Three sync logs should be created');
-        System.assertEquals('CREATE', syncLogs[0].Operation_Type__c, 'First operation should be CREATE');
-        System.assertEquals('DELETE', syncLogs[1].Operation_Type__c, 'Second operation should be DELETE');
-        System.assertEquals('UPDATE', syncLogs[2].Operation_Type__c, 'Third operation should be UPDATE');
+        
+        // Create a map to verify each operation type exists
+        Map<Id, String> recordToOperation = new Map<Id, String>();
+        for (Notion_Sync_Log__c log : syncLogs) {
+            recordToOperation.put(log.Record_Id__c, log.Operation_Type__c);
+            System.assertEquals('Failed', log.Status__c, 'All operations should fail due to missing metadata');
+        }
+        
+        System.assertEquals('CREATE', recordToOperation.get(testAccounts[0].Id), 'First account should have CREATE operation');
+        System.assertEquals('UPDATE', recordToOperation.get(testAccounts[1].Id), 'Second account should have UPDATE operation');
+        System.assertEquals('DELETE', recordToOperation.get(testAccounts[2].Id), 'Third account should have DELETE operation');
     }
     
     @isTest
@@ -341,7 +348,15 @@ private class NotionSyncQueueableTest {
         Test.stopTest();
         
         // Verify the job executed without throwing exceptions
-        System.assertEquals(1, Limits.getQueueableJobs(), 'One queueable job should be enqueued');
+        // Since we don't have metadata setup in test, the job will log an error
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Id, Status__c, Error_Message__c 
+            FROM Notion_Sync_Log__c
+            WHERE Record_Id__c = :testAccount.Id
+        ];
+        System.assertEquals(1, syncLogs.size(), 'One sync log should be created');
+        System.assertEquals('Failed', syncLogs[0].Status__c, 'Status should be Failed due to missing metadata');
+        System.assert(syncLogs[0].Error_Message__c.contains('No sync configuration'), 'Error message should indicate missing configuration');
     }
     
     @isTest
