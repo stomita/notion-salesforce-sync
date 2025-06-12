@@ -46,7 +46,6 @@ jobs:
       - name: Run Apex Tests
         run: |
           sf apex test run --target-org ci-scratch --code-coverage --result-format human --wait 10
-        continue-on-error: true  # Continue even if no tests exist yet
       
       - name: Delete Scratch Org
         if: always()
