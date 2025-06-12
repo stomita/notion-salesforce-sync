@@ -75,13 +75,13 @@ public class NotionDataTransformer {
         Map<String, Object> propertyValue = new Map<String, Object>();
         
         switch on propertyType {
-            when PROPERTY_TYPE_TITLE {
+            when 'title' {
                 propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(String.valueOf(fieldValue)));
             }
-            when PROPERTY_TYPE_RICH_TEXT {
+            when 'rich_text' {
                 propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(String.valueOf(fieldValue)));
             }
-            when PROPERTY_TYPE_NUMBER {
+            when 'number' {
                 if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
                     propertyValue.put(PROPERTY_TYPE_NUMBER, fieldValue);
                 } else {
@@ -92,12 +92,12 @@ public class NotionDataTransformer {
                     }
                 }
             }
-            when PROPERTY_TYPE_SELECT {
+            when 'select' {
                 propertyValue.put(PROPERTY_TYPE_SELECT, new Map<String, Object>{
                     'name' => String.valueOf(fieldValue)
                 });
             }
-            when PROPERTY_TYPE_MULTI_SELECT {
+            when 'multi_select' {
                 List<Map<String, Object>> multiSelectValues = new List<Map<String, Object>>();
                 String multiSelectString = String.valueOf(fieldValue);
                 
@@ -116,7 +116,7 @@ public class NotionDataTransformer {
                 
                 propertyValue.put(PROPERTY_TYPE_MULTI_SELECT, multiSelectValues);
             }
-            when PROPERTY_TYPE_DATE {
+            when 'date' {
                 if (fieldValue instanceof Date) {
                     Date dateValue = (Date) fieldValue;
                     String formattedDate = String.valueOf(dateValue.year()) + '-' + 
@@ -136,7 +136,7 @@ public class NotionDataTransformer {
                     });
                 }
             }
-            when PROPERTY_TYPE_CHECKBOX {
+            when 'checkbox' {
                 if (fieldValue instanceof Boolean) {
                     propertyValue.put(PROPERTY_TYPE_CHECKBOX, fieldValue);
                 } else {
@@ -145,16 +145,16 @@ public class NotionDataTransformer {
                     propertyValue.put(PROPERTY_TYPE_CHECKBOX, boolValue);
                 }
             }
-            when PROPERTY_TYPE_URL {
+            when 'url' {
                 propertyValue.put(PROPERTY_TYPE_URL, String.valueOf(fieldValue));
             }
-            when PROPERTY_TYPE_EMAIL {
+            when 'email' {
                 propertyValue.put(PROPERTY_TYPE_EMAIL, String.valueOf(fieldValue));
             }
-            when PROPERTY_TYPE_PHONE_NUMBER {
+            when 'phone_number' {
                 propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.valueOf(fieldValue));
             }
-            when PROPERTY_TYPE_PEOPLE {
+            when 'people' {
                 List<Map<String, Object>> peopleArray = new List<Map<String, Object>>();
                 
                 if (fieldValue instanceof Id) {
@@ -175,7 +175,7 @@ public class NotionDataTransformer {
                 
                 propertyValue.put(PROPERTY_TYPE_PEOPLE, peopleArray);
             }
-            when PROPERTY_TYPE_FILES {
+            when 'files' {
                 List<Map<String, Object>> filesArray = new List<Map<String, Object>>();
                 String fileUrl = String.valueOf(fieldValue);
                 
@@ -191,7 +191,7 @@ public class NotionDataTransformer {
                 
                 propertyValue.put(PROPERTY_TYPE_FILES, filesArray);
             }
-            when PROPERTY_TYPE_RELATION {
+            when 'relation' {
                 List<Map<String, Object>> relationArray = new List<Map<String, Object>>();
                 
                 if (fieldValue instanceof Id) {
