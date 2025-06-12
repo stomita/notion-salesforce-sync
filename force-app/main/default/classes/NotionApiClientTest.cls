@@ -350,7 +350,7 @@ public class NotionApiClientTest {
         System.assertEquals(0, relationEmpty.size(), 'Should handle empty list');
     }
     
-    public class NotionApiSuccessMock implements HttpCalloutMock {
+    private class NotionApiSuccessMock implements HttpCalloutMock {
         public HttpResponse respond(HttpRequest request) {
             HttpResponse response = new HttpResponse();
             response.setStatusCode(200);
@@ -368,7 +368,7 @@ public class NotionApiClientTest {
         }
     }
     
-    public class NotionApiErrorMock implements HttpCalloutMock {
+    private class NotionApiErrorMock implements HttpCalloutMock {
         public HttpResponse respond(HttpRequest request) {
             HttpResponse response = new HttpResponse();
             response.setStatusCode(400);
@@ -386,7 +386,7 @@ public class NotionApiClientTest {
         }
     }
     
-    public class NotionApiExceptionMock implements HttpCalloutMock {
+    private class NotionApiExceptionMock implements HttpCalloutMock {
         public HttpResponse respond(HttpRequest request) {
             throw new CalloutException('Mock callout exception');
         }
