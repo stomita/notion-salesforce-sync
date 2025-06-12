@@ -291,8 +291,8 @@ public class NotionApiClientTest {
     @isTest
     static void testBuildSelectProperty() {
         Map<String, Object> property = NotionApiClient.buildSelectProperty('Option A');
-        Map<String, Object> select = (Map<String, Object>) property.get('select');
-        System.assertEquals('Option A', select.get('name'), 'Should contain correct option name');
+        Map<String, Object> selectMap = (Map<String, Object>) property.get('select');
+        System.assertEquals('Option A', selectMap.get('name'), 'Should contain correct option name');
     }
     
     @isTest
