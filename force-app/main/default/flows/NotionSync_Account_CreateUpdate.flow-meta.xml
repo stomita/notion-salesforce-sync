@@ -38,7 +38,7 @@
         <inputAssignments>
             <field>Operation_Type__c</field>
             <value>
-                <formulaValue>IF(ISNEW(), 'CREATE', 'UPDATE')</formulaValue>
+                <elementReference>OperationType</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
@@ -60,4 +60,9 @@
         <triggerType>RecordAfterSave</triggerType>
     </start>
     <status>Draft</status>
+    <formulas>
+        <name>OperationType</name>
+        <dataType>String</dataType>
+        <expression>IF(ISNEW(), 'CREATE', 'UPDATE')</expression>
+    </formulas>
 </Flow>

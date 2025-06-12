@@ -44,7 +44,7 @@ Example for Account object:
         <inputAssignments>
             <field>Object_Type__c</field>
             <value>
-                <stringValue>REPLACE_WITH_OBJECT_API_NAME</stringValue>
+                <stringValue>Account</stringValue>
             </value>
         </inputAssignments>
         <inputAssignments>
@@ -67,7 +67,7 @@ Example for Account object:
         <connector>
             <targetReference>Create_Notion_Sync_Event</targetReference>
         </connector>
-        <object>REPLACE_WITH_OBJECT_API_NAME</object>
+        <object>Account</object>
         <recordTriggerType>Delete</recordTriggerType>
         <triggerType>RecordBeforeDelete</triggerType>
     </start>
