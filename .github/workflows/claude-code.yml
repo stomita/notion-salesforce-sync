@@ -1,14 +1,10 @@
-name: Claude Assistant
+name: Claude Code Generation
 
 on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
   issues:
-    types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
 
 permissions:
   contents: write
