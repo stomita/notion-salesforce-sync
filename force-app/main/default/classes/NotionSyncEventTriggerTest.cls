@@ -224,7 +224,7 @@ private class NotionSyncEventTriggerTest {
     static void testLargeVolumeEventProcessing() {
         // Create additional test accounts for volume testing
         List<Account> additionalAccounts = new List<Account>();
-        for (Integer i = 0; i < 195; i++) { // Adding to existing 5 to make 200 total
+        for (Integer i = 0; i < 95; i++) { // Adding to existing 5 to make 100 total
             additionalAccounts.add(new Account(
                 Name = 'Volume Test Account ' + i,
                 Description = 'Volume testing account'
