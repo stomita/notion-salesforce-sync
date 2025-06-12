@@ -356,7 +356,7 @@ private class NotionSyncQueueableTest {
         ];
         System.assertEquals(1, syncLogs.size(), 'One sync log should be created');
         System.assertEquals('Failed', syncLogs[0].Status__c, 'Status should be Failed due to missing metadata');
-        System.assert(syncLogs[0].Error_Message__c.contains('No sync configuration'), 'Error message should indicate missing configuration');
+        System.assert(syncLogs[0].Error_Message__c.contains('Sync configuration not found or inactive for:'), 'Error message should indicate missing configuration');
     }
     
     @isTest
