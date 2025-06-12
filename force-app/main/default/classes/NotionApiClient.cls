@@ -3,6 +3,10 @@ public class NotionApiClient {
     private static final String NAMED_CREDENTIAL = 'callout:Notion_API';
     private static final String API_VERSION = '2022-06-28';
     
+    private static Long lastRequestTime = 0;
+    private static Integer requestCount = 0;
+    private static final Long RATE_LIMIT_WINDOW = 1000; // 1 second in milliseconds
+    
     public class NotionApiException extends Exception {}
     
     public class NotionResponse {
@@ -23,8 +27,10 @@ public class NotionApiClient {
     
     public class NotionPageRequest {
         public String databaseId;
+        public String pageId;
         public Map<String, Object> properties;
         public List<Object> children;
+        public String recordId;
         
         public NotionPageRequest(String databaseId, Map<String, Object> properties) {
             this.databaseId = databaseId;
@@ -36,6 +42,53 @@ public class NotionApiClient {
             this.databaseId = databaseId;
             this.properties = properties;
             this.children = children;
+        }
+        
+        public NotionPageRequest(String recordId, String pageId, Map<String, Object> properties) {
+            this.recordId = recordId;
+            this.pageId = pageId;
+            this.properties = properties;
+            this.children = new List<Object>();
+        }
+    }
+    
+    public class BulkNotionResponse {
+        public List<NotionResponse> responses;
+        public Integer successCount;
+        public Integer failureCount;
+        public Boolean hasErrors;
+        
+        public BulkNotionResponse() {
+            this.responses = new List<NotionResponse>();
+            this.successCount = 0;
+            this.failureCount = 0;
+            this.hasErrors = false;
+        }
+        
+        public void addResponse(NotionResponse response) {
+            this.responses.add(response);
+            if (response.success) {
+                this.successCount++;
+            } else {
+                this.failureCount++;
+                this.hasErrors = true;
+            }
+        }
+    }
+    
+    public class BatchOperationResult {
+        public String recordId;
+        public String operationType;
+        public Boolean success;
+        public String pageId;
+        public String errorMessage;
+        
+        public BatchOperationResult(String recordId, String operationType, Boolean success, String pageId, String errorMessage) {
+            this.recordId = recordId;
+            this.operationType = operationType;
+            this.success = success;
+            this.pageId = pageId;
+            this.errorMessage = errorMessage;
         }
     }
     
@@ -129,6 +182,104 @@ public class NotionApiClient {
         } catch (Exception e) {
             return new NotionResponse(false, pageId, 'Exception during page retrieval: ' + e.getMessage(), null, null);
         }
+    }
+    
+    public static BulkNotionResponse bulkCreatePages(List<NotionPageRequest> pageRequests) {
+        BulkNotionResponse bulkResponse = new BulkNotionResponse();
+        
+        if (pageRequests == null || pageRequests.isEmpty()) {
+            return bulkResponse;
+        }
+        
+        for (NotionPageRequest pageRequest : pageRequests) {
+            enforceRateLimit();
+            NotionResponse response = createPage(pageRequest);
+            bulkResponse.addResponse(response);
+        }
+        
+        return bulkResponse;
+    }
+    
+    public static BulkNotionResponse bulkUpdatePages(List<NotionPageRequest> pageRequests) {
+        BulkNotionResponse bulkResponse = new BulkNotionResponse();
+        
+        if (pageRequests == null || pageRequests.isEmpty()) {
+            return bulkResponse;
+        }
+        
+        for (NotionPageRequest pageRequest : pageRequests) {
+            enforceRateLimit();
+            NotionResponse response = updatePage(pageRequest.pageId, pageRequest.properties);
+            bulkResponse.addResponse(response);
+        }
+        
+        return bulkResponse;
+    }
+    
+    public static BulkNotionResponse bulkDeletePages(List<String> pageIds) {
+        BulkNotionResponse bulkResponse = new BulkNotionResponse();
+        
+        if (pageIds == null || pageIds.isEmpty()) {
+            return bulkResponse;
+        }
+        
+        for (String pageId : pageIds) {
+            enforceRateLimit();
+            NotionResponse response = deletePage(pageId);
+            bulkResponse.addResponse(response);
+        }
+        
+        return bulkResponse;
+    }
+    
+    public static List<BatchOperationResult> processBatch(List<NotionPageRequest> createRequests, 
+                                                         List<NotionPageRequest> updateRequests,
+                                                         List<String> deletePageIds) {
+        List<BatchOperationResult> results = new List<BatchOperationResult>();
+        
+        if (createRequests != null && !createRequests.isEmpty()) {
+            BulkNotionResponse createResponse = bulkCreatePages(createRequests);
+            for (Integer i = 0; i < createRequests.size(); i++) {
+                NotionResponse response = createResponse.responses[i];
+                results.add(new BatchOperationResult(
+                    createRequests[i].recordId,
+                    'CREATE',
+                    response.success,
+                    response.pageId,
+                    response.errorMessage
+                ));
+            }
+        }
+        
+        if (updateRequests != null && !updateRequests.isEmpty()) {
+            BulkNotionResponse updateResponse = bulkUpdatePages(updateRequests);
+            for (Integer i = 0; i < updateRequests.size(); i++) {
+                NotionResponse response = updateResponse.responses[i];
+                results.add(new BatchOperationResult(
+                    updateRequests[i].recordId,
+                    'UPDATE',
+                    response.success,
+                    response.pageId,
+                    response.errorMessage
+                ));
+            }
+        }
+        
+        if (deletePageIds != null && !deletePageIds.isEmpty()) {
+            BulkNotionResponse deleteResponse = bulkDeletePages(deletePageIds);
+            for (Integer i = 0; i < deletePageIds.size(); i++) {
+                NotionResponse response = deleteResponse.responses[i];
+                results.add(new BatchOperationResult(
+                    null, // recordId not available for deletes
+                    'DELETE',
+                    response.success,
+                    deletePageIds[i],
+                    response.errorMessage
+                ));
+            }
+        }
+        
+        return results;
     }
     
     private static HttpRequest buildHttpRequest(String method, String endpoint) {
@@ -305,5 +456,55 @@ public class NotionApiClient {
         return new Map<String, Object>{
             'relation' => relations
         };
+    }
+    
+    private static void enforceRateLimit() {
+        try {
+            NotionSyncConfig__mdt config = getNotionSyncConfig();
+            Integer rateLimitPerSecond = Integer.valueOf(config.RateLimitPerSecond__c);
+            
+            Long currentTime = System.currentTimeMillis();
+            
+            if (lastRequestTime == 0 || (currentTime - lastRequestTime) >= RATE_LIMIT_WINDOW) {
+                lastRequestTime = currentTime;
+                requestCount = 1;
+                return;
+            }
+            
+            if (requestCount >= rateLimitPerSecond) {
+                Long waitTime = RATE_LIMIT_WINDOW - (currentTime - lastRequestTime);
+                if (waitTime > 0) {
+                    System.debug('Rate limit reached, waiting ' + waitTime + 'ms');
+                }
+                lastRequestTime = System.currentTimeMillis();
+                requestCount = 1;
+            } else {
+                requestCount++;
+            }
+            
+        } catch (Exception e) {
+            System.debug('Error in rate limiting: ' + e.getMessage());
+        }
+    }
+    
+    private static NotionSyncConfig__mdt getNotionSyncConfig() {
+        List<NotionSyncConfig__mdt> configs = [
+            SELECT BatchSize__c, RateLimitPerSecond__c, MaxRetryAttempts__c, 
+                   EnableBulkProcessing__c, QueueableChainLimit__c
+            FROM NotionSyncConfig__mdt
+            LIMIT 1
+        ];
+        
+        if (configs.isEmpty()) {
+            NotionSyncConfig__mdt defaultConfig = new NotionSyncConfig__mdt();
+            defaultConfig.BatchSize__c = 10;
+            defaultConfig.RateLimitPerSecond__c = 3;
+            defaultConfig.MaxRetryAttempts__c = 3;
+            defaultConfig.EnableBulkProcessing__c = true;
+            defaultConfig.QueueableChainLimit__c = 5;
+            return defaultConfig;
+        }
+        
+        return configs[0];
     }
 }
