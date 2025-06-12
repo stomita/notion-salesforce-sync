@@ -1,16 +1,22 @@
 public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     private List<SyncRequest> requests;
+    private NotionRelationshipHandler relationshipHandler;
     
     public NotionSyncQueueable(List<SyncRequest> requests) {
         this.requests = requests;
+        this.relationshipHandler = new NotionRelationshipHandler();
     }
     
     public void execute(QueueableContext context) {
         Map<String, List<SyncRequest>> requestsByObjectType = groupRequestsByObjectType();
         
-        for (String objectType : requestsByObjectType.keySet()) {
-            List<SyncRequest> objectRequests = requestsByObjectType.get(objectType);
-            processObjectRequests(objectType, objectRequests);
+        List<String> processingOrder = relationshipHandler.getProcessingOrder(requestsByObjectType.keySet());
+        
+        for (String objectType : processingOrder) {
+            if (requestsByObjectType.containsKey(objectType)) {
+                List<SyncRequest> objectRequests = requestsByObjectType.get(objectType);
+                processObjectRequests(objectType, objectRequests);
+            }
         }
     }
     
@@ -136,6 +142,22 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         if (String.isNotBlank(notionPageId)) {
             deleteNotionPage(notionPageId);
         }
+        
+        List<String> childRecordsToDelete = relationshipHandler.getChildRecordsToDelete(request.objectType, request.recordId);
+        if (!childRecordsToDelete.isEmpty()) {
+            List<SyncRequest> cascadeDeleteRequests = new List<SyncRequest>();
+            
+            for (String childRecordId : childRecordsToDelete) {
+                String childObjectType = getObjectTypeFromId(childRecordId);
+                if (String.isNotBlank(childObjectType)) {
+                    cascadeDeleteRequests.add(new SyncRequest(childRecordId, childObjectType, 'DELETE'));
+                }
+            }
+            
+            if (!cascadeDeleteRequests.isEmpty()) {
+                System.enqueueJob(new NotionSyncQueueable(cascadeDeleteRequests));
+            }
+        }
     }
     
     private void handleCreateOrUpdateOperation(SyncRequest request, NotionSyncObject__mdt syncConfig, 
@@ -145,6 +167,7 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         }
         
         Map<String, Object> notionProperties = transformDataToNotionFormat(record, fieldMappings);
+        notionProperties = relationshipHandler.enrichNotionPropertiesWithRelations(request.objectType, record, notionProperties);
         String notionPageId = findNotionPageId(request.recordId, syncConfig);
         
         if (String.isNotBlank(notionPageId)) {
@@ -371,6 +394,20 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             insert log;
         } catch (Exception e) {
             System.debug('Failed to insert sync log: ' + e.getMessage());
+        }
+    }
+    
+    private String getObjectTypeFromId(String recordId) {
+        if (String.isBlank(recordId) || recordId.length() < 15) {
+            return null;
+        }
+        
+        try {
+            Id idValue = Id.valueOf(recordId);
+            return idValue.getSObjectType().getDescribe().getName();
+        } catch (Exception e) {
+            System.debug('NotionSyncQueueable: Error getting object type from ID ' + recordId + ': ' + e.getMessage());
+            return null;
         }
     }
     

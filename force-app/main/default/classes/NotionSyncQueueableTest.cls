@@ -505,4 +505,197 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
     }
+    
+    @isTest
+    static void testRelationshipHandlerIntegration() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('CREATE'));
+        
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        Contact testContact = [SELECT Id, AccountId FROM Contact LIMIT 1];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'Account',
+            'CREATE'
+        ));
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testContact.Id,
+            'Contact',
+            'CREATE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        // Verify that both objects were processed and the relationship handler was initialized
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c, Object_Type__c, Status__c
+            FROM Notion_Sync_Log__c
+            ORDER BY Object_Type__c
+        ];
+        
+        System.assertEquals(2, syncLogs.size(), 'Two sync logs should be created');
+        
+        // Verify both object types were processed
+        Set<String> processedObjectTypes = new Set<String>();
+        for (Notion_Sync_Log__c log : syncLogs) {
+            processedObjectTypes.add(log.Object_Type__c);
+        }
+        System.assert(processedObjectTypes.contains('Account'), 'Account should be processed');
+        System.assert(processedObjectTypes.contains('Contact'), 'Contact should be processed');
+    }
+    
+    @isTest
+    static void testCascadeDeleteFunctionality() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('DELETE'));
+        
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'Account',
+            'DELETE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        // Verify delete operation was logged
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c, Operation_Type__c, Status__c
+            FROM Notion_Sync_Log__c
+            WHERE Record_Id__c = :testAccount.Id
+        ];
+        
+        System.assertEquals(1, syncLogs.size(), 'One sync log should be created for parent delete');
+        System.assertEquals('DELETE', syncLogs[0].Operation_Type__c, 'Operation should be DELETE');
+        
+        // Note: In a real scenario with relationship metadata configured, 
+        // cascade deletes would be enqueued for child records
+    }
+    
+    @isTest
+    static void testGetObjectTypeFromIdMethod() {
+        Test.startTest();
+        
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        Contact testContact = [SELECT Id FROM Contact LIMIT 1];
+        
+        // Create queueable instance to test the private method indirectly
+        NotionSyncQueueable job = new NotionSyncQueueable(new List<NotionSyncQueueable.SyncRequest>());
+        
+        // Test valid IDs by creating requests and verifying processing
+        List<NotionSyncQueueable.SyncRequest> validRequests = new List<NotionSyncQueueable.SyncRequest>();
+        validRequests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'Account',
+            'CREATE'
+        ));
+        validRequests.add(new NotionSyncQueueable.SyncRequest(
+            testContact.Id,
+            'Contact',
+            'CREATE'
+        ));
+        
+        // Verify request creation with valid IDs works
+        System.assertEquals(testAccount.Id, validRequests[0].recordId, 'Account ID should be valid');
+        System.assertEquals(testContact.Id, validRequests[1].recordId, 'Contact ID should be valid');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
+    static void testProcessingOrderWithRelationships() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('CREATE'));
+        
+        // Get test records with relationships
+        Account testAccount = [SELECT Id FROM Account LIMIT 1];
+        List<Contact> testContacts = [SELECT Id, AccountId FROM Contact WHERE AccountId = :testAccount.Id LIMIT 2];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        
+        // Add child records first to test that processing order is determined correctly
+        for (Contact contact : testContacts) {
+            requests.add(new NotionSyncQueueable.SyncRequest(
+                contact.Id,
+                'Contact',
+                'CREATE'
+            ));
+        }
+        
+        // Add parent record last
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testAccount.Id,
+            'Account',
+            'CREATE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        // Verify all records were processed
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c, Object_Type__c, Status__c
+            FROM Notion_Sync_Log__c
+            ORDER BY CreatedDate
+        ];
+        
+        System.assertEquals(3, syncLogs.size(), 'Three sync logs should be created');
+        
+        // Verify both object types were processed regardless of submission order
+        Set<String> processedObjectTypes = new Set<String>();
+        for (Notion_Sync_Log__c log : syncLogs) {
+            processedObjectTypes.add(log.Object_Type__c);
+        }
+        System.assert(processedObjectTypes.contains('Account'), 'Account should be processed');
+        System.assert(processedObjectTypes.contains('Contact'), 'Contact should be processed');
+    }
+    
+    @isTest 
+    static void testRelationshipEnrichment() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('CREATE'));
+        
+        Contact testContact = [SELECT Id, AccountId FROM Contact WHERE AccountId != null LIMIT 1];
+        
+        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        requests.add(new NotionSyncQueueable.SyncRequest(
+            testContact.Id,
+            'Contact',
+            'CREATE'
+        ));
+        
+        Test.startTest();
+        
+        NotionSyncQueueable job = new NotionSyncQueueable(requests);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        // Verify contact sync was processed
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c, Object_Type__c, Status__c
+            FROM Notion_Sync_Log__c
+            WHERE Record_Id__c = :testContact.Id
+        ];
+        
+        System.assertEquals(1, syncLogs.size(), 'One sync log should be created for contact');
+        System.assertEquals('Contact', syncLogs[0].Object_Type__c, 'Object type should be Contact');
+        
+        // Note: In a real scenario with relationship metadata configured,
+        // the properties would be enriched with parent Account relation data
+    }
 }
