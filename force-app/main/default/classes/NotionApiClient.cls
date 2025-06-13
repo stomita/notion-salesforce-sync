@@ -137,6 +137,7 @@ public class NotionApiClient {
         request.setEndpoint(NAMED_CREDENTIAL + endpoint);
         request.setHeader('Content-Type', 'application/json');
         request.setHeader('Notion-Version', API_VERSION);
+        request.setHeader('Authorization', 'Bearer {!$Credential.Password}');
         request.setTimeout(60000);
         
         return request;
