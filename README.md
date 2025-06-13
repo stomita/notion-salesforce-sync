@@ -105,6 +105,26 @@ sf org display -o your-devhub-alias --verbose --json
 ```
 Look for the `sfdxAuthUrl` field in the output.
 
+## CI/CD
+
+### Continuous Integration
+
+This project uses GitHub Actions for automated testing:
+
+- **Automatic CI**: Runs on all pushes to `main` and on all pull requests
+- **Manual CI Trigger**: Add the `run-ci` label to a PR to manually trigger CI
+- **Direct Workflow Execution**: Use the Actions tab to run CI on any branch
+
+The CI workflow:
+1. Creates a temporary Salesforce scratch org
+2. Deploys all metadata
+3. Runs all Apex tests with code coverage
+4. Automatically cleans up the scratch org
+
+### PR Labels
+
+- `run-ci`: Manually triggers the CI workflow on a pull request
+
 ## License
 
 MIT
