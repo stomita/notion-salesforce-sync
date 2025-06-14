@@ -9,6 +9,14 @@ This guide explains how to run integration tests that verify the Notion sync fun
 3. Test databases created in Notion (see CI_SETUP.md for database setup)
 4. A Salesforce scratch org with the package deployed
 
+## Test Database Requirements
+
+Each Notion test database must have a `salesforce_id` property (type: Text) for tracking Salesforce records. The integration tests use:
+- **Account Test Database** - For Account sync testing
+- **Contact Test Database** - For Contact sync with Account relationships
+- **Test Parent Database** - For custom object parent records
+- **Test Child Database** - For testing Master-Detail and Lookup relationships
+
 ## Quick Start
 
 The integration test framework now supports both automated CI execution and interactive local development.
@@ -80,6 +88,18 @@ The integration tests verify:
 2. **Update Sync** - Updating Salesforce records updates Notion pages
 3. **Relationship Sync** - Related records maintain relationships in Notion
 4. **Delete Sync** - Deleting Salesforce records removes Notion pages
+
+### Field Type Coverage
+
+The test objects include various field types to ensure comprehensive sync support:
+- Text and Long Text Areas
+- Number and Currency
+- Date and DateTime
+- Checkbox (Boolean)
+- Picklist values
+- Master-Detail relationships
+- Lookup relationships
+- Body content mapping (Long Text Area → Notion page body)
 
 ## Monitoring Test Results
 
@@ -277,3 +297,30 @@ The test executor uses specific prefixes for test data:
 - Test Objects: "Integration Test"
 
 To use different test data, modify the executor class or create your own test scenarios.
+
+## Integration Test Structure
+
+The `force-app/integration` directory contains:
+
+- **objects/**: Custom test objects with various field types and relationships
+  - `Test_Parent_Object__c`: Parent object with various field types
+  - `Test_Child_Object__c`: Child object with Master-Detail and Lookup relationships
+  
+- **customMetadata/**: Test configurations for Notion sync
+  - NotionDatabase records for test databases
+  - NotionSyncObject records for sync configuration
+  - NotionSyncField records for field mappings
+  - NotionRelation records for relationship mappings
+  
+- **flows/**: Automated flows for test objects
+  - Create/Update flows that trigger Platform Events
+  - Delete flows for record removal
+  
+- **permissionsets/**: Permission set for test object access
+
+- **classes/**: Test execution and credential setup classes
+  - `NotionIntegrationTestExecutor`: Main test runner
+  - `NotionTestCredentialSetup`: Programmatic credential configuration
+  - `NotionTestCredentialSetupTest`: Unit tests for credential setup
+
+Note: This directory is not part of the main package deployment (marked as `default: false` in sfdx-project.json).
