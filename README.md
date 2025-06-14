@@ -41,7 +41,35 @@ cd notion-salesforce-sync
 sfdx force:source:deploy -p force-app/
 ```
 
-3. Configure Named Credentials for Notion API access
+3. Configure Named Credentials for Notion API access:
+
+   a. **Get your Notion API token:**
+   - Go to [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
+   - Click "New integration"
+   - Give it a name (e.g., "Salesforce Sync")
+   - Select the workspace you want to connect
+   - Click "Submit"
+   - Copy the "Internal Integration Token" (starts with `secret_`)
+
+   b. **Configure the External Credential in Salesforce:**
+   - Go to Setup → Named Credentials → External Credentials
+   - Find "Notion Credential"
+   - Click on the principal "NotionIntegration"
+   - Add Authentication Parameter:
+     - Parameter Name: `SecretKey`
+     - Value: Your Notion API token (the one that starts with `secret_`)
+   - Save the configuration
+
+   c. **Assign Permission Set:**
+   - Go to Setup → Permission Sets
+   - Find "Notion Integration User"
+   - Click "Manage Assignments"
+   - Assign to users who need to sync data to Notion
+
+   d. **Grant integration access to your Notion databases:**
+   - In Notion, go to each database you want to sync
+   - Click the "..." menu → "Add connections"
+   - Select your integration and click "Confirm"
 
 4. Set up Custom Metadata records for your sync configuration
 
@@ -84,6 +112,26 @@ To get your Dev Hub auth URL:
 sf org display -o your-devhub-alias --verbose --json
 ```
 Look for the `sfdxAuthUrl` field in the output.
+
+## CI/CD
+
+### Continuous Integration
+
+This project uses GitHub Actions for automated testing:
+
+- **Automatic CI**: Runs on all pushes to `main` and on all pull requests
+- **Manual CI Trigger**: Add the `run-ci` label to a PR to manually trigger CI
+- **Direct Workflow Execution**: Use the Actions tab to run CI on any branch
+
+The CI workflow:
+1. Creates a temporary Salesforce scratch org
+2. Deploys all metadata
+3. Runs all Apex tests with code coverage
+4. Automatically cleans up the scratch org
+
+### PR Labels
+
+- `run-ci`: Manually triggers the CI workflow on a pull request
 
 ## License
 
