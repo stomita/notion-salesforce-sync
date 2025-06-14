@@ -39,53 +39,9 @@ To get a database ID:
 
 ## Setting Up Test Databases in Notion
 
-Each test database must have specific properties configured to match the integration test mappings. 
+For detailed instructions on creating and configuring the test databases with all required properties, see the [Test Database Setup section in the Integration Testing Guide](INTEGRATION_TESTING.md#test-database-setup).
 
-### Required for ALL Databases
-- `salesforce_id` (Text) - **REQUIRED** - Stores the Salesforce record ID for syncing
-
-### Account Test Database Properties
-Create these properties in your Account test database:
-- `Name` (Title) - Maps to Account Name
-- `salesforce_id` (Text) - For Salesforce ID tracking
-
-**Note**: Account Description is mapped to the page body content, not a property.
-
-### Contact Test Database Properties
-Create these properties in your Contact test database:
-- `Name` (Title) - Maps to Contact Name
-- `Email` (Email) - Maps to Contact Email
-- `Account` (Relation) - Links to Account database
-- `salesforce_id` (Text) - For Salesforce ID tracking
-
-### Test Parent Database Properties
-Create these properties in your Test Parent database:
-- `Name` (Title) - Maps to Test_Parent_Object__c Name
-- `Status` (Select) - Maps to Status__c picklist
-  - Add options: Active, Inactive, In Progress
-- `Amount` (Number) - Maps to Amount__c currency field
-- `Active` (Checkbox) - Maps to Active__c checkbox
-- `salesforce_id` (Text) - For Salesforce ID tracking
-
-**Note**: Description__c is mapped to the page body content, not a property.
-
-### Test Child Database Properties
-Create these properties in your Test Child database:
-- `Name` (Title) - Maps to Test_Child_Object__c Name
-- `Quantity` (Number) - Maps to Quantity__c number field
-- `Due Date` (Date) - Maps to Due_Date__c date field
-- `Test Parent` (Relation) - Links to Test Parent database
-- `Account` (Relation) - Links to Account database
-- `salesforce_id` (Text) - For Salesforce ID tracking
-
-**Note**: Details__c is mapped to the page body content, not a property.
-
-### Important Notes on Property Setup
-1. Property names must match EXACTLY (case-sensitive)
-2. Title properties must be named "Name" not "Title"
-3. Relations must point to the correct target database
-4. Select/Multi-select options can be added as needed
-5. Body content mappings mean the field appears in the page content, not as a property
+**Quick Summary**: You need to create four databases (Account, Contact, Test Parent, Test Child) with specific properties that match the integration test field mappings. All databases must have a `salesforce_id` property for tracking.
 
 ## Configuring GitHub Secrets
 

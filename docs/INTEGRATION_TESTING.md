@@ -9,19 +9,110 @@ This guide explains how to run integration tests that verify the Notion sync fun
 3. Test databases created in Notion (see CI_SETUP.md for database setup)
 4. A Salesforce scratch org with the package deployed
 
-## Test Database Requirements
+## Test Database Setup
 
-Each Notion test database must have specific properties configured exactly as expected by the integration tests. 
+### Overview
+
+The integration tests require four Notion databases with specific properties configured exactly as expected by the test mappings.
 
 **IMPORTANT**: All databases must have a `salesforce_id` property (type: Text) for tracking Salesforce records.
 
-The integration tests use four databases:
-- **Account Test Database** - For Account sync testing
-- **Contact Test Database** - For Contact sync with Account relationships
-- **Test Parent Database** - For custom object parent records
-- **Test Child Database** - For testing Master-Detail and Lookup relationships
+### Step-by-Step Database Creation
 
-For detailed property setup instructions, see [Database Property Configuration in CI_SETUP.md](CI_SETUP.md#setting-up-test-databases-in-notion).
+#### 1. Create Four Test Databases in Notion
+
+Create new database pages in your Notion workspace:
+1. Account Test Database
+2. Contact Test Database  
+3. Test Parent Database
+4. Test Child Database
+
+#### 2. Configure Properties for Each Database
+
+##### Account Test Database
+Add these properties:
+- Property name: `Name` → Type: `Title`
+- Property name: `salesforce_id` → Type: `Text`
+
+**Note**: Account Description is mapped to page body content.
+
+##### Contact Test Database
+Add these properties:
+- Property name: `Name` → Type: `Title`
+- Property name: `Email` → Type: `Email`
+- Property name: `Account` → Type: `Relation` → Select "Account Test Database"
+- Property name: `salesforce_id` → Type: `Text`
+
+##### Test Parent Database
+Add these properties:
+- Property name: `Name` → Type: `Title`
+- Property name: `Status` → Type: `Select` → Add options: Active, Inactive, In Progress
+- Property name: `Amount` → Type: `Number`
+- Property name: `Active` → Type: `Checkbox`
+- Property name: `salesforce_id` → Type: `Text`
+
+**Note**: Description__c is mapped to page body content.
+
+##### Test Child Database
+Add these properties:
+- Property name: `Name` → Type: `Title`
+- Property name: `Quantity` → Type: `Number`
+- Property name: `Due Date` → Type: `Date`
+- Property name: `Test Parent` → Type: `Relation` → Select "Test Parent Database"
+- Property name: `Account` → Type: `Relation` → Select "Account Test Database"
+- Property name: `salesforce_id` → Type: `Text`
+
+**Note**: Details__c is mapped to page body content.
+
+#### 3. Grant Integration Access
+
+For each database:
+1. Click `Share` button (top right)
+2. Click `Invite`
+3. Search for your integration name
+4. Select your integration
+5. Ensure it has edit access
+
+#### 4. Get Database IDs
+
+For each database:
+1. Click `Share` → `Copy link`
+2. The URL format is: `https://www.notion.so/{workspace}/{database-id}?v={view-id}`
+3. Copy the database-id portion (32 characters)
+
+#### 5. Configure Database IDs
+
+Set these as environment variables or GitHub secrets:
+- `NOTION_DATABASE_ID_ACCOUNT` = Account database ID
+- `NOTION_DATABASE_ID_CONTACT` = Contact database ID
+- `NOTION_DATABASE_ID_TEST_PARENT` = Test Parent database ID
+- `NOTION_DATABASE_ID_TEST_CHILD` = Test Child database ID
+
+### Common Database Setup Issues
+
+#### "Property not found" errors
+- Property names are case-sensitive and must match exactly
+- Use "Name" not "Title" for title properties
+- Check for trailing spaces in property names
+
+#### "Relation not found" errors
+- Create databases in order (Account first, then Contact, etc.)
+- Ensure relation properties point to correct target databases
+- Relation names must match exactly
+
+#### Sync failures
+- Verify `salesforce_id` property exists in ALL databases
+- Check integration has edit access to all databases
+- Ensure all required properties are created with correct types
+
+### Body Content Field Mappings
+
+These Salesforce fields sync to Notion page body content (not properties):
+- Account: `Description` field → Page content
+- Test Parent: `Description__c` field → Page content
+- Test Child: `Details__c` field → Page content
+
+These appear as rich text within the Notion page itself.
 
 ## Quick Start
 
