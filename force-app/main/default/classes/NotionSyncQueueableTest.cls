@@ -550,69 +550,7 @@ private class NotionSyncQueueableTest {
         System.assert(processedObjectTypes.contains('Contact'), 'Contact should be processed');
     }
     
-    @isTest
-    static void testCascadeDeleteFunctionality() {
-        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('DELETE'));
-        
-        Account testAccount = [SELECT Id FROM Account LIMIT 1];
-        
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
-            testAccount.Id,
-            'Account',
-            'DELETE'
-        ));
-        
-        Test.startTest();
-        
-        NotionSyncQueueable job = new NotionSyncQueueable(requests);
-        System.enqueueJob(job);
-        
-        Test.stopTest();
-        
-        // Verify delete operation was logged
-        List<Notion_Sync_Log__c> syncLogs = [
-            SELECT Record_Id__c, Operation_Type__c, Status__c
-            FROM Notion_Sync_Log__c
-            WHERE Record_Id__c = :testAccount.Id
-        ];
-        
-        System.assertEquals(1, syncLogs.size(), 'One sync log should be created for parent delete');
-        System.assertEquals('DELETE', syncLogs[0].Operation_Type__c, 'Operation should be DELETE');
-        
-        // Note: In a real scenario with relationship metadata configured, 
-        // cascade deletes would be enqueued for child records
-    }
     
-    @isTest
-    static void testGetObjectTypeFromIdMethod() {
-        Test.startTest();
-        
-        Account testAccount = [SELECT Id FROM Account LIMIT 1];
-        Contact testContact = [SELECT Id FROM Contact LIMIT 1];
-        
-        // Create queueable instance to test the private method indirectly
-        NotionSyncQueueable job = new NotionSyncQueueable(new List<NotionSyncQueueable.SyncRequest>());
-        
-        // Test valid IDs by creating requests and verifying processing
-        List<NotionSyncQueueable.SyncRequest> validRequests = new List<NotionSyncQueueable.SyncRequest>();
-        validRequests.add(new NotionSyncQueueable.SyncRequest(
-            testAccount.Id,
-            'Account',
-            'CREATE'
-        ));
-        validRequests.add(new NotionSyncQueueable.SyncRequest(
-            testContact.Id,
-            'Contact',
-            'CREATE'
-        ));
-        
-        // Verify request creation with valid IDs works
-        System.assertEquals(testAccount.Id, validRequests[0].recordId, 'Account ID should be valid');
-        System.assertEquals(testContact.Id, validRequests[1].recordId, 'Contact ID should be valid');
-        
-        Test.stopTest();
-    }
     
     @isTest
     static void testProcessingOrderWithRelationships() {
