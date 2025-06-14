@@ -39,7 +39,7 @@ Expected result: All 27 tests should pass with 92% code coverage.
 2. Execute the test script as Anonymous Apex:
 
 ```bash
-sf apex run --file scripts/test-notion-api.apex --target-org notion-sync-scratch
+sf apex run --file scripts/test-notion-api-client.apex --target-org notion-sync-scratch
 ```
 
 3. Check the debug logs for results:
