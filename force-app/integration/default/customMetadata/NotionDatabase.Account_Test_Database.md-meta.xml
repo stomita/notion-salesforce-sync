@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Account Test Database</label>
+    <protected>false</protected>
+    <values>
+        <field>DatabaseId__c</field>
+        <value xsi:type="xsd:string">REPLACE_WITH_NOTION_DATABASE_ID_FOR_ACCOUNT</value>
+    </values>
+    <values>
+        <field>DatabaseName__c</field>
+        <value xsi:type="xsd:string">Account Test Database</value>
+    </values>
+    <values>
+        <field>WorkspaceId__c</field>
+        <value xsi:type="xsd:string">REPLACE_WITH_NOTION_WORKSPACE_ID</value>
+    </values>
+</CustomMetadata>
