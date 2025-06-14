@@ -122,7 +122,7 @@ This project uses GitHub Actions for continuous integration. The CI workflow aut
 1. Creates a scratch org
 2. Deploys all metadata
 3. Runs Apex tests
-4. Runs integration tests (if configured)
+4. Runs integration tests (if ALL secrets are configured)
 5. Deletes the scratch org
 
 #### Required Secrets
@@ -136,8 +136,9 @@ sf org display -o your-devhub-alias --verbose --json
 ```
 Look for the `sfdxAuthUrl` field in the output.
 
-##### For Integration Testing (Optional):
-If you want to run integration tests in CI, also configure:
+##### For Integration Testing:
+**Important**: Either configure ALL of these secrets or NONE. The CI will fail if only some are configured.
+
 - `NOTION_API_KEY`: Your Notion integration token
 - `NOTION_WORKSPACE_ID`: Your Notion workspace ID
 - `NOTION_DATABASE_ID_ACCOUNT`: Test database ID for Accounts
@@ -145,7 +146,9 @@ If you want to run integration tests in CI, also configure:
 - `NOTION_DATABASE_ID_TEST_PARENT`: Test database ID for parent objects
 - `NOTION_DATABASE_ID_TEST_CHILD`: Test database ID for child objects
 
-See the [CI Setup Guide](docs/CI_SETUP.md) for detailed instructions.
+To skip integration tests in CI, ensure NONE of these secrets are configured.
+
+See the [CI Setup Guide](docs/CI_SETUP.md) for detailed instructions on setting up test databases and obtaining these values.
 
 ## CI/CD
 
