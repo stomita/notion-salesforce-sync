@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>60.0</apiVersion>
+    <description>Triggers Notion sync when Test Parent Object records are created or updated</description>
+    <environments>Default</environments>
+    <interviewLabel>Notion Sync - Test Parent Create/Update {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Notion Sync - Test Parent Create/Update</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordCreates>
+        <description>Create Platform Event to trigger Notion sync</description>
+        <name>Create_Notion_Sync_Event</name>
+        <label>Create Notion Sync Event</label>
+        <locationX>176</locationX>
+        <locationY>158</locationY>
+        <inputAssignments>
+            <field>Object_Type__c</field>
+            <value>
+                <stringValue>Test_Parent_Object__c</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Operation_Type__c</field>
+            <value>
+                <elementReference>OperationType</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Record_Id__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <object>Notion_Sync_Event__e</object>
+    </recordCreates>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Create_Notion_Sync_Event</targetReference>
+        </connector>
+        <object>Test_Parent_Object__c</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+    <formulas>
+        <name>OperationType</name>
+        <dataType>String</dataType>
+        <expression>IF(ISNEW(), 'CREATE', 'UPDATE')</expression>
+    </formulas>
+</Flow>

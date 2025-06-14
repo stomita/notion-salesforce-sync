@@ -1,8 +1,12 @@
 {
   "packageDirectories": [
     {
-      "path": "force-app",
+      "path": "force-app/main",
       "default": true
+    },
+    {
+      "path": "force-app/integration",
+      "default": false
     }
   ],
   "name": "notion-salesforce-sync",

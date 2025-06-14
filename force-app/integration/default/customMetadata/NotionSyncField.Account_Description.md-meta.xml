@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Account Description</label>
+    <protected>false</protected>
+    <values>
+        <field>IsBodyContent__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>NotionPropertyName__c</field>
+        <value xsi:type="xsd:string">Description</value>
+    </values>
+    <values>
+        <field>NotionPropertyType__c</field>
+        <value xsi:type="xsd:string">rich_text</value>
+    </values>
+    <values>
+        <field>NotionSyncObject__c</field>
+        <value xsi:type="xsd:string">Account_Test_Sync</value>
+    </values>
+    <values>
+        <field>SalesforceFieldApiName__c</field>
+        <value xsi:type="xsd:string">Description</value>
+    </values>
+</CustomMetadata>
