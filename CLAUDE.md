@@ -63,7 +63,12 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
    sf apex test run --code-coverage --result-format human
    ```
 
-Only push your changes after both commands complete successfully.
+3. If you have Notion API credentials configured, run integration tests:
+   ```bash
+   ./scripts/run-integration-tests.sh
+   ```
+
+Only push your changes after all tests complete successfully.
 
 ## CI/CD
 
@@ -74,6 +79,7 @@ The project includes GitHub Actions workflows for:
    - Creates a scratch org
    - Deploys all metadata
    - Runs Apex tests
+   - **Runs integration tests with real Notion API** (requires secrets configuration)
    - Cleans up the scratch org
 
 2. **Claude Code Integration** (`.github/workflows/claude-code.yml`):
@@ -89,6 +95,18 @@ The project includes GitHub Actions workflows for:
    sf org display -o your-devhub-alias --verbose --json
    ```
 4. Add the auth URL as a GitHub secret named `DEVHUB_SFDX_AUTH_URL`
+
+### Integration Test Configuration
+
+For integration tests to run in CI, configure these GitHub secrets:
+- `NOTION_API_KEY` - Your Notion integration token
+- `NOTION_WORKSPACE_ID` - Target workspace ID
+- `NOTION_TEST_ACCOUNT_DB` - Test database ID for Accounts
+- `NOTION_TEST_CONTACT_DB` - Test database ID for Contacts
+- `NOTION_TEST_PARENT_DB` - Test database ID for Test Parent
+- `NOTION_TEST_CHILD_DB` - Test database ID for Test Child
+
+See `docs/CI_SETUP.md` for detailed setup instructions.
 
 ## Coding Standards
 

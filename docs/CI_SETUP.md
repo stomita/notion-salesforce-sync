@@ -1,132 +1,101 @@
-# CI/CD Setup Guide
+# CI Setup Guide
 
-This guide explains how to set up continuous integration for the Notion Salesforce Sync project.
+This guide explains how to configure GitHub Actions for running integration tests with the Notion API.
 
 ## Prerequisites
 
-- Salesforce org with Dev Hub enabled
-- GitHub repository with Actions enabled
-- Admin access to both Salesforce and GitHub
+1. A Notion integration token (API key)
+2. Notion workspace with test databases created
+3. Repository admin access to configure secrets
 
-## Step 1: Enable Dev Hub
+## Required GitHub Secrets
 
-1. Log in to your Salesforce org (Production or Developer Edition)
-2. Navigate to Setup → Development → Dev Hub
-3. Enable Dev Hub
-4. Enable "Unlocked Packages and Second-Generation Managed Packages"
+Configure the following secrets in your GitHub repository settings (Settings → Secrets and variables → Actions):
 
-## Step 2: Create Connected App for CI
+### 1. `NOTION_API_KEY`
+Your Notion integration token. To get this:
+1. Go to https://www.notion.so/my-integrations
+2. Create a new integration or use an existing one
+3. Copy the "Internal Integration Token"
 
-1. In Setup, go to App Manager
-2. Click "New Connected App"
-3. Fill in the required fields:
-   - Connected App Name: `GitHub Actions CI`
-   - API Name: `GitHub_Actions_CI`
-   - Contact Email: your email
-4. Enable OAuth Settings:
-   - Callback URL: `http://localhost:1717/OauthRedirect`
-   - Selected OAuth Scopes:
-     - Access and manage your data (api)
-     - Perform requests on your behalf at any time (refresh_token, offline_access)
-     - Provide access to your data via the Web (web)
-5. Save and note the Consumer Key
+### 2. `NOTION_WORKSPACE_ID`
+The ID of your Notion workspace. To find this:
+1. Open any page in your Notion workspace
+2. Look at the URL: `https://www.notion.so/{workspace-name}-{workspace-id}`
+3. Copy the workspace ID (32-character string)
 
-## Step 3: Authenticate and Get SFDX Auth URL
+### 3. Database IDs
+Create four test databases in Notion and get their IDs:
 
-1. Install Salesforce CLI if not already installed:
-   ```bash
-   npm install -g @salesforce/cli
-   ```
+- `NOTION_TEST_ACCOUNT_DB` - For Account records
+- `NOTION_TEST_CONTACT_DB` - For Contact records  
+- `NOTION_TEST_PARENT_DB` - For Test_Parent_Object__c records
+- `NOTION_TEST_CHILD_DB` - For Test_Child_Object__c records
 
-2. Authenticate to your Dev Hub:
-   ```bash
-   sf org login web -a devhub -d
-   ```
+To get a database ID:
+1. Open the database in Notion
+2. Click "Share" and copy the link
+3. Extract the ID from the URL: `https://www.notion.so/{workspace}/{database-id}?v={view-id}`
 
-3. Get the SFDX auth URL:
-   ```bash
-   sf org display -o devhub --verbose --json
-   ```
+## Setting Up Test Databases in Notion
 
-4. Look for the `sfdxAuthUrl` field in the JSON output. It will look like:
-   ```
-   force://PlatformCLI::5AxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxJ@your-domain.my.salesforce.com
-   ```
+Each test database must have the following property:
+- `salesforce_id` (Text) - To store the Salesforce record ID
 
-## Step 4: Add GitHub Secret
+### Account Test Database
+Additional properties:
+- `Name` (Title)
+- `Description` (Text)
 
-1. Go to your GitHub repository
+### Contact Test Database
+Additional properties:
+- `Name` (Title)
+- `Email` (Email)
+- `Account` (Relation to Account database)
+
+### Test Parent Database
+Additional properties:
+- `Name` (Title)
+- `Description` (Text)
+- `Status` (Select with options: Active, Inactive)
+- `Amount` (Number)
+- `Active` (Checkbox)
+
+### Test Child Database
+Additional properties:
+- `Name` (Title)
+- `Details` (Text)
+- `Quantity` (Number)
+- `Due Date` (Date)
+- `Test Parent` (Relation to Test Parent database)
+- `Account` (Relation to Account database)
+
+## Configuring GitHub Secrets
+
+1. Go to your repository on GitHub
 2. Navigate to Settings → Secrets and variables → Actions
-3. Click "New repository secret"
-4. Name: `DEVHUB_SFDX_AUTH_URL`
-5. Value: Paste the SFDX auth URL from step 3
-6. Click "Add secret"
+3. Click "New repository secret" for each required secret
+4. Enter the name exactly as shown above and paste the value
 
-## Step 5: Verify CI Setup
+## Verifying Setup
 
-1. Create a pull request or push to main branch
-2. Check the Actions tab in GitHub
-3. The CI workflow should:
-   - Create a scratch org
-   - Deploy metadata
-   - Run tests
-   - Clean up
+After configuring all secrets:
+1. Push a change to trigger CI
+2. Check the Actions tab to monitor the workflow
+3. The "Validate Integration Test Configuration" step will verify all secrets are set
 
 ## Troubleshooting
 
-### "Invalid grant" error
-- The auth URL may have expired. Re-authenticate and update the secret.
+### CI Fails at "Validate Integration Test Configuration"
+- Ensure all 6 required secrets are configured
+- Check for typos in secret names
+- Verify the values are not empty
 
-### "No Dev Hub org found"
-- Ensure Dev Hub is enabled in your org
-- Verify the auth URL is from a Dev Hub-enabled org
+### Integration Tests Fail
+- Verify your Notion API key has access to all test databases
+- Check that database properties match the expected names
+- Ensure the workspace ID is correct
 
-### Scratch org creation fails
-- Check your Dev Hub org has remaining scratch org capacity
-- Verify the `config/project-scratch-def.json` file is valid
-
-## CI Workflow Details
-
-The CI workflow (`.github/workflows/ci.yml`) performs these steps:
-
-1. **Install Salesforce CLI**: Installs the latest version
-2. **Authenticate Dev Hub**: Uses the stored auth URL
-3. **Create Scratch Org**: Creates a temporary org for testing
-4. **Deploy Source**: Deploys all metadata from `force-app/`
-5. **Run Tests**: Executes all Apex tests with code coverage
-6. **Cleanup**: Deletes the scratch org (even on failure)
-
-## Best Practices
-
-1. **Protect main branch**: Require CI to pass before merging PRs
-2. **Code Coverage**: Maintain at least 75% code coverage
-3. **Regular Auth Refresh**: Update the auth URL periodically
-4. **Monitor Usage**: Track scratch org consumption in Dev Hub
-
-## Additional Configuration
-
-### Custom Scratch Org Settings
-
-Edit `config/project-scratch-def.json` to customize:
-- Org edition
-- Features
-- Settings
-- Duration (max 30 days, CI uses 1 day)
-
-### Test Configuration
-
-Create `force-app/main/default/testSuites/` for test suite configuration.
-
-### Deployment Options
-
-Modify the deploy command in CI workflow for specific needs:
-```bash
-# Deploy with tests
-sf project deploy start --source-dir force-app --test-level RunLocalTests
-
-# Deploy specific metadata types
-sf project deploy start --metadata CustomObject,CustomField
-
-# Validate only (no deployment)
-sf project deploy validate --source-dir force-app
-```
+### Permission Errors
+- Grant your Notion integration access to all test databases
+- In each database, click Share → Invite → Select your integration
