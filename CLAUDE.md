@@ -41,10 +41,29 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 
 ## Development Commands
 
-- `sf project deploy start --source-dir force-app` - Deploy to Salesforce org
-- `sf apex test run --code-coverage --result-format human` - Run all Apex tests
+### Scratch Org Setup (Initial or when expired)
 - `sf org create scratch -f config/project-scratch-def.json -a my-scratch` - Create scratch org
 - `sf org delete scratch -o my-scratch -p` - Delete scratch org
+
+### Daily Development Commands
+- `sf project deploy start --source-dir force-app` - Deploy to Salesforce org
+- `sf apex test run --code-coverage --result-format human` - Run all Apex tests
+
+### Important: Pre-Push Testing Requirement
+
+**ALWAYS run the following commands before pushing code to ensure code quality:**
+
+1. Deploy all changes to your scratch org:
+   ```bash
+   sf project deploy start --source-dir force-app
+   ```
+
+2. Run all Apex tests to verify functionality:
+   ```bash
+   sf apex test run --code-coverage --result-format human
+   ```
+
+Only push your changes after both commands complete successfully.
 
 ## CI/CD
 

@@ -41,7 +41,35 @@ cd notion-salesforce-sync
 sfdx force:source:deploy -p force-app/
 ```
 
-3. Configure Named Credentials for Notion API access
+3. Configure Named Credentials for Notion API access:
+
+   a. **Get your Notion API token:**
+   - Go to [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
+   - Click "New integration"
+   - Give it a name (e.g., "Salesforce Sync")
+   - Select the workspace you want to connect
+   - Click "Submit"
+   - Copy the "Internal Integration Token" (starts with `secret_`)
+
+   b. **Configure the External Credential in Salesforce:**
+   - Go to Setup → Named Credentials → External Credentials
+   - Find "Notion Credential"
+   - Click on the principal "NotionIntegration"
+   - Add Authentication Parameter:
+     - Parameter Name: `SecretKey`
+     - Value: Your Notion API token (the one that starts with `secret_`)
+   - Save the configuration
+
+   c. **Assign Permission Set:**
+   - Go to Setup → Permission Sets
+   - Find "Notion Integration User"
+   - Click "Manage Assignments"
+   - Assign to users who need to sync data to Notion
+
+   d. **Grant integration access to your Notion databases:**
+   - In Notion, go to each database you want to sync
+   - Click the "..." menu → "Add connections"
+   - Select your integration and click "Confirm"
 
 4. Set up Custom Metadata records for your sync configuration
 
