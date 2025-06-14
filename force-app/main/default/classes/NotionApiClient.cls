@@ -131,25 +131,13 @@ public class NotionApiClient {
         }
     }
     
-    private static String getNotionApiToken() {
-        // TODO: Implement proper token storage mechanism
-        // Options:
-        // 1. Custom Setting (per-user or org-wide)
-        // 2. Custom Metadata Type
-        // 3. Named Credential with External Credential (newer approach)
-        // For CI testing, return a placeholder
-        return 'secret_test_token';
-    }
-    
     private static HttpRequest buildHttpRequest(String method, String endpoint) {
         HttpRequest request = new HttpRequest();
         request.setMethod(method);
         request.setEndpoint(NAMED_CREDENTIAL + endpoint);
         request.setHeader('Content-Type', 'application/json');
         request.setHeader('Notion-Version', API_VERSION);
-        // TODO: Replace with actual API token from Custom Setting or Custom Metadata
-        // For now, this will be configured post-deployment
-        request.setHeader('Authorization', 'Bearer ' + getNotionApiToken());
+        // Authorization header is handled by Named Credential with External Credential
         request.setTimeout(60000);
         
         return request;
