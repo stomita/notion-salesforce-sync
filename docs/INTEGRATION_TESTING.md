@@ -11,11 +11,17 @@ This guide explains how to run integration tests that verify the Notion sync fun
 
 ## Test Database Requirements
 
-Each Notion test database must have a `salesforce_id` property (type: Text) for tracking Salesforce records. The integration tests use:
+Each Notion test database must have specific properties configured exactly as expected by the integration tests. 
+
+**IMPORTANT**: All databases must have a `salesforce_id` property (type: Text) for tracking Salesforce records.
+
+The integration tests use four databases:
 - **Account Test Database** - For Account sync testing
 - **Contact Test Database** - For Contact sync with Account relationships
 - **Test Parent Database** - For custom object parent records
 - **Test Child Database** - For testing Master-Detail and Lookup relationships
+
+For detailed property setup instructions, see [Database Property Configuration in CI_SETUP.md](CI_SETUP.md#setting-up-test-databases-in-notion).
 
 ## Quick Start
 

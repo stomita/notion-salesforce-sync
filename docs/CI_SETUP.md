@@ -27,10 +27,10 @@ The ID of your Notion workspace. To find this:
 ### 3. Database IDs
 Create four test databases in Notion and get their IDs:
 
-- `NOTION_TEST_ACCOUNT_DB` - For Account records
-- `NOTION_TEST_CONTACT_DB` - For Contact records  
-- `NOTION_TEST_PARENT_DB` - For Test_Parent_Object__c records
-- `NOTION_TEST_CHILD_DB` - For Test_Child_Object__c records
+- `NOTION_DATABASE_ID_ACCOUNT` - For Account records
+- `NOTION_DATABASE_ID_CONTACT` - For Contact records  
+- `NOTION_DATABASE_ID_TEST_PARENT` - For Test_Parent_Object__c records
+- `NOTION_DATABASE_ID_TEST_CHILD` - For Test_Child_Object__c records
 
 To get a database ID:
 1. Open the database in Notion
@@ -39,36 +39,53 @@ To get a database ID:
 
 ## Setting Up Test Databases in Notion
 
-Each test database must have the following property:
-- `salesforce_id` (Text) - To store the Salesforce record ID
+Each test database must have specific properties configured to match the integration test mappings. 
 
-### Account Test Database
-Additional properties:
-- `Name` (Title)
-- `Description` (Text)
+### Required for ALL Databases
+- `salesforce_id` (Text) - **REQUIRED** - Stores the Salesforce record ID for syncing
 
-### Contact Test Database
-Additional properties:
-- `Name` (Title)
-- `Email` (Email)
-- `Account` (Relation to Account database)
+### Account Test Database Properties
+Create these properties in your Account test database:
+- `Name` (Title) - Maps to Account Name
+- `salesforce_id` (Text) - For Salesforce ID tracking
 
-### Test Parent Database
-Additional properties:
-- `Name` (Title)
-- `Description` (Text)
-- `Status` (Select with options: Active, Inactive)
-- `Amount` (Number)
-- `Active` (Checkbox)
+**Note**: Account Description is mapped to the page body content, not a property.
 
-### Test Child Database
-Additional properties:
-- `Name` (Title)
-- `Details` (Text)
-- `Quantity` (Number)
-- `Due Date` (Date)
-- `Test Parent` (Relation to Test Parent database)
-- `Account` (Relation to Account database)
+### Contact Test Database Properties
+Create these properties in your Contact test database:
+- `Name` (Title) - Maps to Contact Name
+- `Email` (Email) - Maps to Contact Email
+- `Account` (Relation) - Links to Account database
+- `salesforce_id` (Text) - For Salesforce ID tracking
+
+### Test Parent Database Properties
+Create these properties in your Test Parent database:
+- `Name` (Title) - Maps to Test_Parent_Object__c Name
+- `Status` (Select) - Maps to Status__c picklist
+  - Add options: Active, Inactive, In Progress
+- `Amount` (Number) - Maps to Amount__c currency field
+- `Active` (Checkbox) - Maps to Active__c checkbox
+- `salesforce_id` (Text) - For Salesforce ID tracking
+
+**Note**: Description__c is mapped to the page body content, not a property.
+
+### Test Child Database Properties
+Create these properties in your Test Child database:
+- `Name` (Title) - Maps to Test_Child_Object__c Name
+- `Quantity` (Number) - Maps to Quantity__c number field
+- `Due Date` (Date) - Maps to Due_Date__c date field
+- `Test Parent` (Relation) - Links to Test Parent database
+- `Account` (Relation) - Links to Account database
+- `salesforce_id` (Text) - For Salesforce ID tracking
+
+**Note**: Details__c is mapped to the page body content, not a property.
+
+### Important Notes on Property Setup
+1. Property names must match EXACTLY (case-sensitive)
+2. Title properties must be named "Name" not "Title"
+3. Relations must point to the correct target database
+4. Select/Multi-select options can be added as needed
+5. Body content mappings mean the field appears in the page content, not as a property
 
 ## Configuring GitHub Secrets
 
