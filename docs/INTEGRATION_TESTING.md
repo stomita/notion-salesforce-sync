@@ -298,6 +298,16 @@ If tests fail due to existing data:
 3. **Monitor API limits** - Be aware of Notion API rate limits
 4. **Test in isolation** - Use a dedicated scratch org for integration tests
 
+## Unit Testing
+
+Before running integration tests, verify the core functionality with unit tests:
+
+```bash
+sf apex test run --tests NotionApiClientTest --code-coverage --result-format human --wait 10
+```
+
+Expected result: All tests should pass with high code coverage.
+
 ## Manual Test Execution
 
 If you need more control over the test process:
@@ -394,6 +404,30 @@ The test executor uses specific prefixes for test data:
 - Test Objects: "Integration Test"
 
 To use different test data, modify the executor class or create your own test scenarios.
+
+## Security Best Practices
+
+1. **Never commit API tokens** to version control
+2. Use **Named Credentials** for all external API calls
+3. Rotate API tokens regularly
+4. Limit integration access to only necessary databases in Notion
+5. Monitor sync logs for unauthorized access attempts
+
+## Additional Debug Commands
+
+```bash
+# View recent logs
+sf apex log list
+
+# Get detailed log
+sf apex log get --log-id <log-id>
+
+# Monitor sync logs
+sf data query --query "$(cat scripts/check-sync-logs.soql)"
+
+# Check Platform Events
+sf data query --query "SELECT Id, ReplayId, CreatedDate FROM Notion_Sync_Event__e"
+```
 
 ## Integration Test Structure
 

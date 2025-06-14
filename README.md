@@ -92,6 +92,27 @@ sfdx force:source:deploy -p force-app/
 
 See [CLAUDE.md](CLAUDE.md) for detailed development guidelines and architecture documentation.
 
+## Testing
+
+### Unit Tests
+
+Run unit tests to verify core functionality:
+
+```bash
+sf apex test run --code-coverage --result-format human
+```
+
+### Integration Tests
+
+For comprehensive end-to-end testing with real Notion API calls, see the [Integration Testing Guide](docs/INTEGRATION_TESTING.md).
+
+Quick start:
+```bash
+./scripts/run-integration-tests.sh
+```
+
+The script will prompt for any required configuration and run all integration tests.
+
 ### CI/CD Setup
 
 This project uses GitHub Actions for continuous integration. The CI workflow automatically:
