@@ -136,8 +136,8 @@ public class NotionApiClient {
         request.setMethod(method);
         request.setEndpoint(NAMED_CREDENTIAL + endpoint);
         request.setHeader('Content-Type', 'application/json');
-        request.setHeader('Notion-Version', API_VERSION);
-        // Authorization header is handled by Named Credential with External Credential
+        // Notion-Version header is handled by Named Credential
+        // Authorization header is handled by External Credential
         request.setTimeout(60000);
         
         return request;
