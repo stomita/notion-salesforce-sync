@@ -51,12 +51,22 @@ sfdx force:source:deploy -p force-app/
    - Click "Submit"
    - Copy the "Internal Integration Token" (starts with `secret_`)
 
-   b. **Configure the Notion API Token in Salesforce:**
-   - NOTE: The Named Credential is configured for the endpoint only
-   - API token configuration will be added in a future update
-   - For now, update the NotionApiClient.getNotionApiToken() method with your token
+   b. **Configure the External Credential in Salesforce:**
+   - Go to Setup → Named Credentials → External Credentials
+   - Find "Notion Credential"
+   - Click on the principal "NotionIntegration"
+   - Add Authentication Parameter:
+     - Parameter Name: `SecretKey`
+     - Value: Your Notion API token (the one that starts with `secret_`)
+   - Save the configuration
 
-   c. **Grant integration access to your Notion databases:**
+   c. **Assign Permission Set:**
+   - Go to Setup → Permission Sets
+   - Find "Notion Integration User"
+   - Click "Manage Assignments"
+   - Assign to users who need to sync data to Notion
+
+   d. **Grant integration access to your Notion databases:**
    - In Notion, go to each database you want to sync
    - Click the "..." menu → "Add connections"
    - Select your integration and click "Confirm"
