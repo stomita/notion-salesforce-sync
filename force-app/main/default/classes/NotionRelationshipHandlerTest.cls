@@ -87,19 +87,6 @@ public class NotionRelationshipHandlerTest {
     }
     
     @IsTest
-    static void testGetChildRecordsToDelete() {
-        NotionRelationshipHandler handler = new NotionRelationshipHandler();
-        
-        Account testAccount = [SELECT Id FROM Account LIMIT 1];
-        
-        Test.startTest();
-        List<String> childRecords = handler.getChildRecordsToDelete('Account', testAccount.Id);
-        Test.stopTest();
-        
-        System.assertNotEquals(null, childRecords, 'Child records list should not be null');
-    }
-    
-    @IsTest
     static void testGetRelatedRecordNotionPageIds() {
         NotionRelationshipHandler handler = new NotionRelationshipHandler();
         
@@ -229,20 +216,6 @@ public class NotionRelationshipHandlerTest {
         Test.stopTest();
         
         System.assertNotEquals(null, enrichedProperties, 'Enriched properties should not be null');
-    }
-    
-    @IsTest
-    static void testGetChildRecordsToDeleteWithData() {
-        NotionRelationshipHandler handler = new NotionRelationshipHandler();
-        Account testAccount = [SELECT Id FROM Account LIMIT 1];
-        
-        Test.startTest();
-        List<String> childRecords = handler.getChildRecordsToDelete('Account', testAccount.Id);
-        Test.stopTest();
-        
-        System.assertNotEquals(null, childRecords, 'Child records list should not be null');
-        // Should find at least the Contact and Opportunity we created
-        System.assert(childRecords.size() >= 0, 'Should handle query results properly');
     }
     
     @IsTest

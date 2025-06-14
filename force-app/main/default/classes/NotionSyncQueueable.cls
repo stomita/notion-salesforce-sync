@@ -142,22 +142,6 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         if (String.isNotBlank(notionPageId)) {
             deleteNotionPage(notionPageId);
         }
-        
-        List<String> childRecordsToDelete = relationshipHandler.getChildRecordsToDelete(request.objectType, request.recordId);
-        if (!childRecordsToDelete.isEmpty()) {
-            List<SyncRequest> cascadeDeleteRequests = new List<SyncRequest>();
-            
-            for (String childRecordId : childRecordsToDelete) {
-                String childObjectType = getObjectTypeFromId(childRecordId);
-                if (String.isNotBlank(childObjectType)) {
-                    cascadeDeleteRequests.add(new SyncRequest(childRecordId, childObjectType, 'DELETE'));
-                }
-            }
-            
-            if (!cascadeDeleteRequests.isEmpty()) {
-                System.enqueueJob(new NotionSyncQueueable(cascadeDeleteRequests));
-            }
-        }
     }
     
     private void handleCreateOrUpdateOperation(SyncRequest request, NotionSyncObject__mdt syncConfig, 
@@ -397,19 +381,6 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         }
     }
     
-    private String getObjectTypeFromId(String recordId) {
-        if (String.isBlank(recordId) || recordId.length() < 15) {
-            return null;
-        }
-        
-        try {
-            Id idValue = Id.valueOf(recordId);
-            return idValue.getSObjectType().getDescribe().getName();
-        } catch (Exception e) {
-            System.debug('NotionSyncQueueable: Error getting object type from ID ' + recordId + ': ' + e.getMessage());
-            return null;
-        }
-    }
     
     public class NotionSyncException extends Exception {}
     

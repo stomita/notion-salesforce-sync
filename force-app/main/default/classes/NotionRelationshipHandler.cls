@@ -153,34 +153,6 @@ public class NotionRelationshipHandler {
         return enrichedProperties;
     }
     
-    public List<String> getChildRecordsToDelete(String parentObjectType, String parentRecordId) {
-        List<String> childRecordsToDelete = new List<String>();
-        
-        if (!relationshipsByParentObject.containsKey(parentObjectType)) {
-            return childRecordsToDelete;
-        }
-        
-        for (RelationshipConfig config : relationshipsByParentObject.get(parentObjectType)) {
-            String query = 'SELECT Id FROM ' + config.childObjectType + 
-                          ' WHERE ' + config.salesforceRelationshipField + ' = :parentRecordId';
-            
-            try {
-                List<SObject> childRecords = Database.query(query);
-                for (SObject childRecord : childRecords) {
-                    childRecordsToDelete.add(String.valueOf(childRecord.Id));
-                }
-                
-                System.debug('NotionRelationshipHandler: Found ' + childRecords.size() + 
-                           ' child records of type ' + config.childObjectType + 
-                           ' for parent ' + parentRecordId);
-                           
-            } catch (Exception e) {
-                System.debug('NotionRelationshipHandler: Error querying child records: ' + e.getMessage());
-            }
-        }
-        
-        return childRecordsToDelete;
-    }
     
     public Map<Id, String> getRelatedRecordNotionPageIds(String objectType, Set<Id> recordIds) {
         Map<Id, String> recordToPageIdMap = new Map<Id, String>();
