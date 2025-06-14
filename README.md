@@ -38,8 +38,10 @@ cd notion-salesforce-sync
 
 2. Deploy to your Salesforce org:
 ```bash
-sfdx force:source:deploy -p force-app/
+sf project deploy start --source-dir force-app/main
 ```
+
+Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
 
 3. Configure Named Credentials for Notion API access:
 
@@ -120,12 +122,12 @@ This project uses GitHub Actions for continuous integration. The CI workflow aut
 1. Creates a scratch org
 2. Deploys all metadata
 3. Runs Apex tests
-4. Deletes the scratch org
+4. Runs integration tests (if configured)
+5. Deletes the scratch org
 
 #### Required Secrets
 
-To enable CI/CD, add the following secret to your GitHub repository:
-
+##### For Basic CI/CD:
 - `DEVHUB_SFDX_AUTH_URL`: The Salesforce DX auth URL for your Dev Hub org
 
 To get your Dev Hub auth URL:
@@ -133,6 +135,17 @@ To get your Dev Hub auth URL:
 sf org display -o your-devhub-alias --verbose --json
 ```
 Look for the `sfdxAuthUrl` field in the output.
+
+##### For Integration Testing (Optional):
+If you want to run integration tests in CI, also configure:
+- `NOTION_API_KEY`: Your Notion integration token
+- `NOTION_WORKSPACE_ID`: Your Notion workspace ID
+- `NOTION_DATABASE_ID_ACCOUNT`: Test database ID for Accounts
+- `NOTION_DATABASE_ID_CONTACT`: Test database ID for Contacts
+- `NOTION_DATABASE_ID_TEST_PARENT`: Test database ID for parent objects
+- `NOTION_DATABASE_ID_TEST_CHILD`: Test database ID for child objects
+
+See the [CI Setup Guide](docs/CI_SETUP.md) for detailed instructions.
 
 ## CI/CD
 
@@ -145,10 +158,20 @@ This project uses GitHub Actions for automated testing:
 - **Direct Workflow Execution**: Use the Actions tab to run CI on any branch
 
 The CI workflow:
-1. Creates a temporary Salesforce scratch org
-2. Deploys all metadata
-3. Runs all Apex tests with code coverage
-4. Automatically cleans up the scratch org
+1. Validates configuration (fails fast if integration test secrets are partially configured)
+2. Creates a temporary Salesforce scratch org
+3. Deploys all metadata
+4. Runs all Apex tests with code coverage
+5. Runs integration tests if all required secrets are configured
+6. Automatically cleans up the scratch org
+
+### Integration Testing in CI
+
+When all integration test secrets are configured, the CI will automatically:
+- Configure test metadata with your Notion database IDs
+- Set up Named Credentials programmatically
+- Run end-to-end sync tests against real Notion APIs
+- Validate create, update, delete, and relationship operations
 
 ### PR Labels
 
