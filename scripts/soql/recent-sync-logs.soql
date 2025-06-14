@@ -1,0 +1,15 @@
+-- Query recent sync logs with details
+SELECT 
+    Id,
+    Record_Id__c,
+    Object_Type__c,
+    Operation_Type__c,
+    Status__c,
+    Notion_Page_Id__c,
+    Error_Message__c,
+    Retry_Count__c,
+    CreatedDate
+FROM Notion_Sync_Log__c
+WHERE CreatedDate = TODAY
+ORDER BY CreatedDate DESC
+LIMIT 50

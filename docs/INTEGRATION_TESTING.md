@@ -423,7 +423,7 @@ sf apex log list
 sf apex log get --log-id <log-id>
 
 # Monitor sync logs
-sf data query --query "$(cat scripts/check-sync-logs.soql)"
+sf data query --query "$(cat scripts/soql/check-sync-logs.soql)"
 
 # Check Platform Events
 sf data query --query "SELECT Id, ReplayId, CreatedDate FROM Notion_Sync_Event__e"
