@@ -140,6 +140,21 @@ You can also specify a scratch org:
 ./scripts/run-integration-tests.sh my-scratch-org
 ```
 
+### Running Tests Without Setup
+
+If your org is already configured with:
+- Real Notion database IDs in the metadata
+- Named Credentials with valid API key
+- Deployed integration test components
+
+You can use the simple execution script:
+
+```bash
+./scripts/execute-integration-tests.sh
+```
+
+This script skips all setup steps and just runs the tests directly.
+
 ### Environment Variables (Optional)
 
 For non-interactive execution, set these environment variables:
@@ -346,6 +361,23 @@ sf apex run --file scripts/apex/run-integration-tests.apex
 ```
 
 ## Advanced Usage
+
+### Quick Test Execution
+
+For already-configured orgs, use the simple execution script:
+
+```bash
+# Run tests without any setup steps
+./scripts/execute-integration-tests.sh
+
+# Or specify an org
+./scripts/execute-integration-tests.sh my-scratch-org
+```
+
+This is ideal for:
+- Repeated test runs during development
+- CI environments where configuration is pre-deployed
+- Testing after manual configuration changes
 
 ### Running Individual Tests
 
