@@ -2,8 +2,7 @@
   "orgName": "Notion Sync Dev",
   "edition": "Developer",
   "features": [
-    "EnableSetPasswordInApi",
-    "API"
+    "EnableSetPasswordInApi"
   ],
   "settings": {
     "lightningExperienceSettings": {
