@@ -76,12 +76,13 @@ Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
    c. **Enable System-Wide Access (Important!):**
    - While still in the External Credential page
    - Check "Available for All Users" to enable access for system processes
-   - This allows Platform Event triggers (which run as Automated Process user) to access the credential
+   - This allows the Invocable Apex (when called from Flows) to access the credential
 
    d. **Assign Permission Set (Optional):**
    - Go to Setup → Permission Sets
    - Find "Notion Integration User"
-   - This permission set is already configured but optional with "Available for All Users" enabled
+   - This permission set is already configured
+   - With "Available for All Users" enabled, assignment is optional
    - Assign to users who need explicit sync permissions
 
    e. **Grant integration access to your Notion databases:**
@@ -208,7 +209,7 @@ The CI workflow automatically:
 
 #### "We couldn't access the credential" Error
 
-This error occurs when the Platform Event trigger (running as Automated Process user) cannot access the Named Credential.
+This error occurs when the Invocable Apex method cannot access the Named Credential.
 
 **Solution:**
 1. Ensure you've configured the Named Principal as described in the setup section
