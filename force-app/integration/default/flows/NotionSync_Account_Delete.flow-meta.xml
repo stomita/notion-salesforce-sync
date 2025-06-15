@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>60.0</apiVersion>
-    <description>Sample Flow for Account DELETE operations - triggers Notion sync when Account records are deleted. This serves as an example implementation of the template flow.</description>
+    <description>Triggers Notion sync when Account records are deleted (Integration Test)</description>
     <environments>Default</environments>
-    <label>Notion Sync - Account Delete</label>
+    <interviewLabel>Notion Sync - Account Delete {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Notion Sync - Account Delete (Integration)</label>
     <processMetadataValues>
         <name>BuilderType</name>
         <value>
@@ -24,7 +25,7 @@
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
     <recordCreates>
-        <description>Create Platform Event to trigger Notion sync for Account deletion</description>
+        <description>Create Platform Event to trigger Notion sync for deletion</description>
         <name>Create_Notion_Sync_Event</name>
         <label>Create Notion Sync Event</label>
         <locationX>176</locationX>
@@ -59,5 +60,5 @@
         <recordTriggerType>Delete</recordTriggerType>
         <triggerType>RecordBeforeDelete</triggerType>
     </start>
-    <status>Draft</status>
+    <status>Active</status>
 </Flow>

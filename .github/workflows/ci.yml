@@ -30,6 +30,46 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.event.pull_request.head.sha || github.ref }}
       
+      - name: Validate Required Configuration
+        run: |
+          echo "Validating required GitHub configuration..."
+          
+          # Check Dev Hub authentication (secret)
+          if [ -z "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" ]; then
+            echo "ERROR: DEVHUB_SFDX_AUTH_URL secret is not set or is empty"
+            exit 1
+          fi
+          
+          # Check Notion API key (secret)
+          if [ -z "${{ secrets.NOTION_API_KEY }}" ]; then
+            echo "ERROR: NOTION_API_KEY secret is not configured"
+            exit 1
+          fi
+          
+          # Check Notion configuration (variables)
+          if [ -z "${{ vars.NOTION_WORKSPACE_ID }}" ]; then
+            echo "ERROR: NOTION_WORKSPACE_ID variable is not configured"
+            exit 1
+          fi
+          if [ -z "${{ vars.NOTION_TEST_ACCOUNT_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_ACCOUNT_DB variable is not configured"
+            exit 1
+          fi
+          if [ -z "${{ vars.NOTION_TEST_CONTACT_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_CONTACT_DB variable is not configured"
+            exit 1
+          fi
+          if [ -z "${{ vars.NOTION_TEST_PARENT_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_PARENT_DB variable is not configured"
+            exit 1
+          fi
+          if [ -z "${{ vars.NOTION_TEST_CHILD_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_CHILD_DB variable is not configured"
+            exit 1
+          fi
+          
+          echo "All required configuration is present!"
+      
       - name: Install Salesforce CLI
         run: |
           npm install -g @salesforce/cli
@@ -37,17 +77,13 @@ jobs:
       
       - name: Authenticate Dev Hub
         run: |
-          if [ -z "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" ]; then
-            echo "ERROR: DEVHUB_SFDX_AUTH_URL secret is not set or is empty"
-            exit 1
-          fi
           echo "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" > ./DEVHUB_SFDX_AUTH_URL.txt
           sf org login sfdx-url -f ./DEVHUB_SFDX_AUTH_URL.txt -a devhub -d
           rm ./DEVHUB_SFDX_AUTH_URL.txt
       
       - name: Create Scratch Org
         run: |
-          sf org create scratch -f config/project-scratch-def.json -a ci-scratch --duration-days 1 --no-track-source
+          sf org create scratch -f config/project-scratch-def.json -a ci-scratch --duration-days 1 --no-track-source --wait 10
       
       - name: Deploy Source to Scratch Org
         run: |
@@ -56,6 +92,38 @@ jobs:
       - name: Run Apex Tests
         run: |
           sf apex test run --target-org ci-scratch --code-coverage --result-format human --wait 10
+      
+      - name: Configure Integration Test Metadata
+        run: |
+          ./scripts/configure-test-metadata.sh \
+            --workspace-id "${{ vars.NOTION_WORKSPACE_ID }}" \
+            --account-db "${{ vars.NOTION_TEST_ACCOUNT_DB }}" \
+            --contact-db "${{ vars.NOTION_TEST_CONTACT_DB }}" \
+            --parent-db "${{ vars.NOTION_TEST_PARENT_DB }}" \
+            --child-db "${{ vars.NOTION_TEST_CHILD_DB }}"
+      
+      - name: Deploy Integration Test Components
+        run: |
+          sf project deploy start --source-dir force-app/integration --target-org ci-scratch
+      
+      - name: Setup Notion API Credentials
+        run: |
+          # Create temporary script with API key
+          sed "s/NOTION_API_KEY_PLACEHOLDER/${{ secrets.NOTION_API_KEY }}/g" \
+            scripts/apex/setup-integration-credentials-template.apex > /tmp/setup-credentials.apex
+          sf apex run -f /tmp/setup-credentials.apex -o ci-scratch
+          rm -f /tmp/setup-credentials.apex
+      
+      - name: Run Integration Tests
+        run: |
+          # Export as environment variables for the script
+          export NOTION_WORKSPACE_ID="${{ vars.NOTION_WORKSPACE_ID }}"
+          export NOTION_TEST_ACCOUNT_DB="${{ vars.NOTION_TEST_ACCOUNT_DB }}"
+          export NOTION_TEST_CONTACT_DB="${{ vars.NOTION_TEST_CONTACT_DB }}"
+          export NOTION_TEST_PARENT_DB="${{ vars.NOTION_TEST_PARENT_DB }}"
+          export NOTION_TEST_CHILD_DB="${{ vars.NOTION_TEST_CHILD_DB }}"
+          
+          ./scripts/execute-integration-tests.sh ci-scratch
       
       - name: Delete Scratch Org
         if: always()

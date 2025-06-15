@@ -18,6 +18,9 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                 processObjectRequests(objectType, objectRequests);
             }
         }
+        
+        // Flush all logs to async logger after all callouts are complete
+        NotionSyncLogger.flush();
     }
     
     private Map<String, List<SyncRequest>> groupRequestsByObjectType() {
@@ -110,6 +113,19 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         Set<String> fieldsToQuery = new Set<String>();
         for (NotionSyncField__mdt mapping : fieldMappings) {
             fieldsToQuery.add(mapping.SalesforceFieldApiName__c);
+        }
+        
+        // Also query relationship fields
+        List<NotionRelation__mdt> relations = [
+            SELECT SalesforceRelationshipField__c
+            FROM NotionRelation__mdt
+            WHERE ChildObject__r.ObjectApiName__c = :objectType
+        ];
+        
+        for (NotionRelation__mdt relation : relations) {
+            if (String.isNotBlank(relation.SalesforceRelationshipField__c)) {
+                fieldsToQuery.add(relation.SalesforceRelationshipField__c);
+            }
         }
         
         if (!fieldsToQuery.isEmpty()) {
@@ -365,20 +381,14 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     private void logResult(SyncRequest request, String status, String errorMessage) {
-        Notion_Sync_Log__c log = new Notion_Sync_Log__c(
-            Record_Id__c = request.recordId,
-            Object_Type__c = request.objectType,
-            Operation_Type__c = request.operationType,
-            Status__c = status,
-            Error_Message__c = errorMessage,
-            Retry_Count__c = 0
+        NotionSyncLogger.log(
+            request.recordId,
+            request.objectType,
+            request.operationType,
+            status,
+            errorMessage,
+            0
         );
-        
-        try {
-            insert log;
-        } catch (Exception e) {
-            System.debug('Failed to insert sync log: ' + e.getMessage());
-        }
     }
     
     

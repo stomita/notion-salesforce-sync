@@ -38,8 +38,10 @@ cd notion-salesforce-sync
 
 2. Deploy to your Salesforce org:
 ```bash
-sfdx force:source:deploy -p force-app/
+sf project deploy start --source-dir force-app/main
 ```
+
+Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
 
 3. Configure Named Credentials for Notion API access:
 
@@ -92,6 +94,30 @@ sfdx force:source:deploy -p force-app/
 
 See [CLAUDE.md](CLAUDE.md) for detailed development guidelines and architecture documentation.
 
+## Testing
+
+### Unit Tests
+
+Run unit tests to verify core functionality:
+
+```bash
+sf apex test run --code-coverage --result-format human
+```
+
+### Integration Tests
+
+For comprehensive end-to-end testing with real Notion API calls, see the [Integration Testing Guide](docs/INTEGRATION_TESTING.md).
+
+Quick start:
+```bash
+./scripts/execute-integration-tests.sh
+```
+
+For full setup including metadata configuration and credential setup:
+```bash
+./scripts/run-integration-tests.sh
+```
+
 ### CI/CD Setup
 
 This project uses GitHub Actions for continuous integration. The CI workflow automatically:
@@ -99,19 +125,34 @@ This project uses GitHub Actions for continuous integration. The CI workflow aut
 1. Creates a scratch org
 2. Deploys all metadata
 3. Runs Apex tests
-4. Deletes the scratch org
+4. Runs integration tests
+5. Deletes the scratch org
 
-#### Required Secrets
+#### Required Configuration
 
-To enable CI/CD, add the following secret to your GitHub repository:
-
+##### GitHub Secrets (Sensitive Data):
 - `DEVHUB_SFDX_AUTH_URL`: The Salesforce DX auth URL for your Dev Hub org
+- `NOTION_API_KEY`: Your Notion integration token
 
 To get your Dev Hub auth URL:
 ```bash
 sf org display -o your-devhub-alias --verbose --json
 ```
 Look for the `sfdxAuthUrl` field in the output.
+
+##### GitHub Variables (Non-Sensitive Configuration):
+**Important**: ALL of these must be configured for CI to run successfully.
+
+Configure these as repository variables (Settings → Secrets and variables → Actions → Variables):
+- `NOTION_WORKSPACE_ID`: Your Notion workspace ID
+- `NOTION_TEST_ACCOUNT_DB`: Test database ID for Accounts
+- `NOTION_TEST_CONTACT_DB`: Test database ID for Contacts
+- `NOTION_TEST_PARENT_DB`: Test database ID for parent objects
+- `NOTION_TEST_CHILD_DB`: Test database ID for child objects
+
+The CI workflow validates all configuration at the start and fails if any are missing.
+
+See the [CI Setup Guide](docs/CI_SETUP.md) for detailed instructions on setting up test databases and obtaining these values.
 
 ## CI/CD
 
@@ -124,10 +165,21 @@ This project uses GitHub Actions for automated testing:
 - **Direct Workflow Execution**: Use the Actions tab to run CI on any branch
 
 The CI workflow:
-1. Creates a temporary Salesforce scratch org
-2. Deploys all metadata
-3. Runs all Apex tests with code coverage
-4. Automatically cleans up the scratch org
+1. Validates all required secrets (fails fast if any are missing)
+2. Creates a temporary Salesforce scratch org
+3. Deploys all metadata
+4. Runs all Apex tests with code coverage
+5. Runs integration tests against Notion APIs
+6. Automatically cleans up the scratch org
+
+### Integration Testing in CI
+
+The CI workflow automatically:
+- Validates all required Notion secrets are configured (fails fast if any are missing)
+- Configures test metadata with your Notion database IDs
+- Sets up Named Credentials programmatically
+- Runs end-to-end sync tests against real Notion APIs
+- Validates create, update, delete, and relationship operations
 
 ### PR Labels
 

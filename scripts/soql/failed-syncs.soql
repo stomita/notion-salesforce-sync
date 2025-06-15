@@ -1,0 +1,14 @@
+-- Query failed sync attempts
+SELECT 
+    Id,
+    Record_Id__c,
+    Object_Type__c,
+    Operation_Type__c,
+    Status__c,
+    Error_Message__c,
+    Retry_Count__c,
+    CreatedDate
+FROM Notion_Sync_Log__c
+WHERE Status__c = 'Failed'
+  AND CreatedDate >= LAST_N_DAYS:7
+ORDER BY CreatedDate DESC
