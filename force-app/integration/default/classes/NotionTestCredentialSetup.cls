@@ -122,6 +122,16 @@ public with sharing class NotionTestCredentialSetup {
      */
     public static void setup(String apiKey) {
         setupCredential(apiKey);
+        // Permission set assignment must be done separately to avoid mixed DML
+        ensureUserPermissionsAsync();
+    }
+    
+    /**
+     * Asynchronously ensures the current user has the Notion_Integration_User permission set
+     * Uses @future to avoid mixed DML operations
+     */
+    @future
+    public static void ensureUserPermissionsAsync() {
         ensureUserPermissions();
     }
 }
