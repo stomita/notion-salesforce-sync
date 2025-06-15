@@ -83,7 +83,7 @@ jobs:
       
       - name: Create Scratch Org
         run: |
-          sf org create scratch -f config/project-scratch-def.json -a ci-scratch --duration-days 1 --no-track-source
+          sf org create scratch -f config/project-scratch-def.json -a ci-scratch --duration-days 1 --no-track-source --wait 10
       
       - name: Deploy Source to Scratch Org
         run: |
