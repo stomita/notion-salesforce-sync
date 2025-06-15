@@ -1,12 +1,10 @@
 public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     private List<SyncRequest> requests;
     private NotionRelationshipHandler relationshipHandler;
-    private List<String> pendingLogs;
     
     public NotionSyncQueueable(List<SyncRequest> requests) {
         this.requests = requests;
         this.relationshipHandler = new NotionRelationshipHandler();
-        this.pendingLogs = new List<String>();
     }
     
     public void execute(QueueableContext context) {
@@ -21,16 +19,8 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             }
         }
         
-        // Send all logs to async logger after all callouts are complete
-        if (!pendingLogs.isEmpty()) {
-            if (Test.isRunningTest()) {
-                // In test context, use synchronous logging
-                NotionSyncLogger.logSync(pendingLogs);
-            } else {
-                // In production, use async logging
-                NotionSyncLogger.logAsync(pendingLogs);
-            }
-        }
+        // Flush all logs to async logger after all callouts are complete
+        NotionSyncLogger.flush();
     }
     
     private Map<String, List<SyncRequest>> groupRequestsByObjectType() {
@@ -391,7 +381,7 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     private void logResult(SyncRequest request, String status, String errorMessage) {
-        NotionSyncLogger.LogEntry logEntry = new NotionSyncLogger.LogEntry(
+        NotionSyncLogger.log(
             request.recordId,
             request.objectType,
             request.operationType,
@@ -399,8 +389,6 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             errorMessage,
             0
         );
-        
-        pendingLogs.add(JSON.serialize(logEntry));
     }
     
     

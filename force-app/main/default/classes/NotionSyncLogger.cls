@@ -1,4 +1,5 @@
 public with sharing class NotionSyncLogger {
+    private static List<LogEntry> pendingLogs = new List<LogEntry>();
     
     @future
     public static void logAsync(List<String> logJsonList) {
@@ -31,6 +32,35 @@ public with sharing class NotionSyncLogger {
                 System.debug('Failed to insert sync logs: ' + e.getMessage());
             }
         }
+    }
+    
+    // Add a log entry to the pending collection
+    public static void log(String recordId, String objectType, String operationType, 
+                          String status, String errorMessage, Integer retryCount) {
+        pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount));
+    }
+    
+    // Flush all pending logs
+    public static void flush() {
+        if (!pendingLogs.isEmpty()) {
+            List<String> logJsonList = new List<String>();
+            for (LogEntry entry : pendingLogs) {
+                logJsonList.add(JSON.serialize(entry));
+            }
+            
+            if (Test.isRunningTest()) {
+                logSync(logJsonList);
+            } else {
+                logAsync(logJsonList);
+            }
+            
+            pendingLogs.clear();
+        }
+    }
+    
+    // Clear pending logs without saving (for error scenarios)
+    public static void clear() {
+        pendingLogs.clear();
     }
     
     public class LogEntry {
