@@ -220,4 +220,4 @@ This ensures optimal performance regardless of operation size.
 1. **Permission Sets**: Users must have the `Notion_Integration_User` permission set assigned
 2. **Object Access**: Users need appropriate CRUD permissions on objects being synced
 3. **Field Access**: Ensure field-level security allows access to synced fields
-4. **Named Credentials**: External Credential must have "Available for All Users" checked and API key configured
+4. **Named Credentials**: API key must be configured and users need permission set (or "Available for All Users" for org-wide access)

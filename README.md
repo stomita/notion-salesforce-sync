@@ -69,19 +69,20 @@ Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
      - Parameter Value: Your Notion API token (the one you copied from step a)
    - Save
 
-   c. **Enable System-Wide Access (Important!):**
-   - While still in the External Credential page
-   - Check "Available for All Users" to enable access for system processes
-   - This allows the Invocable Apex (when called from Flows) to access the credential
-   - Without this setting, the sync will fail with credential access errors
-
-   d. **Assign Permission Set (Required):**
+   c. **Assign Permission Set (Required):**
    - Go to Setup → Permission Sets
    - Find "Notion Integration User" (already deployed)
    - Click "Manage Assignments" → "Add Assignment"
    - Select users who will trigger syncs (typically your user or integration user)
    - Save
-   - Note: Even with "Available for All Users" enabled, permission set assignment is required for proper access
+   - This grants access to the Named Credential for sync operations
+
+   d. **Optional: Enable System-Wide Access:**
+   - If you want ALL users to sync without individual permission set assignment:
+   - Go back to External Credential page
+   - Check "Available for All Users"
+   - This allows any user to trigger syncs without the permission set
+   - Note: For security, assigning permission sets to specific users is recommended
 
    e. **Grant integration access to your Notion databases:**
    - In Notion, go to each database you want to sync
@@ -211,8 +212,8 @@ This error occurs when the Invocable Apex method cannot access the Named Credent
 
 **Solution:**
 1. Verify the Named Principal has your API key configured (Setup → Named Credentials → External Credentials → Notion Credential → NotionIntegration)
-2. **Important**: Check "Available for All Users" is enabled in the External Credential settings
-3. Ensure you've assigned the "Notion Integration User" permission set to your user
+2. Ensure you've assigned the "Notion Integration User" permission set to your user
+3. If using org-wide access, check "Available for All Users" in External Credential settings
 4. Run the diagnostic script to verify configuration:
    ```bash
    sf apex run --file scripts/apex/verify-named-credential.apex
@@ -225,7 +226,7 @@ This indicates the Named Principal credential is not configured.
 **Solution:**
 1. The Named Principal should already exist - just add your API key as described in section 3.b
 2. Ensure the `SecretKey` parameter contains your valid Notion API token
-3. Verify "Available for All Users" is checked and permission set is assigned
+3. Verify permission set is assigned to your user (or "Available for All Users" is checked for org-wide access)
 
 #### Sync Not Triggering
 
