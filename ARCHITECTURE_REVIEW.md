@@ -31,8 +31,8 @@
 ### Benefits:
 1. **User Context Preservation**
    - Maintains executing user's permissions
-   - Works with Named Credentials without "Available for All Users"
-   - No special configuration needed
+   - Works with Named Credentials via permission set assignment
+   - No special UI configuration needed
 
 2. **Decoupled Architecture**
    - UI operations complete immediately
@@ -82,7 +82,7 @@
 
 1. **Platform Events**
    - Pros: Fully decoupled, scalable
-   - Cons: Loses user context, requires "Available for All Users" on Named Credentials
+   - Cons: Loses user context (runs as Automated Process user), requires complex credential setup
 
 2. **Change Data Capture (CDC)**
    - Pros: Native Salesforce feature, automatic change tracking

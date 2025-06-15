@@ -55,16 +55,16 @@ Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
    - Click "Submit"
    - Copy the "Internal Integration Token" (starts with `ntn_` or `secret_`)
 
-   b. **Configure Named Principal Credential in Salesforce:**
+   b. **Configure API Key in Salesforce:**
    
-   The Named Credential and Principal are already deployed with the metadata. You only need to set your API key:
+   The External Credential and Named Principal are already deployed with the metadata. You only need to add your API key:
    
    - Go to Setup → Security → Named Credentials
    - Click on "External Credentials" tab
    - Find "Notion Credential" (already deployed)
-   - Click on "NotionIntegration" principal (already created)
+   - Click on "NotionIntegration" principal (already created as Named Principal for org-wide access)
    - Under Authentication Parameters, click "New"
-   - Add Custom Header:
+   - Add parameter:
      - Parameter Name: `SecretKey`
      - Parameter Value: Your Notion API token (the one you copied from step a)
    - Save
@@ -73,21 +73,15 @@ Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
    - Go to Setup → Permission Sets
    - Find "Notion Integration User" (already deployed)
    - Click "Manage Assignments" → "Add Assignment"
-   - Select users who will trigger syncs (typically your user or integration user)
+   - Select users who will trigger syncs
    - Save
-   - This grants access to the Named Credential for sync operations
+   - This permission set grants access to the Named Principal credential
 
-   d. **Optional: Enable System-Wide Access:**
-   - If you want ALL users to sync without individual permission set assignment:
-   - Go back to External Credential page
-   - Check "Available for All Users"
-   - This allows any user to trigger syncs without the permission set
-   - Note: For security, assigning permission sets to specific users is recommended
-
-   e. **Grant integration access to your Notion databases:**
+   d. **Grant integration access to your Notion databases:**
    - In Notion, go to each database you want to sync
    - Click the "..." menu → "Add connections"
    - Select your integration and click "Confirm"
+
 
 4. Set up Custom Metadata records for your sync configuration
 
@@ -208,12 +202,12 @@ The CI workflow automatically:
 
 #### "We couldn't access the credential" Error
 
-This error occurs when the Invocable Apex method cannot access the Named Credential.
+This error occurs when the user cannot access the Named Credential.
 
 **Solution:**
 1. Verify the Named Principal has your API key configured (Setup → Named Credentials → External Credentials → Notion Credential → NotionIntegration)
 2. Ensure you've assigned the "Notion Integration User" permission set to your user
-3. If using org-wide access, check "Available for All Users" in External Credential settings
+3. The permission set must be assigned to any user who will trigger syncs
 4. Run the diagnostic script to verify configuration:
    ```bash
    sf apex run --file scripts/apex/verify-named-credential.apex
@@ -226,7 +220,7 @@ This indicates the Named Principal credential is not configured.
 **Solution:**
 1. The Named Principal should already exist - just add your API key as described in section 3.b
 2. Ensure the `SecretKey` parameter contains your valid Notion API token
-3. Verify permission set is assigned to your user (or "Available for All Users" is checked for org-wide access)
+3. Verify the "Notion Integration User" permission set is assigned to your user
 
 #### Sync Not Triggering
 
