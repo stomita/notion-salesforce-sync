@@ -217,7 +217,7 @@ This ensures optimal performance regardless of operation size.
 
 ## Security Considerations
 
-1. **Permission Sets**: Users must have the `Notion_Integration_User` permission set
+1. **Permission Sets**: Users must have the `Notion_Integration_User` permission set assigned
 2. **Object Access**: Users need appropriate CRUD permissions on objects being synced
 3. **Field Access**: Ensure field-level security allows access to synced fields
-4. **Named Credentials**: Properly configured for Notion API access
+4. **Named Credentials**: External Credential must have "Available for All Users" checked and API key configured
