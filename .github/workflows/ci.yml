@@ -114,7 +114,7 @@ jobs:
       
       - name: Run Integration Tests
         run: |
-          sf apex run -f scripts/apex/run-integration-tests.apex -o ci-scratch
+          ./scripts/execute-integration-tests.sh ci-scratch
       
       - name: Delete Scratch Org
         if: always()

@@ -25,7 +25,51 @@ else
 fi
 
 echo "Running integration tests..."
-sf apex run -f scripts/apex/run-integration-tests.apex $ORG_FLAG
+
+# Test 1: Create
+echo
+echo "=== Test 1: Create and Sync ==="
+echo ">>> Setting up test data..."
+sf apex run -f scripts/apex/test-1-create-setup.apex $ORG_FLAG
+echo ">>> Waiting 5 seconds for sync..."
+sleep 5
+echo ">>> Checking results..."
+sf apex run -f scripts/apex/test-1-create-check.apex $ORG_FLAG
+
+# Test 2: Update
+echo
+echo "=== Test 2: Update and Sync ==="
+echo ">>> Updating records..."
+sf apex run -f scripts/apex/test-2-update-setup.apex $ORG_FLAG
+echo ">>> Waiting 5 seconds for sync..."
+sleep 5
+echo ">>> Checking results..."
+sf apex run -f scripts/apex/test-2-update-check.apex $ORG_FLAG
+
+# Test 3: Relationships
+echo
+echo "=== Test 3: Relationship Sync ==="
+echo ">>> Creating related records..."
+sf apex run -f scripts/apex/test-3-relationship-setup.apex $ORG_FLAG
+echo ">>> Waiting 5 seconds for sync..."
+sleep 5
+echo ">>> Checking results..."
+sf apex run -f scripts/apex/test-3-relationship-check.apex $ORG_FLAG
+
+# Test 4: Delete
+echo
+echo "=== Test 4: Delete and Sync ==="
+echo ">>> Deleting records..."
+sf apex run -f scripts/apex/test-4-delete-setup.apex $ORG_FLAG
+echo ">>> Waiting 5 seconds for sync..."
+sleep 5
+echo ">>> Checking results..."
+sf apex run -f scripts/apex/test-4-delete-check.apex $ORG_FLAG
+
+# Final Report
+echo
+echo "=== Final Report ==="
+sf apex run -f scripts/apex/test-final-report.apex $ORG_FLAG
 
 echo
 echo "=== Integration tests completed ==="

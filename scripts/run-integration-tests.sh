@@ -98,7 +98,7 @@ rm -f "$TEMP_SCRIPT"
 
 echo
 echo "Step 4: Running integration tests..."
-sf apex run -f scripts/apex/run-integration-tests.apex $ORG_FLAG
+./scripts/execute-integration-tests.sh
 
 echo
 echo "=== Integration tests completed ==="

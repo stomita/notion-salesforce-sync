@@ -110,10 +110,13 @@ For comprehensive end-to-end testing with real Notion API calls, see the [Integr
 
 Quick start:
 ```bash
-./scripts/run-integration-tests.sh
+./scripts/execute-integration-tests.sh
 ```
 
-The script will prompt for any required configuration and run all integration tests.
+For full setup including metadata configuration and credential setup:
+```bash
+./scripts/run-integration-tests.sh
+```
 
 ### CI/CD Setup
 

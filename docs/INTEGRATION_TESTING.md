@@ -118,42 +118,44 @@ These appear as rich text within the Notion page itself.
 
 The integration test framework now supports both automated CI execution and interactive local development.
 
-### Running Integration Tests Locally
+### Choosing the Right Script
 
-Simply run:
+#### Use `run-integration-tests.sh` when:
+- **First-time setup** - You haven't configured the test environment yet
+- **CI/CD environment** - Running in a fresh scratch org that needs full setup
+- **Complete automation needed** - You want the script to handle all configuration
+
+This script provides:
+- Interactive prompts for missing environment variables (API key, database IDs)
+- Automatic test metadata configuration
+- Integration test component deployment
+- Named Credential setup with your API key
+- Test execution
+- Cleanup (restoring placeholder values)
 
 ```bash
+# First time setup
 ./scripts/run-integration-tests.sh
-```
 
-The script will:
-- Prompt you for any missing environment variables (API key, database IDs, etc.)
-- Automatically configure test metadata
-- Deploy integration test components
-- Set up Named Credentials programmatically
-- Execute all integration tests
-- Clean up temporary files
-
-You can also specify a scratch org:
-
-```bash
+# Specify a scratch org
 ./scripts/run-integration-tests.sh my-scratch-org
 ```
 
-### Running Tests Without Setup
+#### Use `execute-integration-tests.sh` when:
+- **Everything is already configured** - Named Credentials, metadata, and components are set up
+- **Quick re-runs** - You just want to run tests again without setup
+- **Debugging** - You're iterating on test fixes and need fast execution
 
-If your org is already configured with:
-- Real Notion database IDs in the metadata
-- Named Credentials with valid API key
-- Deployed integration test components
-
-You can use the simple execution script:
+This lightweight script only runs the tests, skipping all setup steps.
 
 ```bash
+# Quick test execution
+./scripts/execute-integration-tests.sh
+
+# After deploying test code changes
+sf project deploy start --source-dir force-app/integration
 ./scripts/execute-integration-tests.sh
 ```
-
-This script skips all setup steps and just runs the tests directly.
 
 ### Environment Variables (Optional)
 
@@ -357,43 +359,10 @@ sf apex run --file /tmp/setup-creds.apex
 ### 4. Run Tests
 
 ```bash
-sf apex run --file scripts/apex/run-integration-tests.apex
+./scripts/execute-integration-tests.sh
 ```
 
 ## Advanced Usage
-
-### Quick Test Execution
-
-For already-configured orgs, use the simple execution script:
-
-```bash
-# Run tests without any setup steps
-./scripts/execute-integration-tests.sh
-
-# Or specify an org
-./scripts/execute-integration-tests.sh my-scratch-org
-```
-
-This is ideal for:
-- Repeated test runs during development
-- CI environments where configuration is pre-deployed
-- Testing after manual configuration changes
-
-### Running Individual Tests
-
-To run specific tests, create a custom apex script:
-
-```apex
-NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
-// Run only specific test
-executor.testCreateSync();
-// Or
-executor.testUpdateSync();
-// Or
-executor.testRelationshipSync();
-// Or
-executor.testDeleteSync();
-```
 
 ### Debugging Failed Tests
 

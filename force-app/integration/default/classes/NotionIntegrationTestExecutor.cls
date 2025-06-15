@@ -10,26 +10,46 @@ public class NotionIntegrationTestExecutor {
     private List<String> errors = new List<String>();
     
     /**
-     * Run all integration tests
+     * Phase 1: Trigger sync operations by creating/updating/deleting records
      */
-    public void runAllTests() {
-        System.debug('=== Starting Notion Integration Tests ===');
+    public void runPhase1_TriggerOperations() {
+        System.debug('=== Phase 1: Triggering Sync Operations ===');
         
         try {
-            // Setup test data
+            // Setup and create test data - this triggers the flows
             setupTestData();
+            createTestRecords();
+            updateTestRecords();
+            createRelatedRecords();
+            deleteTestRecords();
             
-            // Run individual tests
-            testCreateSync();
-            testUpdateSync();
-            testRelationshipSync();
-            testDeleteSync();
+            System.debug('Phase 1 complete - all operations triggered');
+            
+        } catch (Exception e) {
+            System.debug('FATAL ERROR in Phase 1: ' + e.getMessage());
+            System.debug('Stack trace: ' + e.getStackTraceString());
+            throw e;
+        }
+    }
+    
+    /**
+     * Phase 2: Check sync results after platform events have processed
+     */
+    public void runPhase2_CheckResults() {
+        System.debug('=== Phase 2: Checking Sync Results ===');
+        
+        try {
+            // Check results of all sync operations
+            checkCreateSyncResults();
+            checkUpdateSyncResults();
+            checkRelationshipSyncResults();
+            checkDeleteSyncResults();
             
             // Report results
             reportResults();
             
         } catch (Exception e) {
-            System.debug('FATAL ERROR: ' + e.getMessage());
+            System.debug('FATAL ERROR in Phase 2: ' + e.getMessage());
             System.debug('Stack trace: ' + e.getStackTraceString());
             throw e;
         }
@@ -38,7 +58,7 @@ public class NotionIntegrationTestExecutor {
     /**
      * Setup test data
      */
-    private void setupTestData() {
+    public void setupTestData() {
         System.debug('\n--- Setting up test data ---');
         
         // Clean up any existing test data
@@ -47,42 +67,62 @@ public class NotionIntegrationTestExecutor {
         delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test Parent%'];
         delete [SELECT Id FROM Test_Child_Object__c WHERE Name LIKE 'Integration Test Child%'];
         
-        // Wait for any pending syncs to complete
-        waitForSyncCompletion();
-        
         System.debug('Test data cleanup complete');
     }
     
     /**
-     * Test creating records and syncing to Notion
+     * Create test records (Phase 1)
      */
-    private void testCreateSync() {
-        System.debug('\n--- Test 1: Create and Sync ---');
+    public void createTestRecords() {
+        System.debug('\n--- Creating test records ---');
+        
+        // Create test account
+        Account testAccount = new Account(
+            Name = 'Integration Test Account ' + DateTime.now().getTime(),
+            Description = 'This account was created by integration test'
+        );
+        insert testAccount;
+        
+        // Create test parent object
+        Test_Parent_Object__c testParent = new Test_Parent_Object__c(
+            Name = 'Integration Test Parent ' + DateTime.now().getTime(),
+            Description__c = 'Test parent description',
+            Status__c = 'New',
+            Amount__c = 1000.00,
+            Active__c = true
+        );
+        insert testParent;
+        
+        System.debug('Test records created');
+    }
+    
+    /**
+     * Check create sync results (Phase 2)
+     */
+    public void checkCreateSyncResults() {
+        System.debug('\n--- Checking create sync results ---');
         
         try {
-            // Create test account
-            Account testAccount = new Account(
-                Name = 'Integration Test Account ' + DateTime.now().getTime(),
-                Description = 'This account was created by integration test'
-            );
-            insert testAccount;
+            // Get the most recent test records
+            Account testAccount = [
+                SELECT Id, Name 
+                FROM Account 
+                WHERE Name LIKE 'Integration Test Account%' 
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
             
-            // Create test parent object
-            Test_Parent_Object__c testParent = new Test_Parent_Object__c(
-                Name = 'Integration Test Parent ' + DateTime.now().getTime(),
-                Description__c = 'Test parent description',
-                Status__c = 'Active',
-                Amount__c = 1000.00,
-                Active__c = true
-            );
-            insert testParent;
+            Test_Parent_Object__c testParent = [
+                SELECT Id, Name
+                FROM Test_Parent_Object__c
+                WHERE Name LIKE 'Integration Test Parent%'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
             
-            // Wait for sync to complete
-            waitForSyncCompletion();
-            
-            // Verify sync logs
+            // Check sync logs
             List<Notion_Sync_Log__c> logs = [
-                SELECT Id, Status__c, Notion_Page_Id__c, Error_Message__c
+                SELECT Id, Record_Id__c, Status__c, Notion_Page_Id__c, Error_Message__c
                 FROM Notion_Sync_Log__c
                 WHERE Record_Id__c IN (:testAccount.Id, :testParent.Id)
                 AND Operation_Type__c = 'CREATE'
@@ -97,7 +137,7 @@ public class NotionIntegrationTestExecutor {
                     if (log.Record_Id__c == testAccount.Id) accountSynced = true;
                     if (log.Record_Id__c == testParent.Id) parentSynced = true;
                 } else {
-                    errors.add('Sync failed: ' + log.Error_Message__c);
+                    errors.add('Create sync failed for ' + log.Record_Id__c + ': ' + log.Error_Message__c);
                 }
             }
             
@@ -115,9 +155,43 @@ public class NotionIntegrationTestExecutor {
     }
     
     /**
-     * Test updating records and syncing changes to Notion
+     * Update test records (Phase 1)
      */
-    private void testUpdateSync() {
+    public void updateTestRecords() {
+        System.debug('\n--- Updating test records ---');
+        
+        // Get existing test records
+        Account testAccount = [
+            SELECT Id, Name, Description 
+            FROM Account 
+            WHERE Name LIKE 'Integration Test Account%' 
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        Test_Parent_Object__c testParent = [
+            SELECT Id, Name, Status__c, Amount__c
+            FROM Test_Parent_Object__c
+            WHERE Name LIKE 'Integration Test Parent%'
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        // Update records
+        testAccount.Description = 'Updated by integration test at ' + DateTime.now();
+        update testAccount;
+        
+        testParent.Status__c = 'In Progress';
+        testParent.Amount__c = 2500.00;
+        update testParent;
+        
+        System.debug('Test records updated');
+    }
+    
+    /**
+     * Check update sync results (Phase 2)
+     */
+    public void checkUpdateSyncResults() {
         System.debug('\n--- Test 2: Update and Sync ---');
         
         try {
@@ -126,6 +200,7 @@ public class NotionIntegrationTestExecutor {
                 SELECT Id, Name, Description 
                 FROM Account 
                 WHERE Name LIKE 'Integration Test Account%' 
+                ORDER BY CreatedDate DESC
                 LIMIT 1
             ];
             
@@ -133,19 +208,9 @@ public class NotionIntegrationTestExecutor {
                 SELECT Id, Name, Status__c, Amount__c
                 FROM Test_Parent_Object__c
                 WHERE Name LIKE 'Integration Test Parent%'
+                ORDER BY CreatedDate DESC
                 LIMIT 1
             ];
-            
-            // Update records
-            testAccount.Description = 'Updated by integration test at ' + DateTime.now();
-            update testAccount;
-            
-            testParent.Status__c = 'Inactive';
-            testParent.Amount__c = 2500.00;
-            update testParent;
-            
-            // Wait for sync
-            waitForSyncCompletion();
             
             // Verify update sync
             List<Notion_Sync_Log__c> logs = [
@@ -172,12 +237,10 @@ public class NotionIntegrationTestExecutor {
     }
     
     /**
-     * Test relationship syncing
+     * Create related records (Phase 1)
      */
-    private void testRelationshipSync() {
-        System.debug('\n--- Test 3: Relationship Sync ---');
-        
-        try {
+    public void createRelatedRecords() {
+        System.debug('\n--- Creating related records ---');
             // Get test records
             Account testAccount = [
                 SELECT Id, Name 
@@ -213,10 +276,35 @@ public class NotionIntegrationTestExecutor {
             );
             insert testContact;
             
-            // Wait for sync
-            waitForSyncCompletion();
+        
+        System.debug('Related records created');
+    }
+    
+    /**
+     * Check relationship sync results (Phase 2)
+     */
+    public void checkRelationshipSyncResults() {
+        System.debug('\n--- Checking relationship sync results ---');
+        
+        try {
+            // Get created child and contact
+            Test_Child_Object__c testChild = [
+                SELECT Id, Name
+                FROM Test_Child_Object__c
+                WHERE Name LIKE 'Integration Test Child%'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
             
-            // Verify relationship sync
+            Contact testContact = [
+                SELECT Id, LastName
+                FROM Contact
+                WHERE LastName LIKE 'Test Contact%'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            // Check sync logs
             List<Notion_Sync_Log__c> logs = [
                 SELECT Id, Status__c, Notion_Page_Id__c, Error_Message__c, Object_Type__c
                 FROM Notion_Sync_Log__c
@@ -243,34 +331,43 @@ public class NotionIntegrationTestExecutor {
     }
     
     /**
-     * Test deleting records and syncing to Notion
+     * Delete test records (Phase 1)
      */
-    private void testDeleteSync() {
-        System.debug('\n--- Test 4: Delete and Sync ---');
+    public void deleteTestRecords() {
+        System.debug('\n--- Deleting test records ---');
+        
+        // Get child record to delete
+        Test_Child_Object__c testChild = [
+            SELECT Id, Name
+            FROM Test_Child_Object__c
+            WHERE Name LIKE 'Integration Test Child%'
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        // Store the ID for later verification
+        String childIdToDelete = testChild.Id;
+        
+        // Delete the record
+        delete testChild;
+        
+        System.debug('Test child record deleted: ' + childIdToDelete);
+    }
+    
+    /**
+     * Check delete sync results (Phase 2)
+     */
+    public void checkDeleteSyncResults() {
+        System.debug('\n--- Checking delete sync results ---');
         
         try {
-            // Get child record to delete
-            Test_Child_Object__c testChild = [
-                SELECT Id, Name
-                FROM Test_Child_Object__c
-                WHERE Name LIKE 'Integration Test Child%'
-                LIMIT 1
-            ];
-            
-            String childId = testChild.Id;
-            
-            // Delete the record
-            delete testChild;
-            
-            // Wait for sync
-            waitForSyncCompletion();
-            
-            // Verify delete sync
+            // Find the most recent delete sync log
             List<Notion_Sync_Log__c> logs = [
-                SELECT Id, Status__c, Error_Message__c
+                SELECT Id, Record_Id__c, Status__c, Error_Message__c
                 FROM Notion_Sync_Log__c
-                WHERE Record_Id__c = :childId
-                AND Operation_Type__c = 'DELETE'
+                WHERE Operation_Type__c = 'DELETE'
+                AND Object_Type__c = 'Test_Child_Object__c'
+                AND CreatedDate = TODAY
                 ORDER BY CreatedDate DESC
                 LIMIT 1
             ];
@@ -290,45 +387,9 @@ public class NotionIntegrationTestExecutor {
     }
     
     /**
-     * Wait for async sync operations to complete
-     */
-    private void waitForSyncCompletion() {
-        System.debug('Waiting for sync operations to complete...');
-        
-        // Wait up to 30 seconds for sync to complete
-        Integer maxWaitTime = 30000; // 30 seconds
-        Integer waitInterval = 2000; // 2 seconds
-        Integer totalWait = 0;
-        
-        while (totalWait < maxWaitTime) {
-            // Check if there are any pending sync operations
-            Integer pendingCount = [
-                SELECT COUNT()
-                FROM Notion_Sync_Log__c
-                WHERE Status__c = 'Pending'
-                AND CreatedDate >= :DateTime.now().addMinutes(-5)
-            ];
-            
-            if (pendingCount == 0) {
-                System.debug('All sync operations completed');
-                break;
-            }
-            
-            // Wait before checking again
-            Long startTime = DateTime.now().getTime();
-            while (DateTime.now().getTime() - startTime < waitInterval) {
-                // Busy wait
-            }
-            
-            totalWait += waitInterval;
-            System.debug('Still waiting... (' + totalWait/1000 + ' seconds)');
-        }
-    }
-    
-    /**
      * Report test results
      */
-    private void reportResults() {
+    public void reportResults() {
         System.debug('\n=== Integration Test Results ===');
         System.debug('Passed: ' + passCount);
         System.debug('Failed: ' + failCount);
