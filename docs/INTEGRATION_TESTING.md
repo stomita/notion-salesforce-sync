@@ -429,7 +429,7 @@ sf apex log list
 sf apex log get --log-id <log-id>
 
 # Monitor sync logs
-sf data query --query "$(cat scripts/soql/check-sync-logs.soql)"
+sf data query -f scripts/soql/check-sync-logs.soql
 
 # Check Queueable Jobs
 sf data query --query "SELECT Id, Status, JobType, MethodName, CreatedDate FROM AsyncApexJob WHERE JobType='Queueable' ORDER BY CreatedDate DESC LIMIT 10"

@@ -1,4 +1,3 @@
--- Query recent sync logs with details
 SELECT 
     Id,
     Record_Id__c,
