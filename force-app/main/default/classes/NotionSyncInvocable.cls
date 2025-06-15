@@ -16,33 +16,42 @@ public with sharing class NotionSyncInvocable {
     public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
         List<SyncResult> results = new List<SyncResult>();
         
-        // Process each request
-        for (SyncRequest request : requests) {
-            try {
-                // For single record operations, use @future for immediate processing
-                if (requests.size() == 1 && request.operationType != 'DELETE') {
-                    processSyncFuture(
-                        request.recordId, 
-                        request.objectType, 
-                        request.operationType
-                    );
-                    results.add(new SyncResult(true, 'Sync initiated successfully'));
-                }
-                // For bulk operations or deletes, use Queueable
-                else {
-                    List<NotionSyncQueueable.SyncRequest> queueableRequests = 
-                        new List<NotionSyncQueueable.SyncRequest>();
-                    
+        try {
+            // For single record operations (non-delete), use @future for immediate processing
+            if (requests.size() == 1 && requests[0].operationType != 'DELETE') {
+                SyncRequest request = requests[0];
+                processSyncFuture(
+                    request.recordId, 
+                    request.objectType, 
+                    request.operationType
+                );
+                results.add(new SyncResult(true, 'Sync initiated successfully'));
+            }
+            // For bulk operations or deletes, use Queueable
+            else {
+                List<NotionSyncQueueable.SyncRequest> queueableRequests = 
+                    new List<NotionSyncQueueable.SyncRequest>();
+                
+                // Batch all requests together
+                for (SyncRequest request : requests) {
                     queueableRequests.add(new NotionSyncQueueable.SyncRequest(
                         request.recordId,
                         request.objectType,
                         request.operationType
                     ));
-                    
-                    System.enqueueJob(new NotionSyncQueueable(queueableRequests));
+                }
+                
+                // Enqueue once with all requests
+                System.enqueueJob(new NotionSyncQueueable(queueableRequests));
+                
+                // Return success for all
+                for (SyncRequest request : requests) {
                     results.add(new SyncResult(true, 'Sync queued for processing'));
                 }
-            } catch (Exception e) {
+            }
+        } catch (Exception e) {
+            // If there's an error, return error result for all requests
+            for (SyncRequest request : requests) {
                 results.add(new SyncResult(false, 'Error: ' + e.getMessage()));
             }
         }
