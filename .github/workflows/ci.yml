@@ -30,43 +30,45 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.event.pull_request.head.sha || github.ref }}
       
-      - name: Validate Required Secrets
+      - name: Validate Required Configuration
         run: |
-          echo "Validating required GitHub secrets..."
+          echo "Validating required GitHub configuration..."
           
-          # Check Dev Hub authentication
+          # Check Dev Hub authentication (secret)
           if [ -z "${{ secrets.DEVHUB_SFDX_AUTH_URL }}" ]; then
             echo "ERROR: DEVHUB_SFDX_AUTH_URL secret is not set or is empty"
             exit 1
           fi
           
-          # Check Notion integration test configuration
+          # Check Notion API key (secret)
           if [ -z "${{ secrets.NOTION_API_KEY }}" ]; then
             echo "ERROR: NOTION_API_KEY secret is not configured"
             exit 1
           fi
-          if [ -z "${{ secrets.NOTION_WORKSPACE_ID }}" ]; then
-            echo "ERROR: NOTION_WORKSPACE_ID secret is not configured"
+          
+          # Check Notion configuration (variables)
+          if [ -z "${{ vars.NOTION_WORKSPACE_ID }}" ]; then
+            echo "ERROR: NOTION_WORKSPACE_ID variable is not configured"
             exit 1
           fi
-          if [ -z "${{ secrets.NOTION_TEST_ACCOUNT_DB }}" ]; then
-            echo "ERROR: NOTION_TEST_ACCOUNT_DB secret is not configured"
+          if [ -z "${{ vars.NOTION_TEST_ACCOUNT_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_ACCOUNT_DB variable is not configured"
             exit 1
           fi
-          if [ -z "${{ secrets.NOTION_TEST_CONTACT_DB }}" ]; then
-            echo "ERROR: NOTION_TEST_CONTACT_DB secret is not configured"
+          if [ -z "${{ vars.NOTION_TEST_CONTACT_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_CONTACT_DB variable is not configured"
             exit 1
           fi
-          if [ -z "${{ secrets.NOTION_TEST_PARENT_DB }}" ]; then
-            echo "ERROR: NOTION_TEST_PARENT_DB secret is not configured"
+          if [ -z "${{ vars.NOTION_TEST_PARENT_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_PARENT_DB variable is not configured"
             exit 1
           fi
-          if [ -z "${{ secrets.NOTION_TEST_CHILD_DB }}" ]; then
-            echo "ERROR: NOTION_TEST_CHILD_DB secret is not configured"
+          if [ -z "${{ vars.NOTION_TEST_CHILD_DB }}" ]; then
+            echo "ERROR: NOTION_TEST_CHILD_DB variable is not configured"
             exit 1
           fi
           
-          echo "All required secrets are configured!"
+          echo "All required configuration is present!"
       
       - name: Install Salesforce CLI
         run: |
@@ -94,11 +96,11 @@ jobs:
       - name: Configure Integration Test Metadata
         run: |
           ./scripts/configure-test-metadata.sh \
-            --workspace-id "${{ secrets.NOTION_WORKSPACE_ID }}" \
-            --account-db "${{ secrets.NOTION_TEST_ACCOUNT_DB }}" \
-            --contact-db "${{ secrets.NOTION_TEST_CONTACT_DB }}" \
-            --parent-db "${{ secrets.NOTION_TEST_PARENT_DB }}" \
-            --child-db "${{ secrets.NOTION_TEST_CHILD_DB }}"
+            --workspace-id "${{ vars.NOTION_WORKSPACE_ID }}" \
+            --account-db "${{ vars.NOTION_TEST_ACCOUNT_DB }}" \
+            --contact-db "${{ vars.NOTION_TEST_CONTACT_DB }}" \
+            --parent-db "${{ vars.NOTION_TEST_PARENT_DB }}" \
+            --child-db "${{ vars.NOTION_TEST_CHILD_DB }}"
       
       - name: Deploy Integration Test Components
         run: |
@@ -114,6 +116,13 @@ jobs:
       
       - name: Run Integration Tests
         run: |
+          # Export as environment variables for the script
+          export NOTION_WORKSPACE_ID="${{ vars.NOTION_WORKSPACE_ID }}"
+          export NOTION_TEST_ACCOUNT_DB="${{ vars.NOTION_TEST_ACCOUNT_DB }}"
+          export NOTION_TEST_CONTACT_DB="${{ vars.NOTION_TEST_CONTACT_DB }}"
+          export NOTION_TEST_PARENT_DB="${{ vars.NOTION_TEST_PARENT_DB }}"
+          export NOTION_TEST_CHILD_DB="${{ vars.NOTION_TEST_CHILD_DB }}"
+          
           ./scripts/execute-integration-tests.sh ci-scratch
       
       - name: Delete Scratch Org

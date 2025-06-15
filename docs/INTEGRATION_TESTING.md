@@ -249,16 +249,21 @@ The integration tests run automatically in CI when:
 2. A pull request is created or updated
 3. Code is pushed to the main branch
 
-Required GitHub secrets:
-- `NOTION_API_KEY`
-- `NOTION_WORKSPACE_ID`
-- `NOTION_DATABASE_ID_ACCOUNT`
-- `NOTION_DATABASE_ID_CONTACT`
-- `NOTION_DATABASE_ID_TEST_PARENT`
-- `NOTION_DATABASE_ID_TEST_CHILD`
+Required GitHub configuration:
+
+**Secrets** (sensitive data):
+- `DEVHUB_SFDX_AUTH_URL` - Salesforce Dev Hub authentication
+- `NOTION_API_KEY` - Notion API key
+
+**Variables** (non-sensitive configuration):
+- `NOTION_WORKSPACE_ID` - Notion workspace ID
+- `NOTION_TEST_ACCOUNT_DB` - Account test database ID
+- `NOTION_TEST_CONTACT_DB` - Contact test database ID
+- `NOTION_TEST_PARENT_DB` - Test Parent database ID
+- `NOTION_TEST_CHILD_DB` - Test Child database ID
 
 The CI workflow will:
-1. Validate all secrets are present (fail fast if not)
+1. Validate all configuration is present (fail fast if not)
 2. Create a scratch org
 3. Deploy all metadata including integration tests
 4. Configure Named Credentials automatically

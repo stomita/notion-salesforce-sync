@@ -128,10 +128,11 @@ This project uses GitHub Actions for continuous integration. The CI workflow aut
 4. Runs integration tests
 5. Deletes the scratch org
 
-#### Required Secrets
+#### Required Configuration
 
-##### For Basic CI/CD:
+##### GitHub Secrets (Sensitive Data):
 - `DEVHUB_SFDX_AUTH_URL`: The Salesforce DX auth URL for your Dev Hub org
+- `NOTION_API_KEY`: Your Notion integration token
 
 To get your Dev Hub auth URL:
 ```bash
@@ -139,17 +140,17 @@ sf org display -o your-devhub-alias --verbose --json
 ```
 Look for the `sfdxAuthUrl` field in the output.
 
-##### For Integration Testing (Required):
-**Important**: ALL of these secrets MUST be configured for CI to run successfully.
+##### GitHub Variables (Non-Sensitive Configuration):
+**Important**: ALL of these must be configured for CI to run successfully.
 
-- `NOTION_API_KEY`: Your Notion integration token
+Configure these as repository variables (Settings → Secrets and variables → Actions → Variables):
 - `NOTION_WORKSPACE_ID`: Your Notion workspace ID
 - `NOTION_TEST_ACCOUNT_DB`: Test database ID for Accounts
 - `NOTION_TEST_CONTACT_DB`: Test database ID for Contacts
 - `NOTION_TEST_PARENT_DB`: Test database ID for parent objects
 - `NOTION_TEST_CHILD_DB`: Test database ID for child objects
 
-The CI workflow validates these secrets at the start and fails if any are missing.
+The CI workflow validates all configuration at the start and fails if any are missing.
 
 See the [CI Setup Guide](docs/CI_SETUP.md) for detailed instructions on setting up test databases and obtaining these values.
 
