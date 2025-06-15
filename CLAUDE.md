@@ -14,9 +14,9 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 4. **Generic Configuration**: Sync targets configurable via Custom Metadata Types
 5. **Unique Identification**: Notion databases must have properties to store Salesforce IDs for uniqueness
 6. **Long Text Support**: Salesforce Long Text Area fields can be mapped to Notion page body content
-7. **Real-time Sync via Flow**: Sync triggered by Flow on record create/update/delete events using Platform Events for asynchronous processing
+7. **Real-time Sync via Flow**: Sync triggered by Flow on record create/update/delete events using Invocable Apex methods
 8. **Deletion Handling**: When Salesforce records are deleted, corresponding Notion pages are also deleted
-9. **Asynchronous Processing**: Use Platform Events and Queueable Apex to avoid transaction limitations
+9. **Asynchronous Processing**: Use Queueable and @future methods to avoid transaction limitations
 10. **Error Resilience**: Automatic retry mechanism and error logging for failed syncs
 
 ### Architecture Principles
@@ -25,19 +25,18 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 - **Object-Agnostic**: Works with any Salesforce standard or custom objects
 - **Relationship-Aware**: Processes and maintains parent-child and lookup relationships
 - **Notion-Native**: Creates proper Notion database entries with correct property types
-- **Event-Driven**: Uses Platform Events for decoupled, asynchronous processing
+- **User Context Aware**: Maintains user context for Named Credential access
 - **Transaction-Safe**: External API calls happen outside of DML transactions
 
 ### Core Components
 
 1. **Custom Metadata Types**: Define sync configurations (objects, fields, databases, property mappings)
-2. **Platform Event**: `Notion_Sync_Event__e` - Carries sync requests from Flow to async processor
-3. **Event Subscriber**: Processes platform events and enqueues Queueable jobs
-4. **Notion API Client**: Handles authentication and API calls to Notion
-5. **Data Transformer**: Converts Salesforce data to Notion format
-6. **Relationship Handler**: Manages cross-object relationships
-7. **Sync Queueable**: Asynchronous processor for Notion API operations
-8. **Error Logger**: Tracks sync status and failures in custom object
+2. **Invocable Apex**: `NotionSyncInvocable` - Entry point for Flow-triggered syncs
+3. **Notion API Client**: Handles authentication and API calls to Notion
+4. **Data Transformer**: Converts Salesforce data to Notion format
+5. **Relationship Handler**: Manages cross-object relationships
+6. **Sync Queueable**: Asynchronous processor for Notion API operations
+7. **Error Logger**: Tracks sync status and failures in custom object
 
 ## Development Commands
 
@@ -116,65 +115,29 @@ See `docs/CI_SETUP.md` for detailed setup instructions.
 
 ## Implementation Details
 
-### Platform Event Definition
-```xml
-<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
-    <deploymentStatus>Deployed</deploymentStatus>
-    <eventType>HighVolume</eventType>
-    <label>Notion Sync Event</label>
-    <pluralLabel>Notion Sync Events</pluralLabel>
-    <fields>
-        <fullName>Record_Id__c</fullName>
-        <label>Record ID</label>
-        <length>18</length>
-        <required>true</required>
-        <type>Text</type>
-    </fields>
-    <fields>
-        <fullName>Object_Type__c</fullName>
-        <label>Object Type</label>
-        <length>80</length>
-        <required>true</required>
-        <type>Text</type>
-    </fields>
-    <fields>
-        <fullName>Operation_Type__c</fullName>
-        <label>Operation Type</label>
-        <length>20</length>
-        <required>true</required>
-        <type>Text</type>
-    </fields>
-</CustomObject>
+### Invocable Apex Method
+```apex
+@InvocableMethod(
+    label='Sync Record to Notion' 
+    description='Synchronizes a Salesforce record to Notion database'
+    category='Notion Integration'
+)
+public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
+    // Process each sync request
+    // For single records: use @future for immediate processing
+    // For bulk operations: use Queueable
+    // Maintains user context for Named Credential access
+}
 ```
 
 ### Flow Integration
 1. Create Record-Triggered Flow on desired object (e.g., Account)
 2. Set trigger: "When a record is created or updated" or "When a record is deleted"
-3. Add Action: "Create Records" → Platform Event
-4. Set Field Values:
-   - Object: `Notion_Sync_Event__e`
-   - Record_Id__c: `{!$Record.Id}`
-   - Object_Type__c: 'Account' (or dynamic object API name)
-   - Operation_Type__c: 'CREATE', 'UPDATE', or 'DELETE'
-
-### Event Subscriber (Trigger)
-```apex
-trigger NotionSyncEventTrigger on Notion_Sync_Event__e (after insert) {
-    List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-    
-    for (Notion_Sync_Event__e event : Trigger.new) {
-        requests.add(new NotionSyncQueueable.SyncRequest(
-            event.Record_Id__c,
-            event.Object_Type__c,
-            event.Operation_Type__c
-        ));
-    }
-    
-    if (!requests.isEmpty()) {
-        System.enqueueJob(new NotionSyncQueueable(requests));
-    }
-}
-```
+3. Add Action: Call Apex → NotionSyncInvocable
+4. Map Input Values:
+   - recordId: `{!$Record.Id}`
+   - objectType: 'Account' (or dynamic object API name)
+   - operationType: 'CREATE', 'UPDATE', or 'DELETE'
 
 ### Queueable Apex
 ```apex
@@ -187,8 +150,13 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     
     public void execute(QueueableContext context) {
         // Process sync requests
-        // Make Notion API callouts
+        // Make Notion API callouts  
         // Handle errors and retries
+    }
+    
+    public void processSyncRequests(List<SyncRequest> syncRequests) {
+        // Public method to support direct invocation
+        // Processes requests maintaining user context
     }
 }
 ```
@@ -223,15 +191,17 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
 ### Flow Integration
 - **Record-Triggered Flow**: Configured per object to sync
   - Trigger: After insert, update, or delete
-  - Action: Create Platform Event record
-  - Event Fields: Record ID, Object Type, Operation Type
+  - Action: Call NotionSyncInvocable Apex method
+  - Parameters: Record ID, Object Type, Operation Type
 
 ### Data Flow
 1. Flow triggers on record create/update/delete
-2. Flow publishes Platform Event with record details
-3. Platform Event Trigger receives the event
-4. Trigger enqueues Queueable job for asynchronous processing
-5. Queueable job queries Salesforce objects based on metadata configuration
+2. Flow calls NotionSyncInvocable with record details
+3. Invocable method determines processing strategy:
+   - Single record: @future for immediate processing
+   - Bulk/Delete: Queueable for batch processing
+4. Processing maintains user context for Named Credential access
+5. Query Salesforce objects based on metadata configuration
 6. Transform data according to field mappings
 7. Handle relationships by creating/updating related records first
 8. Make API calls to create/update/delete Notion database pages

@@ -6,14 +6,14 @@
 CONFIGURATION INSTRUCTIONS:
 1. Duplicate this flow and rename it for your specific object
 2. Update the 'start' element objectType to match your object API name
-3. Update the Object_Type__c value in the recordCreates element
+3. Update the Object Type value in the actionCalls element
 4. Activate the flow
 5. Test with record delete operations
 
 Example for Account object:
 - Flow Name: NotionSync_Account_Delete
 - objectType: Account
-- Object_Type__c: 'Account'</description>
+- Object Type: 'Account'</description>
     <environments>Default</environments>
     <label>Notion Sync Template - Delete</label>
     <processMetadataValues>
@@ -35,37 +35,38 @@ Example for Account object:
         </value>
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
-    <recordCreates>
-        <description>Create Platform Event to trigger Notion sync for deletion</description>
-        <name>Create_Notion_Sync_Event</name>
-        <label>Create Notion Sync Event</label>
+    <actionCalls>
+        <description>Delete record from Notion</description>
+        <name>Delete_from_Notion</name>
+        <label>Delete from Notion</label>
         <locationX>176</locationX>
         <locationY>158</locationY>
-        <inputAssignments>
-            <field>Object_Type__c</field>
-            <value>
-                <stringValue>Account</stringValue>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
-            <field>Operation_Type__c</field>
-            <value>
-                <stringValue>DELETE</stringValue>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
-            <field>Record_Id__c</field>
+        <actionName>NotionSyncInvocable</actionName>
+        <actionType>apex</actionType>
+        <inputParameters>
+            <name>recordId</name>
             <value>
                 <elementReference>$Record.Id</elementReference>
             </value>
-        </inputAssignments>
-        <object>Notion_Sync_Event__e</object>
-    </recordCreates>
+        </inputParameters>
+        <inputParameters>
+            <name>objectType</name>
+            <value>
+                <stringValue>Account</stringValue>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>operationType</name>
+            <value>
+                <stringValue>DELETE</stringValue>
+            </value>
+        </inputParameters>
+    </actionCalls>
     <start>
         <locationX>50</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Create_Notion_Sync_Event</targetReference>
+            <targetReference>Delete_from_Notion</targetReference>
         </connector>
         <object>Account</object>
         <recordTriggerType>Delete</recordTriggerType>
