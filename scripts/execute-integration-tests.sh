@@ -76,4 +76,4 @@ echo "=== Integration tests completed ==="
 echo
 echo "Check the output above for test results."
 echo "To view sync logs, run:"
-echo "  sf data query --query \"\$(cat scripts/soql/recent-sync-logs.soql)\" $ORG_FLAG"
+echo "  sf data query -f scripts/soql/recent-sync-logs.soql $ORG_FLAG"
