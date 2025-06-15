@@ -4,6 +4,10 @@
  */
 public with sharing class NotionSyncInvocable {
     
+    // Test flag to disable processing during unit tests
+    @TestVisible
+    private static Boolean disableInTest = false;
+    
     /**
      * Invocable method to sync records to Notion
      * Maintains user context throughout the process
@@ -18,7 +22,7 @@ public with sharing class NotionSyncInvocable {
         
         // Skip processing in test context to avoid interference with unit tests
         // Tests will directly call NotionSyncQueueable for testing
-        if (Test.isRunningTest() && !isIntegrationTest()) {
+        if (Test.isRunningTest() && disableInTest) {
             for (SyncRequest request : requests) {
                 results.add(new SyncResult(true, 'Skipped in test context'));
             }
@@ -146,17 +150,4 @@ public with sharing class NotionSyncInvocable {
         }
     }
     
-    /**
-     * Helper method to identify if we're running integration tests
-     * Integration tests will have specific test class names or custom settings
-     */
-    private static Boolean isIntegrationTest() {
-        // Check if any of the running test classes are integration tests
-        // This is a simple implementation - could be enhanced with custom settings
-        String currentTestName = Test.isRunningTest() ? 
-            new DmlException().getStackTraceString() : '';
-        
-        return currentTestName.contains('Integration') || 
-               currentTestName.contains('NotionSync_');
-    }
 }

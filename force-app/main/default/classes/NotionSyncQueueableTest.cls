@@ -1,6 +1,11 @@
 @isTest
 private class NotionSyncQueueableTest {
     
+    // Static initializer to disable flow processing in all test methods
+    static {
+        NotionSyncInvocable.disableInTest = true;
+    }
+    
     // Mock class for Notion API HTTP callouts
     private class NotionAPIHttpCalloutMock implements HttpCalloutMock {
         private String responseBody;
