@@ -1,7 +1,7 @@
-// Script to verify and guide Named Principal credential setup
-// This script cannot create the credential (requires UI), but helps verify configuration
+// Script to verify Named Credential setup
+// This helps verify the credential configuration is working properly
 
-System.debug('=== Named Principal Credential Setup Guide ===');
+System.debug('=== Named Credential Verification ===');
 
 // Check current user permissions
 System.debug('\n1. Current User Check:');
