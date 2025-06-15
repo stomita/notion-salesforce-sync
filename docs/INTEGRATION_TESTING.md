@@ -304,7 +304,7 @@ If records aren't syncing:
 - Verify flows are active in the org
 - Check that Custom Metadata was deployed correctly
 - Look for errors in Notion_Sync_Log__c records
-- Ensure Platform Events are enabled
+- Ensure Flows are properly configured with Invocable Apex
 
 ### Test Data Conflicts
 
@@ -390,16 +390,16 @@ sf apex run --file /tmp/setup-creds.apex
    System.debug(JSON.serializePretty(logs));
    ```
 
-3. **Verify Platform Events:**
+3. **Verify Invocable Apex:**
    ```apex
-   // Check if events are being published
-   EventBus.getPublisher().publishImmediate(
-       new Notion_Sync_Event__e(
-           Record_Id__c = 'test123',
-           Object_Type__c = 'Account',
-           Operation_Type__c = 'CREATE'
-       )
-   );
+   // Test the invocable method directly
+   NotionSyncInvocable.SyncRequest request = new NotionSyncInvocable.SyncRequest();
+   request.recordId = 'test123';
+   request.objectType = 'Account';
+   request.operationType = 'CREATE';
+   
+   List<NotionSyncInvocable.SyncRequest> requests = new List<NotionSyncInvocable.SyncRequest>{request};
+   NotionSyncInvocable.syncToNotion(requests);
    ```
 
 ### Customizing Test Data
@@ -431,8 +431,8 @@ sf apex log get --log-id <log-id>
 # Monitor sync logs
 sf data query --query "$(cat scripts/soql/check-sync-logs.soql)"
 
-# Check Platform Events
-sf data query --query "SELECT Id, ReplayId, CreatedDate FROM Notion_Sync_Event__e"
+# Check Queueable Jobs
+sf data query --query "SELECT Id, Status, JobType, MethodName, CreatedDate FROM AsyncApexJob WHERE JobType='Queueable' ORDER BY CreatedDate DESC LIMIT 10"
 ```
 
 ## Integration Test Structure
@@ -450,7 +450,7 @@ The `force-app/integration` directory contains:
   - NotionRelation records for relationship mappings
   
 - **flows/**: Automated flows for test objects
-  - Create/Update flows that trigger Platform Events
+  - Create/Update flows that call Invocable Apex
   - Delete flows for record removal
   
 - **permissionsets/**: Permission set for test object access

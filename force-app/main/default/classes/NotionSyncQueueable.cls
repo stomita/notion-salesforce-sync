@@ -8,7 +8,15 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     public void execute(QueueableContext context) {
-        Map<String, List<SyncRequest>> requestsByObjectType = groupRequestsByObjectType();
+        processSyncRequests(this.requests);
+    }
+    
+    /**
+     * Process sync requests - can be called from Queueable or directly
+     * Made public to support direct invocation from InvocableMethod
+     */
+    public void processSyncRequests(List<SyncRequest> syncRequests) {
+        Map<String, List<SyncRequest>> requestsByObjectType = groupRequestsByObjectType(syncRequests);
         
         List<String> processingOrder = relationshipHandler.getProcessingOrder(requestsByObjectType.keySet());
         
@@ -23,10 +31,10 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         NotionSyncLogger.flush();
     }
     
-    private Map<String, List<SyncRequest>> groupRequestsByObjectType() {
+    private Map<String, List<SyncRequest>> groupRequestsByObjectType(List<SyncRequest> syncRequests) {
         Map<String, List<SyncRequest>> grouped = new Map<String, List<SyncRequest>>();
         
-        for (SyncRequest request : requests) {
+        for (SyncRequest request : syncRequests) {
             if (!grouped.containsKey(request.objectType)) {
                 grouped.put(request.objectType, new List<SyncRequest>());
             }
@@ -140,13 +148,15 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     private void processSingleRequest(SyncRequest request, NotionSyncObject__mdt syncConfig, 
                                     List<NotionSyncField__mdt> fieldMappings, SObject record) {
         try {
+            String notionPageId = null;
+            
             if (request.operationType == 'DELETE') {
                 handleDeleteOperation(request, syncConfig);
             } else {
-                handleCreateOrUpdateOperation(request, syncConfig, fieldMappings, record);
+                notionPageId = handleCreateOrUpdateOperation(request, syncConfig, fieldMappings, record);
             }
             
-            logSuccess(request);
+            logSuccess(request, notionPageId);
             
         } catch (Exception e) {
             logError(request, e.getMessage());
@@ -160,7 +170,7 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         }
     }
     
-    private void handleCreateOrUpdateOperation(SyncRequest request, NotionSyncObject__mdt syncConfig, 
+    private String handleCreateOrUpdateOperation(SyncRequest request, NotionSyncObject__mdt syncConfig, 
                                             List<NotionSyncField__mdt> fieldMappings, SObject record) {
         if (record == null) {
             throw new NotionSyncException('Record not found: ' + request.recordId);
@@ -172,9 +182,12 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         
         if (String.isNotBlank(notionPageId)) {
             updateNotionPage(notionPageId, notionProperties);
+            return notionPageId;
         } else {
-            notionProperties.put(syncConfig.SalesforceIdPropertyName__c, request.recordId);
-            createNotionPage(syncConfig.NotionDatabaseId__c, notionProperties);
+            // Add Salesforce ID as a rich_text property
+            notionProperties.put(syncConfig.SalesforceIdPropertyName__c, 
+                               NotionApiClient.buildTextProperty(request.recordId));
+            return createNotionPage(syncConfig.NotionDatabaseId__c, notionProperties);
         }
     }
     
@@ -204,29 +217,33 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         if (value == null) return null;
         
         switch on propertyType {
-            when 'title', 'rich_text' {
-                return new Map<String, Object>{ 'type' => 'text', 'text' => new Map<String, Object>{ 'content' => String.valueOf(value) } };
+            when 'title' {
+                return NotionApiClient.buildTitleProperty(String.valueOf(value));
+            }
+            when 'rich_text' {
+                return NotionApiClient.buildTextProperty(String.valueOf(value));
             }
             when 'number' {
-                return value instanceof Decimal ? value : Decimal.valueOf(String.valueOf(value));
+                Decimal numValue = value instanceof Decimal ? (Decimal)value : Decimal.valueOf(String.valueOf(value));
+                return NotionApiClient.buildNumberProperty(numValue);
             }
             when 'checkbox' {
-                return Boolean.valueOf(value);
+                return NotionApiClient.buildCheckboxProperty(Boolean.valueOf(value));
             }
             when 'date' {
                 if (value instanceof Date) {
-                    Date dateValue = (Date)value;
-                    String formattedDate = dateValue.year() + '-' + 
-                                         String.valueOf(dateValue.month()).leftPad(2, '0') + '-' + 
-                                         String.valueOf(dateValue.day()).leftPad(2, '0');
-                    return new Map<String, Object>{ 'start' => formattedDate };
+                    return NotionApiClient.buildDateProperty((Date)value);
                 } else if (value instanceof DateTime) {
-                    return new Map<String, Object>{ 'start' => ((DateTime)value).formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'') };
+                    return NotionApiClient.buildDateTimeProperty((DateTime)value);
                 }
                 return null;
             }
+            when 'select' {
+                return NotionApiClient.buildSelectProperty(String.valueOf(value));
+            }
             when else {
-                return String.valueOf(value);
+                // Default to rich_text for unknown types
+                return NotionApiClient.buildTextProperty(String.valueOf(value));
             }
         }
     }
@@ -265,7 +282,7 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         return null;
     }
     
-    private void createNotionPage(String databaseId, Map<String, Object> properties) {
+    private String createNotionPage(String databaseId, Map<String, Object> properties) {
         HttpRequest req = new HttpRequest();
         req.setEndpoint('callout:Notion_API/v1/pages');
         req.setMethod('POST');
@@ -290,6 +307,10 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new NotionSyncException('Failed to create Notion page: ' + res.getBody());
         }
+        
+        // Parse response to get the created page ID
+        Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        return (String) responseBody.get('id');
     }
     
     private void updateNotionPage(String pageId, Map<String, Object> properties) {
@@ -367,7 +388,11 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     private void logSuccess(SyncRequest request) {
-        logResult(request, 'Success', null);
+        logResult(request, 'Success', null, null);
+    }
+    
+    private void logSuccess(SyncRequest request, String notionPageId) {
+        logResult(request, 'Success', null, notionPageId);
     }
     
     private void logError(SyncRequest request, String errorMessage) {
@@ -381,14 +406,30 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     private void logResult(SyncRequest request, String status, String errorMessage) {
-        NotionSyncLogger.log(
-            request.recordId,
-            request.objectType,
-            request.operationType,
-            status,
-            errorMessage,
-            0
-        );
+        logResult(request, status, errorMessage, null);
+    }
+    
+    private void logResult(SyncRequest request, String status, String errorMessage, String notionPageId) {
+        if (String.isNotBlank(notionPageId)) {
+            NotionSyncLogger.log(
+                request.recordId,
+                request.objectType,
+                request.operationType,
+                status,
+                errorMessage,
+                0,
+                notionPageId
+            );
+        } else {
+            NotionSyncLogger.log(
+                request.recordId,
+                request.objectType,
+                request.operationType,
+                status,
+                errorMessage,
+                0
+            );
+        }
     }
     
     

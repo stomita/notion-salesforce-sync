@@ -4,12 +4,12 @@ This guide explains how to configure Salesforce Flows to trigger Notion synchron
 
 ## Overview
 
-The Notion sync system uses Platform Events (`Notion_Sync_Event__e`) to decouple Flow triggers from the actual sync processing. This ensures that record operations complete quickly while sync processing happens asynchronously.
+The Notion sync system uses Invocable Apex methods to process sync requests while maintaining user context. This ensures that record operations complete quickly while sync processing happens asynchronously with proper Named Credential access.
 
 ## Flow Architecture
 
 ```
-Record Change → Flow Trigger → Platform Event → Event Trigger → Queueable Job → Notion API
+Record Change → Flow Trigger → Invocable Apex → @future/Queueable → Notion API
 ```
 
 ## Template Flows
@@ -51,14 +51,14 @@ Edit the copied CREATE/UPDATE flow file:
    </start>
    ```
 
-4. **Set the Object_Type__c value:**
+4. **Update the action call inputs:**
    ```xml
-   <inputAssignments>
-       <field>Object_Type__c</field>
+   <inputParameters>
+       <name>objectType</name>
        <value>
            <stringValue>[ObjectApiName]</stringValue>
        </value>
-   </inputAssignments>
+   </inputParameters>
    ```
 
 ### Step 3: Configure the DELETE Flow
@@ -84,83 +84,58 @@ Edit the copied DELETE flow file:
    </start>
    ```
 
-4. **Set the Object_Type__c value:**
+4. **Update the action call inputs:**
    ```xml
-   <inputAssignments>
-       <field>Object_Type__c</field>
+   <inputParameters>
+       <name>objectType</name>
        <value>
            <stringValue>[ObjectApiName]</stringValue>
        </value>
-   </inputAssignments>
+   </inputParameters>
    ```
 
 ## Example: Contact Object
 
 Here's how to create flows for the Contact object:
 
-### File Names:
-- `NotionSync_Contact_CreateUpdate.flow-meta.xml`
-- `NotionSync_Contact_Delete.flow-meta.xml`
+### 1. NotionSync_Contact_CreateUpdate.flow-meta.xml
 
-### Configuration:
-- Replace `[ObjectName]` with `Contact`
-- Replace `[ObjectApiName]` with `Contact`
+1. Copy from template
+2. Replace `[ObjectName]` with `Contact`
+3. Replace `[ObjectApiName]` with `Contact`
+4. The flow will trigger when Contact records are created or updated
 
-### CREATE/UPDATE Flow:
-```xml
-<label>Notion Sync - Contact Create/Update</label>
-<start>
-    <object>Contact</object>
-    <recordTriggerType>CreateAndUpdate</recordTriggerType>
-    <triggerType>RecordAfterSave</triggerType>
-</start>
-<inputAssignments>
-    <field>Object_Type__c</field>
-    <value>
-        <stringValue>Contact</stringValue>
-    </value>
-</inputAssignments>
-```
+### 2. NotionSync_Contact_Delete.flow-meta.xml
 
-### DELETE Flow:
-```xml
-<label>Notion Sync - Contact Delete</label>
-<start>
-    <object>Contact</object>
-    <recordTriggerType>Delete</recordTriggerType>
-    <triggerType>RecordBeforeDelete</triggerType>
-</start>
-<inputAssignments>
-    <field>Object_Type__c</field>
-    <value>
-        <stringValue>Contact</stringValue>
-    </value>
-</inputAssignments>
-```
+1. Copy from template
+2. Replace `[ObjectName]` with `Contact`
+3. Replace `[ObjectApiName]` with `Contact`
+4. The flow will trigger when Contact records are deleted
 
-## Deployment and Activation
+## Deploying Flows
 
-### 1. Deploy the Flows
+After creating your flow files:
+
 ```bash
+# Deploy to Salesforce
 sf project deploy start --source-dir force-app/main/default/flows
+
+# Activate the flows in Setup → Flows
 ```
 
-### 2. Activate the Flows
+## Testing Flows
 
-After deployment, activate the flows in your Salesforce org:
-
-1. Go to **Setup** → **Process Automation** → **Flows**
-2. Find your newly deployed flows
-3. Click on each flow and select **Activate**
-4. Choose the appropriate activation options
-
-### 3. Test the Flows
+To verify your flows are working:
 
 1. **Test CREATE:** Create a new record of your object type
 2. **Test UPDATE:** Update an existing record of your object type
 3. **Test DELETE:** Delete a record of your object type
 
-Check the Platform Event Monitor or debug logs to verify that `Notion_Sync_Event__e` records are being created.
+Check the sync logs to verify records are being processed:
+
+```bash
+sf apex run --file scripts/apex/check-sync-result.apex
+```
 
 ## Flow Naming Convention
 
@@ -183,20 +158,21 @@ Examples:
 1. Verify the flow is activated
 2. Check that the object type matches exactly
 3. Ensure the trigger conditions are met
+4. Verify user has the `Notion_Integration_User` permission set
 
-### Platform Event Not Created
+### Invocable Method Not Called
 1. Check flow debug logs
-2. Verify Platform Event permissions
-3. Ensure `Notion_Sync_Event__e` object exists
+2. Verify the action name is `NotionSyncInvocable`
+3. Ensure all required parameters are mapped
 
 ### Sync Not Processing
-1. Check the Platform Event Trigger: `NotionSyncEventTrigger`
-2. Verify Queueable job execution
-3. Review sync logs in `Notion_Sync_Log__c`
+1. Check Apex debug logs for errors
+2. Review sync logs in `Notion_Sync_Log__c`
+3. Verify Named Credential configuration
 
 ## Best Practices
 
-1. **Keep flows simple** - Only create the Platform Event, don't add complex logic
+1. **Keep flows simple** - Only call the Invocable method, don't add complex logic
 2. **Use consistent naming** - Follow the established naming convention
 3. **Test thoroughly** - Verify all trigger scenarios work correctly
 4. **Monitor performance** - Watch for any performance impact on record operations
@@ -208,20 +184,40 @@ Examples:
 To sync only specific records, add entry conditions to your flow:
 
 ```xml
-<start>
-    <object>Account</object>
-    <recordTriggerType>CreateAndUpdate</recordTriggerType>
-    <triggerType>RecordAfterSave</triggerType>
-    <filterLogic>1</filterLogic>
-    <filters>
-        <field>Type</field>
-        <operator>EqualTo</operator>
-        <value>
-            <stringValue>Customer</stringValue>
-        </value>
-    </filters>
-</start>
+<decisions>
+    <name>Should_Sync</name>
+    <label>Should Sync?</label>
+    <locationX>176</locationX>
+    <locationY>134</locationY>
+    <defaultConnectorLabel>Don't Sync</defaultConnectorLabel>
+    <rules>
+        <name>Sync_Record</name>
+        <conditionLogic>and</conditionLogic>
+        <conditions>
+            <leftValueReference>$Record.Status__c</leftValueReference>
+            <operator>EqualTo</operator>
+            <rightValue>
+                <stringValue>Active</stringValue>
+            </rightValue>
+        </conditions>
+        <connector>
+            <targetReference>Sync_to_Notion</targetReference>
+        </connector>
+        <label>Sync Record</label>
+    </rules>
+</decisions>
 ```
 
-### Bulk Processing Considerations
-The flows are designed to handle bulk operations efficiently by creating individual Platform Events for each record. The asynchronous processing via Queueable jobs ensures good performance even with large data volumes.
+### Bulk Operations
+The flows are designed to handle bulk operations efficiently. The Invocable method automatically:
+- Uses @future for single record operations (immediate processing)
+- Uses Queueable for bulk operations (batch processing)
+
+This ensures optimal performance regardless of operation size.
+
+## Security Considerations
+
+1. **Permission Sets**: Users must have the `Notion_Integration_User` permission set assigned
+2. **Object Access**: Users need appropriate CRUD permissions on objects being synced
+3. **Field Access**: Ensure field-level security allows access to synced fields
+4. **Named Credentials**: API key must be configured in the Named Principal and users need the permission set assigned

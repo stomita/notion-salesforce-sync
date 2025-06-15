@@ -19,7 +19,8 @@ public with sharing class NotionSyncLogger {
                 Operation_Type__c = entry.operationType,
                 Status__c = entry.status,
                 Error_Message__c = entry.errorMessage,
-                Retry_Count__c = entry.retryCount
+                Retry_Count__c = entry.retryCount,
+                Notion_Page_Id__c = entry.notionPageId
             );
             
             logs.add(log);
@@ -37,7 +38,13 @@ public with sharing class NotionSyncLogger {
     // Add a log entry to the pending collection
     public static void log(String recordId, String objectType, String operationType, 
                           String status, String errorMessage, Integer retryCount) {
-        pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount));
+        pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, null));
+    }
+    
+    // Add a log entry with Notion page ID
+    public static void log(String recordId, String objectType, String operationType, 
+                          String status, String errorMessage, Integer retryCount, String notionPageId) {
+        pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId));
     }
     
     // Flush all pending logs
@@ -70,15 +77,17 @@ public with sharing class NotionSyncLogger {
         public String status;
         public String errorMessage;
         public Integer retryCount;
+        public String notionPageId;
         
         public LogEntry(String recordId, String objectType, String operationType, 
-                       String status, String errorMessage, Integer retryCount) {
+                       String status, String errorMessage, Integer retryCount, String notionPageId) {
             this.recordId = recordId;
             this.objectType = objectType;
             this.operationType = operationType;
             this.status = status;
             this.errorMessage = errorMessage;
             this.retryCount = retryCount;
+            this.notionPageId = notionPageId;
         }
     }
 }

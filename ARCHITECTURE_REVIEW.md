@@ -20,75 +20,88 @@
 - No built-in retry mechanism
 - Difficult to handle partial failures
 
-## Recommended Architecture: Event-Driven Asynchronous Processing
+## Recommended Architecture: Flow-Driven Asynchronous Processing
 
-### Platform Event + Queueable Apex Pattern
+### Invocable Apex + Queueable/Future Pattern
 
 ```
-[Record Change] → [Flow] → [Platform Event] → [Event Subscriber] → [Queueable Apex] → [Notion API]
+[Record Change] → [Flow] → [Invocable Apex] → [Queueable/Future] → [Notion API]
 ```
 
 ### Benefits:
-1. **Decoupled Architecture**
+1. **User Context Preservation**
+   - Maintains executing user's permissions
+   - Works with Named Credentials via permission set assignment
+   - No special UI configuration needed
+
+2. **Decoupled Architecture**
    - UI operations complete immediately
    - Background processing for API calls
    - No transaction blocking
 
-2. **Scalability**
+3. **Scalability**
    - Handle bulk operations efficiently
    - Process records in batches
    - Chain Queueable jobs for large datasets
 
-3. **Reliability**
+4. **Reliability**
    - Built-in retry mechanism
    - Error isolation
-   - Audit trail through platform events
+   - Clear execution path
 
-4. **Governor Limit Compliance**
+5. **Governor Limit Compliance**
    - Separate transaction contexts
    - Unlimited callout time in async
    - Better resource utilization
 
 ### Implementation Components:
 
-1. **Platform Event**: `Notion_Sync_Event__e`
-   - Record IDs
-   - Object Type
-   - Operation Type (CREATE/UPDATE/DELETE)
-   - Retry Count
+1. **Invocable Apex**: `NotionSyncInvocable`
+   - Entry point for Flow integration
+   - Maintains user context
+   - Routes to appropriate async method
+   - Single records: @future for immediate processing
+   - Bulk/Deletes: Queueable for batch processing
 
-2. **Event Subscriber**: Apex Trigger on Platform Event
-   - Enqueue Queueable jobs
-   - Group records by object type
-
-3. **Queueable Apex**: `NotionSyncQueueable`
+2. **Queueable Apex**: `NotionSyncQueueable`
    - Process records in batches
-   - Handle API calls
+   - Handle API calls with proper error handling
    - Chain for continuation
 
-4. **Error Handling**: `Notion_Sync_Log__c` Custom Object
-   - Track sync status
-   - Store error details
-   - Enable manual retry
+3. **Future Method**: For single record operations
+   - Immediate processing
+   - Maintains user context
+   - Ideal for UI-triggered syncs
+
+4. **Error Handling**: `NotionSyncLogger`
+   - In-memory log aggregation
+   - Bulk insert of logs
+   - Tracks sync status and errors
 
 ### Alternative Approaches Considered:
 
-1. **Change Data Capture (CDC)**
+1. **Platform Events**
+   - Pros: Fully decoupled, scalable
+   - Cons: Loses user context (runs as Automated Process user), requires complex credential setup
+
+2. **Change Data Capture (CDC)**
    - Pros: Native Salesforce feature, automatic change tracking
    - Cons: Limited control, requires additional configuration
 
-2. **@future Methods**
+3. **Direct @future Methods**
    - Pros: Simple implementation
    - Cons: No chaining, limited error handling, 50 calls limit
 
-3. **Batch Apex**
+4. **Batch Apex**
    - Pros: Good for large volumes
    - Cons: Not real-time, minimum 1-minute delay
 
 ## Recommendation
-Implement Platform Event + Queueable Apex pattern for optimal balance of:
+Implement Invocable Apex + Async Processing pattern for optimal balance of:
+- User context preservation (critical for Named Credentials)
 - Real-time processing
 - Scalability
 - Error handling
 - User experience
 - Maintainability
+- Simplified deployment (no UI configuration required)

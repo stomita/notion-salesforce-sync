@@ -6,7 +6,7 @@ A Salesforce-native integration tool that synchronizes Salesforce data to Notion
 
 - 🔄 Real-time synchronization via Flow triggers
 - 🔗 Preserves Salesforce object relationships as Notion relations
-- ⚡ Asynchronous processing using Platform Events
+- ⚡ Asynchronous processing using Queueable Apex
 - 🛠️ Configuration-driven through Custom Metadata Types
 - 🔒 Secure API integration with Named Credentials
 - 📝 Support for Long Text Area fields as Notion page content
@@ -14,11 +14,13 @@ A Salesforce-native integration tool that synchronizes Salesforce data to Notion
 
 ## Architecture
 
-This tool uses an event-driven architecture:
+This tool uses a synchronous Flow-based architecture:
 
 ```
-[Record Change] → [Flow] → [Platform Event] → [Event Subscriber] → [Queueable Apex] → [Notion API]
+[Record Change] → [Flow] → [Invocable Apex] → [Queueable/Future] → [Notion API]
 ```
+
+The synchronous approach maintains user context throughout the process, ensuring Named Credential access works properly.
 
 ## Setup
 
@@ -51,27 +53,35 @@ Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
    - Give it a name (e.g., "Salesforce Sync")
    - Select the workspace you want to connect
    - Click "Submit"
-   - Copy the "Internal Integration Token" (starts with `secret_`)
+   - Copy the "Internal Integration Token" (starts with `ntn_` or `secret_`)
 
-   b. **Configure the External Credential in Salesforce:**
-   - Go to Setup → Named Credentials → External Credentials
-   - Find "Notion Credential"
-   - Click on the principal "NotionIntegration"
-   - Add Authentication Parameter:
+   b. **Configure API Key in Salesforce:**
+   
+   The External Credential and Named Principal are already deployed with the metadata. You only need to add your API key:
+   
+   - Go to Setup → Security → Named Credentials
+   - Click on "External Credentials" tab
+   - Find "Notion Credential" (already deployed)
+   - Click on "NotionIntegration" principal (already created as Named Principal for org-wide access)
+   - Under Authentication Parameters, click "New"
+   - Add parameter:
      - Parameter Name: `SecretKey`
-     - Value: Your Notion API token (the one that starts with `secret_`)
-   - Save the configuration
+     - Parameter Value: Your Notion API token (the one you copied from step a)
+   - Save
 
-   c. **Assign Permission Set:**
+   c. **Assign Permission Set (Required):**
    - Go to Setup → Permission Sets
-   - Find "Notion Integration User"
-   - Click "Manage Assignments"
-   - Assign to users who need to sync data to Notion
+   - Find "Notion Integration User" (already deployed)
+   - Click "Manage Assignments" → "Add Assignment"
+   - Select users who will trigger syncs
+   - Save
+   - This permission set grants access to the Named Principal credential
 
    d. **Grant integration access to your Notion databases:**
    - In Notion, go to each database you want to sync
    - Click the "..." menu → "Add connections"
    - Select your integration and click "Confirm"
+
 
 4. Set up Custom Metadata records for your sync configuration
 
@@ -88,7 +98,8 @@ Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
 
 1. Create a Record-Triggered Flow for each object you want to sync
 2. Configure triggers for Insert, Update, and Delete
-3. Add Create Records action to publish Platform Events
+3. Add Action to call the NotionSyncInvocable Apex method
+4. Map the required parameters: recordId, objectType, and operationType
 
 ## Development
 
@@ -184,6 +195,54 @@ The CI workflow automatically:
 ### PR Labels
 
 - `run-ci`: Manually triggers the CI workflow on a pull request
+
+## Troubleshooting
+
+### Common Issues
+
+#### "We couldn't access the credential" Error
+
+This error occurs when the user cannot access the Named Credential.
+
+**Solution:**
+1. Verify the Named Principal has your API key configured (Setup → Named Credentials → External Credentials → Notion Credential → NotionIntegration)
+2. Ensure you've assigned the "Notion Integration User" permission set to your user
+3. The permission set must be assigned to any user who will trigger syncs
+4. Run the diagnostic script to verify configuration:
+   ```bash
+   sf apex run --file scripts/apex/verify-named-credential.apex
+   ```
+
+#### "Unauthorized endpoint" Error
+
+This indicates the Named Principal credential is not configured.
+
+**Solution:**
+1. The Named Principal should already exist - just add your API key as described in section 3.b
+2. Ensure the `SecretKey` parameter contains your valid Notion API token
+3. Verify the "Notion Integration User" permission set is assigned to your user
+
+#### Sync Not Triggering
+
+If records aren't syncing to Notion:
+
+1. Check Flow activation:
+   ```bash
+   sf apex run --file scripts/apex/diagnose-sync-issue.apex
+   ```
+
+2. Verify the sync logs for errors:
+   - Go to App Launcher → Notion Sync Logs
+   - Check the Error Message field for failed syncs
+
+3. Ensure your Notion databases have the required properties configured
+
+#### API Token Issues
+
+If you see 401 errors in sync logs:
+- Verify your Notion API token is correct
+- Ensure the integration has access to your Notion databases
+- Check that the token hasn't expired or been revoked
 
 ## License
 
