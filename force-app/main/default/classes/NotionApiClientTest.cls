@@ -340,6 +340,21 @@ public class NotionApiClientTest {
     }
     
     @isTest
+    static void testBuildEmailProperty() {
+        // Test valid email
+        Map<String, Object> property = NotionApiClient.buildEmailProperty('test@example.com');
+        System.assertEquals('test@example.com', property.get('email'), 'Should contain email value');
+        
+        // Test empty email
+        Map<String, Object> emptyProperty = NotionApiClient.buildEmailProperty('');
+        System.assertEquals(null, emptyProperty, 'Should return null for empty email');
+        
+        // Test null email
+        Map<String, Object> nullProperty = NotionApiClient.buildEmailProperty(null);
+        System.assertEquals(null, nullProperty, 'Should return null for null email');
+    }
+    
+    @isTest
     static void testBuildRelationPropertyEmpty() {
         Map<String, Object> property = NotionApiClient.buildRelationProperty(null);
         List<Object> relation = (List<Object>) property.get('relation');

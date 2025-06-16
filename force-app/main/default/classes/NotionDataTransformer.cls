@@ -74,6 +74,8 @@ public class NotionDataTransformer {
         System.debug('NotionDataTransformer: Adding property ' + mapping.NotionPropertyName__c + ' of type ' + propertyType + ' for field ' + mapping.SalesforceFieldApiName__c);
         Map<String, Object> propertyValue = new Map<String, Object>();
         
+        Boolean shouldAddProperty = true;
+        
         switch on propertyType {
             when 'title' {
                 propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(String.valueOf(fieldValue)));
@@ -149,7 +151,18 @@ public class NotionDataTransformer {
                 propertyValue.put(PROPERTY_TYPE_URL, String.valueOf(fieldValue));
             }
             when 'email' {
-                propertyValue.put(PROPERTY_TYPE_EMAIL, String.valueOf(fieldValue));
+                if (fieldValue != null) {
+                    String emailValue = String.valueOf(fieldValue);
+                    if (String.isNotBlank(emailValue)) {
+                        propertyValue.put(PROPERTY_TYPE_EMAIL, emailValue);
+                    } else {
+                        // Skip adding property if email is empty - Notion expects valid email or nothing
+                        shouldAddProperty = false;
+                    }
+                } else {
+                    // Skip adding property if email is null - Notion expects valid email or nothing
+                    shouldAddProperty = false;
+                }
             }
             when 'phone_number' {
                 propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.valueOf(fieldValue));
@@ -215,7 +228,9 @@ public class NotionDataTransformer {
             }
         }
         
-        notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
+        if (shouldAddProperty) {
+            notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
+        }
     }
     
     private static void addBodyContent(NotionPage notionPage, Object fieldValue) {

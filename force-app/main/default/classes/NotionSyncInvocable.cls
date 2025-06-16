@@ -104,6 +104,8 @@ public with sharing class NotionSyncInvocable {
                 'Future method error: ' + e.getMessage(),
                 0
             );
+            // Since we're in a future context, the logger will automatically
+            // use synchronous logging to avoid "future from future" error
             NotionSyncLogger.flush();
         }
     }

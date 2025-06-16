@@ -54,7 +54,12 @@ public class NotionApiClient {
                 requestBody.put('children', pageRequest.children);
             }
             
-            request.setBody(JSON.serialize(requestBody));
+            String jsonBody = JSON.serialize(requestBody);
+            request.setBody(jsonBody);
+            
+            // Debug logging
+            System.debug('NotionApiClient.createPage: Sending request to Notion');
+            System.debug('Request Body: ' + jsonBody);
             
             HttpResponse response = new Http().send(request);
             return processResponse(response);
@@ -146,6 +151,12 @@ public class NotionApiClient {
     private static NotionResponse processResponse(HttpResponse response) {
         Integer statusCode = response.getStatusCode();
         String responseBody = response.getBody();
+        
+        // Debug logging
+        System.debug('NotionApiClient: Response Status Code: ' + statusCode);
+        if (statusCode != 200) {
+            System.debug('NotionApiClient: Error Response Body: ' + responseBody);
+        }
         
         if (statusCode >= 200 && statusCode < 300) {
             try {
@@ -263,6 +274,16 @@ public class NotionApiClient {
             'select' => new Map<String, Object>{
                 'name' => value
             }
+        };
+    }
+    
+    public static Map<String, Object> buildEmailProperty(String value) {
+        if (String.isBlank(value)) {
+            return null;
+        }
+        
+        return new Map<String, Object>{
+            'email' => value
         };
     }
     

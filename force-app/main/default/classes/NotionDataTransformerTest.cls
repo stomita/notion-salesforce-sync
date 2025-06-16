@@ -284,6 +284,30 @@ public class NotionDataTransformerTest {
     }
     
     @isTest
+    static void testTransformRecordWithEmptyEmailProperty() {
+        Test.startTest();
+        
+        NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
+        NotionSyncField__mdt emailMapping = createMockFieldMapping('Email__c', 'Email', 'email', false);
+        
+        // Test with null email
+        callAddPropertyMethod(notionPage, emailMapping, null);
+        System.assertEquals(false, notionPage.properties.containsKey('Email'), 'Should not add property for null email');
+        
+        // Test with empty string email
+        notionPage = new NotionDataTransformer.NotionPage();
+        callAddPropertyMethod(notionPage, emailMapping, '');
+        System.assertEquals(false, notionPage.properties.containsKey('Email'), 'Should not add property for empty email');
+        
+        // Test with whitespace-only email
+        notionPage = new NotionDataTransformer.NotionPage();
+        callAddPropertyMethod(notionPage, emailMapping, '   ');
+        System.assertEquals(false, notionPage.properties.containsKey('Email'), 'Should not add property for whitespace-only email');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
     static void testTransformRecordWithPhoneProperty() {
         Test.startTest();
         
@@ -489,6 +513,15 @@ public class NotionDataTransformerTest {
         } else {
             // Simulate addProperty by manually calling the property transformation logic
             String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+            
+            // Special handling for email to match the actual implementation
+            if (propertyType == 'email') {
+                if (fieldValue == null || String.isBlank(String.valueOf(fieldValue))) {
+                    // Skip adding property for null or empty email
+                    return;
+                }
+            }
+            
             Map<String, Object> propertyValue = transformFieldValue(fieldValue, propertyType, mapping.SalesforceFieldApiName__c);
             notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
         }

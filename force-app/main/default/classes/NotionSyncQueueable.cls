@@ -241,6 +241,13 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             when 'select' {
                 return NotionApiClient.buildSelectProperty(String.valueOf(value));
             }
+            when 'email' {
+                String emailValue = String.valueOf(value);
+                if (String.isNotBlank(emailValue)) {
+                    return NotionApiClient.buildEmailProperty(emailValue);
+                }
+                return null;
+            }
             when else {
                 // Default to rich_text for unknown types
                 return NotionApiClient.buildTextProperty(String.valueOf(value));

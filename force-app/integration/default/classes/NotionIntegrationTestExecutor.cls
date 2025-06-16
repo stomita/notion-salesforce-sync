@@ -21,6 +21,7 @@ public class NotionIntegrationTestExecutor {
             createTestRecords();
             updateTestRecords();
             createRelatedRecords();
+            createDeletionTestRecords();  // Create separate records for deletion
             deleteTestRecords();
             
             System.debug('Phase 1 complete - all operations triggered');
@@ -61,11 +62,11 @@ public class NotionIntegrationTestExecutor {
     public void setupTestData() {
         System.debug('\n--- Setting up test data ---');
         
-        // Clean up any existing test data
-        delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test Account%'];
-        delete [SELECT Id FROM Contact WHERE LastName LIKE 'Integration Test Contact%'];
-        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test Parent%'];
-        delete [SELECT Id FROM Test_Child_Object__c WHERE Name LIKE 'Integration Test Child%'];
+        // Clean up any existing test data including deletion test records
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Contact WHERE LastName LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Test_Child_Object__c WHERE Name LIKE 'Integration Test%'];
         
         System.debug('Test data cleanup complete');
     }
@@ -270,7 +271,7 @@ public class NotionIntegrationTestExecutor {
             // Create contact related to account
             Contact testContact = new Contact(
                 FirstName = 'Integration',
-                LastName = 'Test Contact ' + DateTime.now().getTime(),
+                LastName = 'Integration Test Contact ' + DateTime.now().getTime(),
                 Email = 'integration.test@example.com',
                 AccountId = testAccount.Id
             );
@@ -299,7 +300,8 @@ public class NotionIntegrationTestExecutor {
             Contact testContact = [
                 SELECT Id, LastName
                 FROM Contact
-                WHERE LastName LIKE 'Test Contact%'
+                WHERE LastName LIKE 'Integration Test Contact%'
+                AND FirstName != 'DELETE'
                 ORDER BY CreatedDate DESC
                 LIMIT 1
             ];
@@ -331,27 +333,88 @@ public class NotionIntegrationTestExecutor {
     }
     
     /**
+     * Create records specifically for deletion testing (Phase 1)
+     */
+    public void createDeletionTestRecords() {
+        System.debug('\n--- Creating records for deletion test ---');
+        
+        // Create a separate account for deletion
+        Account deleteAccount = new Account(
+            Name = 'Integration Test DELETE Account ' + DateTime.now().getTime(),
+            Description = 'This account will be deleted to test deletion sync'
+        );
+        insert deleteAccount;
+        
+        // Create a separate contact for deletion
+        Contact deleteContact = new Contact(
+            FirstName = 'DELETE',
+            LastName = 'Integration Test Contact DELETE ' + DateTime.now().getTime(),
+            Email = 'delete.test@example.com',
+            AccountId = deleteAccount.Id
+        );
+        insert deleteContact;
+        
+        // Create a separate parent for deletion
+        Test_Parent_Object__c deleteParent = new Test_Parent_Object__c(
+            Name = 'Integration Test DELETE Parent ' + DateTime.now().getTime(),
+            Description__c = 'This parent will be deleted',
+            Status__c = 'To Delete',
+            Amount__c = 999.99,
+            Active__c = false
+        );
+        insert deleteParent;
+        
+        // Create a separate child for deletion
+        Test_Child_Object__c deleteChild = new Test_Child_Object__c(
+            Name = 'Integration Test DELETE Child ' + DateTime.now().getTime(),
+            Test_Parent__c = deleteParent.Id,
+            Account__c = deleteAccount.Id,
+            Details__c = 'This child will be deleted',
+            Quantity__c = 999,
+            Due_Date__c = Date.today()
+        );
+        insert deleteChild;
+        
+        System.debug('Deletion test records created');
+    }
+    
+    /**
      * Delete test records (Phase 1)
      */
     public void deleteTestRecords() {
         System.debug('\n--- Deleting test records ---');
         
-        // Get child record to delete
-        Test_Child_Object__c testChild = [
-            SELECT Id, Name
-            FROM Test_Child_Object__c
-            WHERE Name LIKE 'Integration Test Child%'
-            ORDER BY CreatedDate DESC
-            LIMIT 1
+        // Get all records created for deletion testing
+        List<Account> deleteAccounts = [
+            SELECT Id FROM Account 
+            WHERE Name LIKE 'Integration Test DELETE Account%'
         ];
         
-        // Store the ID for later verification
-        String childIdToDelete = testChild.Id;
+        List<Contact> deleteContacts = [
+            SELECT Id FROM Contact 
+            WHERE LastName LIKE 'Integration Test Contact DELETE%'
+        ];
         
-        // Delete the record
-        delete testChild;
+        List<Test_Parent_Object__c> deleteParents = [
+            SELECT Id FROM Test_Parent_Object__c 
+            WHERE Name LIKE 'Integration Test DELETE Parent%'
+        ];
         
-        System.debug('Test child record deleted: ' + childIdToDelete);
+        List<Test_Child_Object__c> deleteChildren = [
+            SELECT Id FROM Test_Child_Object__c 
+            WHERE Name LIKE 'Integration Test DELETE Child%'
+        ];
+        
+        // Delete in reverse dependency order
+        delete deleteChildren;
+        delete deleteContacts;
+        delete deleteParents;
+        delete deleteAccounts;
+        
+        System.debug('Deleted ' + deleteChildren.size() + ' child records');
+        System.debug('Deleted ' + deleteContacts.size() + ' contact records');
+        System.debug('Deleted ' + deleteParents.size() + ' parent records');
+        System.debug('Deleted ' + deleteAccounts.size() + ' account records');
     }
     
     /**
@@ -361,23 +424,55 @@ public class NotionIntegrationTestExecutor {
         System.debug('\n--- Checking delete sync results ---');
         
         try {
-            // Find the most recent delete sync log
+            // Find all delete sync logs from today
             List<Notion_Sync_Log__c> logs = [
-                SELECT Id, Record_Id__c, Status__c, Error_Message__c
+                SELECT Id, Record_Id__c, Object_Type__c, Status__c, Error_Message__c
                 FROM Notion_Sync_Log__c
                 WHERE Operation_Type__c = 'DELETE'
-                AND Object_Type__c = 'Test_Child_Object__c'
                 AND CreatedDate = TODAY
                 ORDER BY CreatedDate DESC
-                LIMIT 1
             ];
             
-            assert(!logs.isEmpty(), 'Delete sync log should be created');
-            assert(logs[0].Status__c == 'Success', 
-                'Delete sync should succeed: ' + logs[0].Error_Message__c);
+            // Count successful deletions by object type
+            Map<String, Integer> successCountByType = new Map<String, Integer>{
+                'Account' => 0,
+                'Contact' => 0,
+                'Test_Parent_Object__c' => 0,
+                'Test_Child_Object__c' => 0
+            };
+            
+            Integer totalDeleteLogs = 0;
+            for (Notion_Sync_Log__c log : logs) {
+                // Only count logs for our deletion test records
+                if (log.Status__c == 'Success') {
+                    if (successCountByType.containsKey(log.Object_Type__c)) {
+                        successCountByType.put(log.Object_Type__c, 
+                            successCountByType.get(log.Object_Type__c) + 1);
+                        totalDeleteLogs++;
+                    }
+                } else {
+                    errors.add('Delete sync failed for ' + log.Object_Type__c + 
+                        ' (' + log.Record_Id__c + '): ' + log.Error_Message__c);
+                }
+            }
+            
+            // Verify we have at least one successful deletion for each type
+            assert(successCountByType.get('Account') >= 1, 
+                'At least one Account deletion should succeed');
+            assert(successCountByType.get('Contact') >= 1, 
+                'At least one Contact deletion should succeed');
+            assert(successCountByType.get('Test_Parent_Object__c') >= 1, 
+                'At least one Test Parent deletion should succeed');
+            assert(successCountByType.get('Test_Child_Object__c') >= 1, 
+                'At least one Test Child deletion should succeed');
+            
+            System.debug('Delete sync summary:');
+            for (String objType : successCountByType.keySet()) {
+                System.debug('  ' + objType + ': ' + successCountByType.get(objType) + ' deleted');
+            }
             
             passCount++;
-            System.debug('✓ Delete sync test passed');
+            System.debug('✓ Delete sync test passed - ' + totalDeleteLogs + ' records deleted');
             
         } catch (Exception e) {
             failCount++;
