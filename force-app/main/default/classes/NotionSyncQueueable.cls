@@ -200,9 +200,15 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             
             if (mapping.IsBodyContent__c && fieldValue != null) {
                 bodyContent = String.valueOf(fieldValue);
-            } else if (fieldValue != null) {
-                properties.put(mapping.NotionPropertyName__c, 
-                             formatValueForNotionProperty(fieldValue, mapping.NotionPropertyType__c));
+            } else {
+                // For text/title properties, we need to include null values to support clearing
+                String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+                Boolean isTextOrTitle = propertyType == 'title' || propertyType == 'rich_text';
+                
+                if (fieldValue != null || isTextOrTitle) {
+                    properties.put(mapping.NotionPropertyName__c, 
+                                 formatValueForNotionProperty(fieldValue, mapping.NotionPropertyType__c));
+                }
             }
         }
         
@@ -214,21 +220,24 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     private Object formatValueForNotionProperty(Object value, String propertyType) {
-        if (value == null) return null;
-        
         switch on propertyType {
             when 'title' {
-                return NotionApiClient.buildTitleProperty(String.valueOf(value));
+                String textValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildTitleProperty(textValue);
             }
             when 'rich_text' {
-                return NotionApiClient.buildTextProperty(String.valueOf(value));
+                String textValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildTextProperty(textValue);
             }
             when 'number' {
+                if (value == null) {
+                    return NotionApiClient.buildNumberProperty(null);
+                }
                 Decimal numValue = value instanceof Decimal ? (Decimal)value : Decimal.valueOf(String.valueOf(value));
                 return NotionApiClient.buildNumberProperty(numValue);
             }
             when 'checkbox' {
-                return NotionApiClient.buildCheckboxProperty(Boolean.valueOf(value));
+                return NotionApiClient.buildCheckboxProperty(value != null ? Boolean.valueOf(value) : null);
             }
             when 'date' {
                 if (value instanceof Date) {
@@ -242,11 +251,9 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                 return NotionApiClient.buildSelectProperty(String.valueOf(value));
             }
             when 'email' {
-                String emailValue = String.valueOf(value);
-                if (String.isNotBlank(emailValue)) {
-                    return NotionApiClient.buildEmailProperty(emailValue);
-                }
-                return null;
+                // Always return email property to support clearing (null) in Notion
+                String emailValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildEmailProperty(emailValue);
             }
             when else {
                 // Default to rich_text for unknown types

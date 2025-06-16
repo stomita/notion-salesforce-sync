@@ -196,11 +196,18 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildTextProperty(String value) {
+        // If value is blank, return empty array to clear the property
+        if (String.isBlank(value)) {
+            return new Map<String, Object>{
+                'rich_text' => new List<Object>()
+            };
+        }
+        
         return new Map<String, Object>{
             'rich_text' => new List<Object>{
                 new Map<String, Object>{
                     'text' => new Map<String, Object>{
-                        'content' => value != null ? value : ''
+                        'content' => value
                     }
                 }
             }
@@ -208,11 +215,18 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildTitleProperty(String value) {
+        // If value is blank, return empty array to clear the property
+        if (String.isBlank(value)) {
+            return new Map<String, Object>{
+                'title' => new List<Object>()
+            };
+        }
+        
         return new Map<String, Object>{
             'title' => new List<Object>{
                 new Map<String, Object>{
                     'text' => new Map<String, Object>{
-                        'content' => value != null ? value : ''
+                        'content' => value
                     }
                 }
             }
@@ -220,6 +234,7 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildNumberProperty(Decimal value) {
+        // Notion accepts null to clear number properties
         return new Map<String, Object>{
             'number' => value
         };
@@ -278,12 +293,9 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildEmailProperty(String value) {
-        if (String.isBlank(value)) {
-            return null;
-        }
-        
+        // Notion accepts null to clear email, but not empty string
         return new Map<String, Object>{
-            'email' => value
+            'email' => String.isBlank(value) ? null : value
         };
     }
     

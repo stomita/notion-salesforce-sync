@@ -290,19 +290,25 @@ public class NotionDataTransformerTest {
         NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
         NotionSyncField__mdt emailMapping = createMockFieldMapping('Email__c', 'Email', 'email', false);
         
-        // Test with null email
+        // Test with null email - should add property with null value to clear in Notion
         callAddPropertyMethod(notionPage, emailMapping, null);
-        System.assertEquals(false, notionPage.properties.containsKey('Email'), 'Should not add property for null email');
+        System.assertEquals(true, notionPage.properties.containsKey('Email'), 'Should add property for null email');
+        Map<String, Object> nullEmailProp = (Map<String, Object>) notionPage.properties.get('Email');
+        System.assertEquals(null, nullEmailProp.get('email'), 'Should have null email value');
         
-        // Test with empty string email
+        // Test with empty string email - should add property with null value
         notionPage = new NotionDataTransformer.NotionPage();
         callAddPropertyMethod(notionPage, emailMapping, '');
-        System.assertEquals(false, notionPage.properties.containsKey('Email'), 'Should not add property for empty email');
+        System.assertEquals(true, notionPage.properties.containsKey('Email'), 'Should add property for empty email');
+        Map<String, Object> emptyEmailProp = (Map<String, Object>) notionPage.properties.get('Email');
+        System.assertEquals(null, emptyEmailProp.get('email'), 'Should have null email value for empty string');
         
-        // Test with whitespace-only email
+        // Test with whitespace-only email - should add property with null value
         notionPage = new NotionDataTransformer.NotionPage();
         callAddPropertyMethod(notionPage, emailMapping, '   ');
-        System.assertEquals(false, notionPage.properties.containsKey('Email'), 'Should not add property for whitespace-only email');
+        System.assertEquals(true, notionPage.properties.containsKey('Email'), 'Should add property for whitespace-only email');
+        Map<String, Object> whitespaceEmailProp = (Map<String, Object>) notionPage.properties.get('Email');
+        System.assertEquals(null, whitespaceEmailProp.get('email'), 'Should have null email value for whitespace');
         
         Test.stopTest();
     }
@@ -435,6 +441,59 @@ public class NotionDataTransformerTest {
     }
     
     @isTest
+    static void testTransformRecordWithEmptyTextProperty() {
+        Account testAccount = new Account(Name = 'Test Account', Description = null);
+        insert testAccount;
+        
+        Test.startTest();
+        
+        NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
+        
+        // Test null description (rich_text)
+        NotionSyncField__mdt richTextMapping = createMockFieldMapping('Description', 'Description', 'rich_text', false);
+        callAddPropertyMethod(notionPage, richTextMapping, null);
+        
+        // Test empty string description
+        notionPage = new NotionDataTransformer.NotionPage();
+        callAddPropertyMethod(notionPage, richTextMapping, '');
+        
+        Test.stopTest();
+        
+        // Both should add property with empty array to clear
+        System.assertEquals(true, notionPage.properties.containsKey('Description'), 'Should add property for empty text');
+        Map<String, Object> richTextProp = (Map<String, Object>) notionPage.properties.get('Description');
+        List<Object> richTextArray = (List<Object>) richTextProp.get('rich_text');
+        System.assertEquals(0, richTextArray.size(), 'Should have empty array for clearing');
+    }
+    
+    @isTest
+    static void testTransformRecordWithEmptyTitleProperty() {
+        Test.startTest();
+        
+        NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
+        
+        // Test null title
+        NotionSyncField__mdt titleMapping = createMockFieldMapping('Name', 'Title', 'title', false);
+        callAddPropertyMethod(notionPage, titleMapping, null);
+        
+        System.assertEquals(true, notionPage.properties.containsKey('Title'), 'Should add property for null title');
+        Map<String, Object> titleProp = (Map<String, Object>) notionPage.properties.get('Title');
+        List<Object> titleArray = (List<Object>) titleProp.get('title');
+        System.assertEquals(0, titleArray.size(), 'Should have empty array for clearing');
+        
+        // Test empty string title
+        notionPage = new NotionDataTransformer.NotionPage();
+        callAddPropertyMethod(notionPage, titleMapping, '');
+        
+        System.assertEquals(true, notionPage.properties.containsKey('Title'), 'Should add property for empty title');
+        Map<String, Object> emptyTitleProp = (Map<String, Object>) notionPage.properties.get('Title');
+        List<Object> emptyTitleArray = (List<Object>) emptyTitleProp.get('title');
+        System.assertEquals(0, emptyTitleArray.size(), 'Should have empty array for clearing');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
     static void testCreateNotionPageJson() {
         Test.startTest();
         
@@ -514,13 +573,7 @@ public class NotionDataTransformerTest {
             // Simulate addProperty by manually calling the property transformation logic
             String propertyType = mapping.NotionPropertyType__c.toLowerCase();
             
-            // Special handling for email to match the actual implementation
-            if (propertyType == 'email') {
-                if (fieldValue == null || String.isBlank(String.valueOf(fieldValue))) {
-                    // Skip adding property for null or empty email
-                    return;
-                }
-            }
+            // No special skip handling for email - we always add the property
             
             Map<String, Object> propertyValue = transformFieldValue(fieldValue, propertyType, mapping.SalesforceFieldApiName__c);
             notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
@@ -547,10 +600,20 @@ public class NotionDataTransformerTest {
         
         switch on propertyType {
             when 'title' {
-                propertyValue.put('title', createTestRichTextArray(String.valueOf(fieldValue)));
+                String textValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                if (String.isBlank(textValue)) {
+                    propertyValue.put('title', new List<Object>());
+                } else {
+                    propertyValue.put('title', createTestRichTextArray(textValue));
+                }
             }
             when 'rich_text' {
-                propertyValue.put('rich_text', createTestRichTextArray(String.valueOf(fieldValue)));
+                String textValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                if (String.isBlank(textValue)) {
+                    propertyValue.put('rich_text', new List<Object>());
+                } else {
+                    propertyValue.put('rich_text', createTestRichTextArray(textValue));
+                }
             }
             when 'number' {
                 if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
@@ -620,7 +683,9 @@ public class NotionDataTransformerTest {
                 propertyValue.put('url', String.valueOf(fieldValue));
             }
             when 'email' {
-                propertyValue.put('email', String.valueOf(fieldValue));
+                // Match the actual implementation - null for empty values
+                String emailValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                propertyValue.put('email', String.isBlank(emailValue) ? null : emailValue);
             }
             when 'phone_number' {
                 propertyValue.put('phone_number', String.valueOf(fieldValue));

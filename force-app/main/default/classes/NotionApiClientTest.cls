@@ -218,11 +218,20 @@ public class NotionApiClientTest {
     
     @isTest
     static void testBuildTextPropertyNull() {
+        // Test null value - should return empty array to clear
         Map<String, Object> property = NotionApiClient.buildTextProperty(null);
         List<Object> richText = (List<Object>) property.get('rich_text');
-        Map<String, Object> textElement = (Map<String, Object>) richText[0];
-        Map<String, Object> text = (Map<String, Object>) textElement.get('text');
-        System.assertEquals('', text.get('content'), 'Should handle null value');
+        System.assertEquals(0, richText.size(), 'Should return empty array for null value');
+        
+        // Test empty string - should return empty array to clear
+        Map<String, Object> emptyProperty = NotionApiClient.buildTextProperty('');
+        List<Object> emptyRichText = (List<Object>) emptyProperty.get('rich_text');
+        System.assertEquals(0, emptyRichText.size(), 'Should return empty array for empty string');
+        
+        // Test whitespace - should return empty array to clear
+        Map<String, Object> whitespaceProperty = NotionApiClient.buildTextProperty('   ');
+        List<Object> whitespaceRichText = (List<Object>) whitespaceProperty.get('rich_text');
+        System.assertEquals(0, whitespaceRichText.size(), 'Should return empty array for whitespace');
     }
     
     @isTest
@@ -236,6 +245,24 @@ public class NotionApiClientTest {
         Map<String, Object> titleElement = (Map<String, Object>) title[0];
         Map<String, Object> text = (Map<String, Object>) titleElement.get('text');
         System.assertEquals('Test Title', text.get('content'), 'Should contain correct content');
+    }
+    
+    @isTest
+    static void testBuildTitlePropertyNull() {
+        // Test null value - should return empty array to clear
+        Map<String, Object> property = NotionApiClient.buildTitleProperty(null);
+        List<Object> title = (List<Object>) property.get('title');
+        System.assertEquals(0, title.size(), 'Should return empty array for null value');
+        
+        // Test empty string - should return empty array to clear
+        Map<String, Object> emptyProperty = NotionApiClient.buildTitleProperty('');
+        List<Object> emptyTitle = (List<Object>) emptyProperty.get('title');
+        System.assertEquals(0, emptyTitle.size(), 'Should return empty array for empty string');
+        
+        // Test whitespace - should return empty array to clear
+        Map<String, Object> whitespaceProperty = NotionApiClient.buildTitleProperty('   ');
+        List<Object> whitespaceTitle = (List<Object>) whitespaceProperty.get('title');
+        System.assertEquals(0, whitespaceTitle.size(), 'Should return empty array for whitespace');
     }
     
     @isTest
@@ -345,13 +372,15 @@ public class NotionApiClientTest {
         Map<String, Object> property = NotionApiClient.buildEmailProperty('test@example.com');
         System.assertEquals('test@example.com', property.get('email'), 'Should contain email value');
         
-        // Test empty email
+        // Test empty email - should return property with null value
         Map<String, Object> emptyProperty = NotionApiClient.buildEmailProperty('');
-        System.assertEquals(null, emptyProperty, 'Should return null for empty email');
+        System.assertNotEquals(null, emptyProperty, 'Should return property for empty email');
+        System.assertEquals(null, emptyProperty.get('email'), 'Should have null email value for empty string');
         
-        // Test null email
+        // Test null email - should return property with null value
         Map<String, Object> nullProperty = NotionApiClient.buildEmailProperty(null);
-        System.assertEquals(null, nullProperty, 'Should return null for null email');
+        System.assertNotEquals(null, nullProperty, 'Should return property for null email');
+        System.assertEquals(null, nullProperty.get('email'), 'Should have null email value');
     }
     
     @isTest

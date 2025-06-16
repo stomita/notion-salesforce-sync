@@ -49,7 +49,11 @@ public class NotionDataTransformer {
             for (NotionSyncField__mdt mapping : fieldMappings) {
                 Object fieldValue = record.get(mapping.SalesforceFieldApiName__c);
                 
-                if (fieldValue == null) {
+                // For text/title properties, we need to process null values to support clearing
+                String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+                Boolean isTextOrTitle = propertyType == 'title' || propertyType == 'rich_text';
+                
+                if (fieldValue == null && !isTextOrTitle) {
                     continue;
                 }
                 
@@ -78,10 +82,22 @@ public class NotionDataTransformer {
         
         switch on propertyType {
             when 'title' {
-                propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(String.valueOf(fieldValue)));
+                String textValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                if (String.isBlank(textValue)) {
+                    // Return empty array to clear the property
+                    propertyValue.put(PROPERTY_TYPE_TITLE, new List<Object>());
+                } else {
+                    propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(textValue));
+                }
             }
             when 'rich_text' {
-                propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(String.valueOf(fieldValue)));
+                String textValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                if (String.isBlank(textValue)) {
+                    // Return empty array to clear the property
+                    propertyValue.put(PROPERTY_TYPE_RICH_TEXT, new List<Object>());
+                } else {
+                    propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(textValue));
+                }
             }
             when 'number' {
                 if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
@@ -151,18 +167,9 @@ public class NotionDataTransformer {
                 propertyValue.put(PROPERTY_TYPE_URL, String.valueOf(fieldValue));
             }
             when 'email' {
-                if (fieldValue != null) {
-                    String emailValue = String.valueOf(fieldValue);
-                    if (String.isNotBlank(emailValue)) {
-                        propertyValue.put(PROPERTY_TYPE_EMAIL, emailValue);
-                    } else {
-                        // Skip adding property if email is empty - Notion expects valid email or nothing
-                        shouldAddProperty = false;
-                    }
-                } else {
-                    // Skip adding property if email is null - Notion expects valid email or nothing
-                    shouldAddProperty = false;
-                }
+                // Always include email property - Notion accepts null to clear
+                String emailValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                propertyValue.put(PROPERTY_TYPE_EMAIL, String.isBlank(emailValue) ? null : emailValue);
             }
             when 'phone_number' {
                 propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.valueOf(fieldValue));
