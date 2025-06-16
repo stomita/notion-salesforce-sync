@@ -245,7 +245,9 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                 return NotionApiClient.buildCheckboxProperty(value != null ? Boolean.valueOf(value) : null);
             }
             when 'date' {
-                if (value instanceof Date) {
+                if (value == null) {
+                    return NotionApiClient.buildDateProperty(null);
+                } else if (value instanceof Date) {
                     return NotionApiClient.buildDateProperty((Date)value);
                 } else if (value instanceof DateTime) {
                     return NotionApiClient.buildDateTimeProperty((DateTime)value);
@@ -253,7 +255,8 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                 return null;
             }
             when 'select' {
-                return NotionApiClient.buildSelectProperty(String.valueOf(value));
+                String selectValue = value != null ? String.valueOf(value) : null;
+                return NotionApiClient.buildSelectProperty(selectValue);
             }
             when 'email' {
                 // Always return email property to support clearing (null) in Notion
