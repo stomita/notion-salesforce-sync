@@ -201,11 +201,16 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             if (mapping.IsBodyContent__c && fieldValue != null) {
                 bodyContent = String.valueOf(fieldValue);
             } else {
-                // For text/title properties, we need to include null values to support clearing
+                // For properties that support clearing, we need to include null values
                 String propertyType = mapping.NotionPropertyType__c.toLowerCase();
-                Boolean isTextOrTitle = propertyType == 'title' || propertyType == 'rich_text';
+                Boolean supportsClearing = propertyType == 'title' || 
+                                         propertyType == 'rich_text' || 
+                                         propertyType == 'number' ||
+                                         propertyType == 'select' ||
+                                         propertyType == 'date' ||
+                                         propertyType == 'email';
                 
-                if (fieldValue != null || isTextOrTitle) {
+                if (fieldValue != null || supportsClearing) {
                     properties.put(mapping.NotionPropertyName__c, 
                                  formatValueForNotionProperty(fieldValue, mapping.NotionPropertyType__c));
                 }
@@ -374,10 +379,8 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         
         for (String key : properties.keySet()) {
             if (key != 'body') {
-                Object value = properties.get(key);
-                if (value != null) {
-                    notionProps.put(key, value);
-                }
+                // Include all properties, even null values, to support clearing
+                notionProps.put(key, properties.get(key));
             }
         }
         

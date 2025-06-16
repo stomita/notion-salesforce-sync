@@ -494,6 +494,65 @@ public class NotionDataTransformerTest {
     }
     
     @isTest
+    static void testTransformRecordWithEmptyNumberProperty() {
+        Test.startTest();
+        
+        NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
+        
+        // Test null number
+        NotionSyncField__mdt numberMapping = createMockFieldMapping('Amount__c', 'Amount', 'number', false);
+        callAddPropertyMethod(notionPage, numberMapping, null);
+        
+        System.assertEquals(true, notionPage.properties.containsKey('Amount'), 'Should add property for null number');
+        Map<String, Object> numberProp = (Map<String, Object>) notionPage.properties.get('Amount');
+        System.assertEquals(null, numberProp.get('number'), 'Should have null number value for clearing');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
+    static void testTransformRecordWithEmptySelectProperty() {
+        Test.startTest();
+        
+        NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
+        
+        // Test null select
+        NotionSyncField__mdt selectMapping = createMockFieldMapping('Status__c', 'Status', 'select', false);
+        callAddPropertyMethod(notionPage, selectMapping, null);
+        
+        System.assertEquals(true, notionPage.properties.containsKey('Status'), 'Should add property for null select');
+        Map<String, Object> selectProp = (Map<String, Object>) notionPage.properties.get('Status');
+        System.assertEquals(null, selectProp.get('select'), 'Should have null select value for clearing');
+        
+        // Test empty string select
+        notionPage = new NotionDataTransformer.NotionPage();
+        callAddPropertyMethod(notionPage, selectMapping, '');
+        
+        System.assertEquals(true, notionPage.properties.containsKey('Status'), 'Should add property for empty select');
+        Map<String, Object> emptySelectProp = (Map<String, Object>) notionPage.properties.get('Status');
+        System.assertEquals(null, emptySelectProp.get('select'), 'Should have null select value for empty string');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
+    static void testTransformRecordWithEmptyDateProperty() {
+        Test.startTest();
+        
+        NotionDataTransformer.NotionPage notionPage = new NotionDataTransformer.NotionPage();
+        
+        // Test null date
+        NotionSyncField__mdt dateMapping = createMockFieldMapping('CloseDate', 'Close Date', 'date', false);
+        callAddPropertyMethod(notionPage, dateMapping, null);
+        
+        System.assertEquals(true, notionPage.properties.containsKey('Close Date'), 'Should add property for null date');
+        Map<String, Object> dateProp = (Map<String, Object>) notionPage.properties.get('Close Date');
+        System.assertEquals(null, dateProp.get('date'), 'Should have null date value for clearing');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
     static void testCreateNotionPageJson() {
         Test.startTest();
         
@@ -616,7 +675,9 @@ public class NotionDataTransformerTest {
                 }
             }
             when 'number' {
-                if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
+                if (fieldValue == null) {
+                    propertyValue.put('number', null);
+                } else if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
                     propertyValue.put('number', fieldValue);
                 } else {
                     try {
@@ -627,9 +688,13 @@ public class NotionDataTransformerTest {
                 }
             }
             when 'select' {
-                propertyValue.put('select', new Map<String, Object>{
-                    'name' => String.valueOf(fieldValue)
-                });
+                if (fieldValue == null || String.isBlank(String.valueOf(fieldValue))) {
+                    propertyValue.put('select', null);
+                } else {
+                    propertyValue.put('select', new Map<String, Object>{
+                        'name' => String.valueOf(fieldValue)
+                    });
+                }
             }
             when 'multi_select' {
                 List<Map<String, Object>> multiSelectValues = new List<Map<String, Object>>();
@@ -651,7 +716,9 @@ public class NotionDataTransformerTest {
                 propertyValue.put('multi_select', multiSelectValues);
             }
             when 'date' {
-                if (fieldValue instanceof Date) {
+                if (fieldValue == null) {
+                    propertyValue.put('date', null);
+                } else if (fieldValue instanceof Date) {
                     Date dateValue = (Date) fieldValue;
                     String formattedDate = String.valueOf(dateValue.year()) + '-' + 
                                          String.valueOf(dateValue.month()).leftPad(2, '0') + '-' + 
