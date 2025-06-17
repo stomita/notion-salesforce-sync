@@ -198,22 +198,28 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         for (NotionSyncField__mdt mapping : fieldMappings) {
             Object fieldValue = record.get(mapping.SalesforceFieldApiName__c);
             
-            if (mapping.IsBodyContent__c && fieldValue != null) {
-                bodyContent = String.valueOf(fieldValue);
-            } else {
-                // For properties that support clearing, we need to include null values
-                String propertyType = mapping.NotionPropertyType__c.toLowerCase();
-                Boolean supportsClearing = propertyType == 'title' || 
-                                         propertyType == 'rich_text' || 
-                                         propertyType == 'number' ||
-                                         propertyType == 'select' ||
-                                         propertyType == 'date' ||
-                                         propertyType == 'email';
-                
-                if (fieldValue != null || supportsClearing) {
-                    properties.put(mapping.NotionPropertyName__c, 
-                                 formatValueForNotionProperty(fieldValue, mapping.NotionPropertyType__c));
+            if (mapping.IsBodyContent__c) {
+                // If this field is marked as body content, add it to body content only
+                if (fieldValue != null) {
+                    bodyContent = String.valueOf(fieldValue);
                 }
+                // Skip adding it to properties - continue to next field
+                continue;
+            }
+            
+            // For regular properties (not body content)
+            // For properties that support clearing, we need to include null values
+            String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+            Boolean supportsClearing = propertyType == 'title' || 
+                                     propertyType == 'rich_text' || 
+                                     propertyType == 'number' ||
+                                     propertyType == 'select' ||
+                                     propertyType == 'date' ||
+                                     propertyType == 'email';
+            
+            if (fieldValue != null || supportsClearing) {
+                properties.put(mapping.NotionPropertyName__c, 
+                             formatValueForNotionProperty(fieldValue, mapping.NotionPropertyType__c));
             }
         }
         
