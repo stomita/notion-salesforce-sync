@@ -49,7 +49,16 @@ public class NotionDataTransformer {
             for (NotionSyncField__mdt mapping : fieldMappings) {
                 Object fieldValue = record.get(mapping.SalesforceFieldApiName__c);
                 
-                if (fieldValue == null) {
+                // For properties that support clearing, we need to process null values
+                String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+                Boolean supportsClearing = propertyType == 'title' || 
+                                         propertyType == 'rich_text' || 
+                                         propertyType == 'number' ||
+                                         propertyType == 'select' ||
+                                         propertyType == 'date' ||
+                                         propertyType == 'email';
+                
+                if (fieldValue == null && !supportsClearing) {
                     continue;
                 }
                 
@@ -74,15 +83,32 @@ public class NotionDataTransformer {
         System.debug('NotionDataTransformer: Adding property ' + mapping.NotionPropertyName__c + ' of type ' + propertyType + ' for field ' + mapping.SalesforceFieldApiName__c);
         Map<String, Object> propertyValue = new Map<String, Object>();
         
+        Boolean shouldAddProperty = true;
+        
         switch on propertyType {
             when 'title' {
-                propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(String.valueOf(fieldValue)));
+                String textValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                if (String.isBlank(textValue)) {
+                    // Return empty array to clear the property
+                    propertyValue.put(PROPERTY_TYPE_TITLE, new List<Object>());
+                } else {
+                    propertyValue.put(PROPERTY_TYPE_TITLE, createRichTextArray(textValue));
+                }
             }
             when 'rich_text' {
-                propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(String.valueOf(fieldValue)));
+                String textValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                if (String.isBlank(textValue)) {
+                    // Return empty array to clear the property
+                    propertyValue.put(PROPERTY_TYPE_RICH_TEXT, new List<Object>());
+                } else {
+                    propertyValue.put(PROPERTY_TYPE_RICH_TEXT, createRichTextArray(textValue));
+                }
             }
             when 'number' {
-                if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
+                if (fieldValue == null) {
+                    // Send null to clear number property
+                    propertyValue.put(PROPERTY_TYPE_NUMBER, null);
+                } else if (fieldValue instanceof Decimal || fieldValue instanceof Integer || fieldValue instanceof Double) {
                     propertyValue.put(PROPERTY_TYPE_NUMBER, fieldValue);
                 } else {
                     try {
@@ -93,9 +119,14 @@ public class NotionDataTransformer {
                 }
             }
             when 'select' {
-                propertyValue.put(PROPERTY_TYPE_SELECT, new Map<String, Object>{
-                    'name' => String.valueOf(fieldValue)
-                });
+                if (fieldValue == null || String.isBlank(String.valueOf(fieldValue))) {
+                    // Send null to clear select property
+                    propertyValue.put(PROPERTY_TYPE_SELECT, null);
+                } else {
+                    propertyValue.put(PROPERTY_TYPE_SELECT, new Map<String, Object>{
+                        'name' => String.valueOf(fieldValue)
+                    });
+                }
             }
             when 'multi_select' {
                 List<Map<String, Object>> multiSelectValues = new List<Map<String, Object>>();
@@ -117,7 +148,10 @@ public class NotionDataTransformer {
                 propertyValue.put(PROPERTY_TYPE_MULTI_SELECT, multiSelectValues);
             }
             when 'date' {
-                if (fieldValue instanceof Date) {
+                if (fieldValue == null) {
+                    // Send null to clear date property
+                    propertyValue.put(PROPERTY_TYPE_DATE, null);
+                } else if (fieldValue instanceof Date) {
                     Date dateValue = (Date) fieldValue;
                     String formattedDate = String.valueOf(dateValue.year()) + '-' + 
                                          String.valueOf(dateValue.month()).leftPad(2, '0') + '-' + 
@@ -149,7 +183,9 @@ public class NotionDataTransformer {
                 propertyValue.put(PROPERTY_TYPE_URL, String.valueOf(fieldValue));
             }
             when 'email' {
-                propertyValue.put(PROPERTY_TYPE_EMAIL, String.valueOf(fieldValue));
+                // Always include email property - Notion accepts null to clear
+                String emailValue = fieldValue != null ? String.valueOf(fieldValue) : '';
+                propertyValue.put(PROPERTY_TYPE_EMAIL, String.isBlank(emailValue) ? null : emailValue);
             }
             when 'phone_number' {
                 propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.valueOf(fieldValue));
@@ -215,7 +251,9 @@ public class NotionDataTransformer {
             }
         }
         
-        notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
+        if (shouldAddProperty) {
+            notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
+        }
     }
     
     private static void addBodyContent(NotionPage notionPage, Object fieldValue) {

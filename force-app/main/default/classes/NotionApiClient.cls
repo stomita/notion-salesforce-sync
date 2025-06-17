@@ -54,7 +54,12 @@ public class NotionApiClient {
                 requestBody.put('children', pageRequest.children);
             }
             
-            request.setBody(JSON.serialize(requestBody));
+            String jsonBody = JSON.serialize(requestBody);
+            request.setBody(jsonBody);
+            
+            // Debug logging
+            System.debug('NotionApiClient.createPage: Sending request to Notion');
+            System.debug('Request Body: ' + jsonBody);
             
             HttpResponse response = new Http().send(request);
             return processResponse(response);
@@ -147,6 +152,12 @@ public class NotionApiClient {
         Integer statusCode = response.getStatusCode();
         String responseBody = response.getBody();
         
+        // Debug logging
+        System.debug('NotionApiClient: Response Status Code: ' + statusCode);
+        if (statusCode != 200) {
+            System.debug('NotionApiClient: Error Response Body: ' + responseBody);
+        }
+        
         if (statusCode >= 200 && statusCode < 300) {
             try {
                 Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
@@ -185,11 +196,18 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildTextProperty(String value) {
+        // If value is blank, return empty array to clear the property
+        if (String.isBlank(value)) {
+            return new Map<String, Object>{
+                'rich_text' => new List<Object>()
+            };
+        }
+        
         return new Map<String, Object>{
             'rich_text' => new List<Object>{
                 new Map<String, Object>{
                     'text' => new Map<String, Object>{
-                        'content' => value != null ? value : ''
+                        'content' => value
                     }
                 }
             }
@@ -197,11 +215,18 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildTitleProperty(String value) {
+        // If value is blank, return empty array to clear the property
+        if (String.isBlank(value)) {
+            return new Map<String, Object>{
+                'title' => new List<Object>()
+            };
+        }
+        
         return new Map<String, Object>{
             'title' => new List<Object>{
                 new Map<String, Object>{
                     'text' => new Map<String, Object>{
-                        'content' => value != null ? value : ''
+                        'content' => value
                     }
                 }
             }
@@ -209,6 +234,7 @@ public class NotionApiClient {
     }
     
     public static Map<String, Object> buildNumberProperty(Decimal value) {
+        // Notion accepts null to clear number properties
         return new Map<String, Object>{
             'number' => value
         };
@@ -263,6 +289,13 @@ public class NotionApiClient {
             'select' => new Map<String, Object>{
                 'name' => value
             }
+        };
+    }
+    
+    public static Map<String, Object> buildEmailProperty(String value) {
+        // Notion accepts null to clear email, but not empty string
+        return new Map<String, Object>{
+            'email' => String.isBlank(value) ? null : value
         };
     }
     

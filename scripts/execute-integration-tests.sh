@@ -56,15 +56,25 @@ sleep 5
 echo ">>> Checking results..."
 sf apex run -f scripts/apex/test-3-relationship-check.apex $ORG_FLAG
 
-# Test 4: Delete
+# Test 4: Relationship Changes
 echo
-echo "=== Test 4: Delete and Sync ==="
-echo ">>> Deleting records..."
-sf apex run -f scripts/apex/test-4-delete-setup.apex $ORG_FLAG
+echo "=== Test 4: Relationship Change Sync ==="
+echo ">>> Changing relationships..."
+sf apex run -f scripts/apex/test-4-relationship-change-setup.apex $ORG_FLAG
 echo ">>> Waiting 5 seconds for sync..."
 sleep 5
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-4-delete-check.apex $ORG_FLAG
+sf apex run -f scripts/apex/test-4-relationship-change-check.apex $ORG_FLAG
+
+# Test 5: Delete
+echo
+echo "=== Test 5: Delete and Sync ==="
+echo ">>> Deleting records..."
+sf apex run -f scripts/apex/test-5-delete-setup.apex $ORG_FLAG
+echo ">>> Waiting 5 seconds for sync..."
+sleep 5
+echo ">>> Checking results..."
+sf apex run -f scripts/apex/test-5-delete-check.apex $ORG_FLAG
 
 # Final Report
 echo

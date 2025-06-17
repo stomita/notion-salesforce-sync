@@ -55,7 +55,34 @@ public with sharing class NotionSyncLogger {
                 logJsonList.add(JSON.serialize(entry));
             }
             
-            if (Test.isRunningTest()) {
+            // If we're already in a future context, we need to handle this specially
+            // We can't call another @future method, and we can't do DML if there are
+            // pending callouts. So we'll store the logs and process them separately.
+            if (System.isFuture()) {
+                // Convert back to logs and insert directly
+                // This should only be called AFTER all callouts are complete
+                List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();
+                for (String logJson : logJsonList) {
+                    LogEntry entry = (LogEntry) JSON.deserialize(logJson, LogEntry.class);
+                    logs.add(new Notion_Sync_Log__c(
+                        Record_Id__c = entry.recordId,
+                        Object_Type__c = entry.objectType,
+                        Operation_Type__c = entry.operationType,
+                        Status__c = entry.status,
+                        Error_Message__c = entry.errorMessage,
+                        Retry_Count__c = entry.retryCount,
+                        Notion_Page_Id__c = entry.notionPageId
+                    ));
+                }
+                
+                if (!logs.isEmpty()) {
+                    try {
+                        insert logs;
+                    } catch (Exception e) {
+                        System.debug('Failed to insert sync logs from future context: ' + e.getMessage());
+                    }
+                }
+            } else if (Test.isRunningTest()) {
                 logSync(logJsonList);
             } else {
                 logAsync(logJsonList);
