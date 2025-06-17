@@ -10,53 +10,6 @@ public class NotionIntegrationTestExecutor {
     private List<String> errors = new List<String>();
     
     /**
-     * Phase 1: Trigger sync operations by creating/updating/deleting records
-     */
-    public void runPhase1_TriggerOperations() {
-        System.debug('=== Phase 1: Triggering Sync Operations ===');
-        
-        try {
-            // Setup and create test data - this triggers the flows
-            setupTestData();
-            createTestRecords();
-            updateTestRecords();
-            createRelatedRecords();
-            createDeletionTestRecords();  // Create separate records for deletion
-            deleteTestRecords();
-            
-            System.debug('Phase 1 complete - all operations triggered');
-            
-        } catch (Exception e) {
-            System.debug('FATAL ERROR in Phase 1: ' + e.getMessage());
-            System.debug('Stack trace: ' + e.getStackTraceString());
-            throw e;
-        }
-    }
-    
-    /**
-     * Phase 2: Check sync results after platform events have processed
-     */
-    public void runPhase2_CheckResults() {
-        System.debug('=== Phase 2: Checking Sync Results ===');
-        
-        try {
-            // Check results of all sync operations
-            checkCreateSyncResults();
-            checkUpdateSyncResults();
-            checkRelationshipSyncResults();
-            checkDeleteSyncResults();
-            
-            // Report results
-            reportResults();
-            
-        } catch (Exception e) {
-            System.debug('FATAL ERROR in Phase 2: ' + e.getMessage());
-            System.debug('Stack trace: ' + e.getStackTraceString());
-            throw e;
-        }
-    }
-    
-    /**
      * Setup test data
      */
     public void setupTestData() {
@@ -329,6 +282,136 @@ public class NotionIntegrationTestExecutor {
             failCount++;
             errors.add('Relationship sync test failed: ' + e.getMessage());
             System.debug('✗ Relationship sync test failed: ' + e.getMessage());
+        }
+    }
+    
+    /**
+     * Test relationship changes (for separate test scripts)
+     */
+    public void setupRelationshipChanges() {
+        System.debug('\n--- Testing relationship changes ---');
+        
+        try {
+            // Create additional accounts for relationship changes
+            Account secondAccount = new Account(
+                Name = 'Integration Test Second Account ' + DateTime.now().getTime(),
+                Description = 'Account for relationship change testing'
+            );
+            insert secondAccount;
+            
+            // Get the first account and test parent
+            Account firstAccount = [
+                SELECT Id, Name 
+                FROM Account 
+                WHERE Name LIKE 'Integration Test Account%' 
+                AND (NOT Name LIKE '%DELETE%')
+                AND (NOT Name LIKE '%Second%')
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            Test_Parent_Object__c testParent = [
+                SELECT Id
+                FROM Test_Parent_Object__c
+                WHERE Name LIKE 'Integration Test Parent%'
+                AND (NOT Name LIKE '%DELETE%')
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            // Get existing contact and child
+            Contact testContact = [
+                SELECT Id, AccountId
+                FROM Contact
+                WHERE LastName LIKE 'Integration Test Contact%'
+                AND FirstName != 'DELETE'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            Test_Child_Object__c testChild = [
+                SELECT Id, Account__c
+                FROM Test_Child_Object__c
+                WHERE Name LIKE 'Integration Test Child%'
+                AND (NOT Name LIKE '%DELETE%')
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            // Change relationships
+            System.debug('Changing Contact account from ' + testContact.AccountId + ' to ' + secondAccount.Id);
+            testContact.AccountId = secondAccount.Id;
+            update testContact;
+            
+            System.debug('Changing Test Child account from ' + testChild.Account__c + ' to ' + secondAccount.Id);
+            testChild.Account__c = secondAccount.Id;
+            update testChild;
+            
+            System.debug('Relationship changes completed');
+            
+        } catch (Exception e) {
+            System.debug('Error in relationship change test: ' + e.getMessage());
+            throw e;
+        }
+    }
+    
+    /**
+     * Check relationship change sync results (for separate test scripts)
+     */
+    public void checkRelationshipChanges() {
+        System.debug('\n--- Checking relationship change sync results ---');
+        
+        try {
+            // Get the records that had relationships changed
+            Contact testContact = [
+                SELECT Id, AccountId
+                FROM Contact
+                WHERE LastName LIKE 'Integration Test Contact%'
+                AND FirstName != 'DELETE'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            Test_Child_Object__c testChild = [
+                SELECT Id, Account__c
+                FROM Test_Child_Object__c
+                WHERE Name LIKE 'Integration Test Child%'
+                AND (NOT Name LIKE '%DELETE%')
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            // Check for UPDATE sync logs
+            List<Notion_Sync_Log__c> logs = [
+                SELECT Id, Record_Id__c, Object_Type__c, Status__c, Error_Message__c, CreatedDate
+                FROM Notion_Sync_Log__c
+                WHERE Record_Id__c IN (:testContact.Id, :testChild.Id)
+                AND Operation_Type__c = 'UPDATE'
+                ORDER BY CreatedDate DESC
+            ];
+            
+            // Look for recent update logs (should have at least 2 - one for each relationship change)
+            Integer recentUpdateCount = 0;
+            DateTime fiveMinutesAgo = DateTime.now().addMinutes(-5);
+            
+            for (Notion_Sync_Log__c log : logs) {
+                if (log.CreatedDate >= fiveMinutesAgo) {
+                    recentUpdateCount++;
+                    assert(log.Status__c == 'Success', 
+                        'Relationship change sync should succeed for ' + log.Object_Type__c + ': ' + log.Error_Message__c);
+                }
+            }
+            
+            assert(recentUpdateCount >= 2, 
+                'Should have at least 2 UPDATE sync logs for relationship changes, found: ' + recentUpdateCount);
+            
+            passCount++;
+            System.debug('✓ Relationship change sync test passed');
+            
+        } catch (Exception e) {
+            failCount++;
+            errors.add('Relationship change sync test failed: ' + e.getMessage());
+            System.debug('✗ Relationship change sync test failed: ' + e.getMessage());
         }
     }
     
