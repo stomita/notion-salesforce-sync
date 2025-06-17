@@ -178,13 +178,23 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         
         Map<String, Object> notionProperties = transformDataToNotionFormat(record, fieldMappings);
         notionProperties = relationshipHandler.enrichNotionPropertiesWithRelations(request.objectType, record, notionProperties);
+        
+        // For CREATE operations, don't check for existing page - just create
+        if (request.operationType == 'CREATE') {
+            // Add Salesforce ID as a rich_text property
+            notionProperties.put(syncConfig.SalesforceIdPropertyName__c, 
+                               NotionApiClient.buildTextProperty(request.recordId));
+            return createNotionPage(syncConfig.NotionDatabaseId__c, notionProperties);
+        }
+        
+        // For UPDATE operations, find and update existing page
         String notionPageId = findNotionPageId(request.recordId, syncConfig);
         
         if (String.isNotBlank(notionPageId)) {
             updateNotionPage(notionPageId, notionProperties);
             return notionPageId;
         } else {
-            // Add Salesforce ID as a rich_text property
+            // If UPDATE operation but no page found, create it (handles edge cases)
             notionProperties.put(syncConfig.SalesforceIdPropertyName__c, 
                                NotionApiClient.buildTextProperty(request.recordId));
             return createNotionPage(syncConfig.NotionDatabaseId__c, notionProperties);
