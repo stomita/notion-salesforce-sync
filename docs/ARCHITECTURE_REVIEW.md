@@ -1,5 +1,8 @@
 # Architecture Review: Salesforce-Notion Sync
 
+## Purpose
+This document explains the architectural decisions and rationale for the Salesforce-Notion sync implementation. For handling large data volumes and batch processing, see [LARGE_DATA_SYNC.md](LARGE_DATA_SYNC.md).
+
 ## Current Approach Issues
 
 ### 1. Transaction Limitations
@@ -17,8 +20,8 @@
 
 ### 3. Error Handling Challenges
 - API failures would rollback entire transaction
-- No built-in retry mechanism
 - Difficult to handle partial failures
+- Complex retry logic needed for resilience
 
 ## Recommended Architecture: Flow-Driven Asynchronous Processing
 
@@ -39,14 +42,14 @@
    - Background processing for API calls
    - No transaction blocking
 
-3. **Scalability**
-   - Handle bulk operations efficiently
-   - Process records in batches
-   - Chain Queueable jobs for large datasets
+3. **Scalability Foundation**
+   - Handle real-time operations efficiently
+   - Extensible to batch processing (see LARGE_DATA_SYNC.md)
+   - Clear separation of sync patterns
 
-4. **Reliability**
-   - Built-in retry mechanism
-   - Error isolation
+4. **Error Isolation**
+   - API failures don't affect DML transactions
+   - Errors logged separately for analysis
    - Clear execution path
 
 5. **Governor Limit Compliance**
@@ -54,29 +57,16 @@
    - Unlimited callout time in async
    - Better resource utilization
 
-### Implementation Components:
+### Core Implementation Pattern:
 
-1. **Invocable Apex**: `NotionSyncInvocable`
-   - Entry point for Flow integration
-   - Maintains user context
-   - Routes to appropriate async method
-   - Single records: @future for immediate processing
-   - Bulk/Deletes: Queueable for batch processing
+The base architecture uses a simple pattern optimized for real-time, event-driven synchronization:
 
-2. **Queueable Apex**: `NotionSyncQueueable`
-   - Process records in batches
-   - Handle API calls with proper error handling
-   - Chain for continuation
+1. **Flow Trigger**: Captures record changes
+2. **Invocable Apex**: Routes based on operation type and volume
+3. **Async Processing**: @future for single records, Queueable for small batches
+4. **Error Logging**: Asynchronous logging to avoid DML-callout conflicts
 
-3. **Future Method**: For single record operations
-   - Immediate processing
-   - Maintains user context
-   - Ideal for UI-triggered syncs
-
-4. **Error Handling**: `NotionSyncLogger`
-   - In-memory log aggregation
-   - Bulk insert of logs
-   - Tracks sync status and errors
+For detailed implementation including retry mechanisms, batch processing, and large volume handling, refer to [LARGE_DATA_SYNC.md](LARGE_DATA_SYNC.md).
 
 ### Alternative Approaches Considered:
 
@@ -97,11 +87,25 @@
    - Cons: Not real-time, minimum 1-minute delay
 
 ## Recommendation
-Implement Invocable Apex + Async Processing pattern for optimal balance of:
+
+The implemented Invocable Apex + Async Processing pattern provides optimal balance for real-time synchronization:
+
+### Strengths:
 - User context preservation (critical for Named Credentials)
-- Real-time processing
-- Scalability
-- Error handling
-- User experience
-- Maintainability
-- Simplified deployment (no UI configuration required)
+- Real-time processing capability
+- Clean error isolation
+- Excellent user experience
+- Simple deployment model
+
+### Limitations:
+- Limited to ~30-40 records per sync due to API callout limits
+- No automatic retry mechanism in base implementation
+- Requires enhancement for large data volumes
+
+### Next Steps:
+For organizations needing to sync large data volumes or requiring batch processing capabilities, implement the patterns described in [LARGE_DATA_SYNC.md](LARGE_DATA_SYNC.md), which extends this base architecture with:
+- Batch Apex for large datasets
+- Queueable chaining for medium volumes
+- Retry mechanisms
+- Progress tracking
+- Scheduled sync capabilities
