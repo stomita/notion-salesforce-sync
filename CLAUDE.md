@@ -229,3 +229,23 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
 - **Error_Message__c**: Error details if failed
 - **Retry_Count__c**: Number of retry attempts
 - **Created_Date__c**: Timestamp of sync attempt
+
+### Current Limitations
+
+**Important**: The current implementation is optimized for real-time, event-driven sync of individual records or small batches. It has the following limitations for large data volumes:
+
+- **Maximum Records per Sync**: ~30-40 records (due to API callout limits)
+- **No Batch Processing**: All records processed in single transaction
+- **No Retry Mechanism**: Despite the Retry_Count__c field, automatic retries are not yet implemented
+- **Memory Constraints**: All data held in memory simultaneously
+
+For large data sync architecture and planned improvements, see [docs/LARGE_DATA_SYNC.md](docs/LARGE_DATA_SYNC.md).
+
+### Documentation
+
+Additional documentation is available in the `docs/` folder:
+- [ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) - Architecture analysis and recommendations
+- [CI_SETUP.md](docs/CI_SETUP.md) - CI/CD configuration guide
+- [FLOW_CONFIGURATION.md](docs/FLOW_CONFIGURATION.md) - Flow setup instructions
+- [INTEGRATION_TESTING.md](docs/INTEGRATION_TESTING.md) - Integration testing guide
+- [LARGE_DATA_SYNC.md](docs/LARGE_DATA_SYNC.md) - Large data volume handling architecture
