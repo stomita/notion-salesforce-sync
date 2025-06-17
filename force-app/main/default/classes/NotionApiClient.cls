@@ -11,6 +11,8 @@ public class NotionApiClient {
         public String errorMessage;
         public Integer statusCode;
         public String responseBody;
+        public Boolean isRateLimited;
+        public Integer retryAfterSeconds;
         
         public NotionResponse(Boolean success, String pageId, String errorMessage, Integer statusCode, String responseBody) {
             this.success = success;
@@ -18,6 +20,18 @@ public class NotionApiClient {
             this.errorMessage = errorMessage;
             this.statusCode = statusCode;
             this.responseBody = responseBody;
+            this.isRateLimited = false;
+            this.retryAfterSeconds = null;
+        }
+        
+        public NotionResponse(Boolean success, String pageId, String errorMessage, Integer statusCode, String responseBody, Boolean isRateLimited, Integer retryAfterSeconds) {
+            this.success = success;
+            this.pageId = pageId;
+            this.errorMessage = errorMessage;
+            this.statusCode = statusCode;
+            this.responseBody = responseBody;
+            this.isRateLimited = isRateLimited;
+            this.retryAfterSeconds = retryAfterSeconds;
         }
     }
     
@@ -41,6 +55,9 @@ public class NotionApiClient {
     
     public static NotionResponse createPage(NotionPageRequest pageRequest) {
         try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
             HttpRequest request = buildHttpRequest('POST', '/v1/pages');
             
             Map<String, Object> requestBody = new Map<String, Object>{
@@ -64,6 +81,9 @@ public class NotionApiClient {
             HttpResponse response = new Http().send(request);
             return processResponse(response);
             
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, null, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
         } catch (Exception e) {
             return new NotionResponse(false, null, 'Exception during page creation: ' + e.getMessage(), null, null);
         }
@@ -71,6 +91,9 @@ public class NotionApiClient {
     
     public static NotionResponse updatePage(String pageId, Map<String, Object> properties) {
         try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
             HttpRequest request = buildHttpRequest('PATCH', '/v1/pages/' + pageId);
             
             Map<String, Object> requestBody = new Map<String, Object>{
@@ -82,6 +105,9 @@ public class NotionApiClient {
             HttpResponse response = new Http().send(request);
             return processResponse(response);
             
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, pageId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
         } catch (Exception e) {
             return new NotionResponse(false, pageId, 'Exception during page update: ' + e.getMessage(), null, null);
         }
@@ -89,6 +115,9 @@ public class NotionApiClient {
     
     public static NotionResponse deletePage(String pageId) {
         try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
             HttpRequest request = buildHttpRequest('PATCH', '/v1/pages/' + pageId);
             
             Map<String, Object> requestBody = new Map<String, Object>{
@@ -100,6 +129,9 @@ public class NotionApiClient {
             HttpResponse response = new Http().send(request);
             return processResponse(response);
             
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, pageId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
         } catch (Exception e) {
             return new NotionResponse(false, pageId, 'Exception during page deletion: ' + e.getMessage(), null, null);
         }
@@ -107,6 +139,9 @@ public class NotionApiClient {
     
     public static NotionResponse queryDatabase(String databaseId, Map<String, Object> filter) {
         try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
             HttpRequest request = buildHttpRequest('POST', '/v1/databases/' + databaseId + '/query');
             
             Map<String, Object> requestBody = new Map<String, Object>();
@@ -119,6 +154,9 @@ public class NotionApiClient {
             HttpResponse response = new Http().send(request);
             return processResponse(response);
             
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, null, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
         } catch (Exception e) {
             return new NotionResponse(false, null, 'Exception during database query: ' + e.getMessage(), null, null);
         }
@@ -126,11 +164,17 @@ public class NotionApiClient {
     
     public static NotionResponse getPage(String pageId) {
         try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
             HttpRequest request = buildHttpRequest('GET', '/v1/pages/' + pageId);
             
             HttpResponse response = new Http().send(request);
             return processResponse(response);
             
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, pageId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
         } catch (Exception e) {
             return new NotionResponse(false, pageId, 'Exception during page retrieval: ' + e.getMessage(), null, null);
         }
@@ -156,6 +200,30 @@ public class NotionApiClient {
         System.debug('NotionApiClient: Response Status Code: ' + statusCode);
         if (statusCode != 200) {
             System.debug('NotionApiClient: Error Response Body: ' + responseBody);
+        }
+        
+        // Handle rate limiting (429 status code)
+        if (statusCode == 429) {
+            Boolean isRateLimited = NotionRateLimiter.handleRateLimit(response);
+            String retryAfterHeader = response.getHeader('Retry-After');
+            Integer retryAfterSeconds = null;
+            
+            if (String.isNotBlank(retryAfterHeader)) {
+                try {
+                    retryAfterSeconds = Integer.valueOf(retryAfterHeader);
+                } catch (Exception e) {
+                    System.debug('Failed to parse Retry-After header: ' + retryAfterHeader);
+                }
+            }
+            
+            String errorMessage = 'Rate limit exceeded. ';
+            if (retryAfterSeconds != null) {
+                errorMessage += 'Retry after ' + retryAfterSeconds + ' seconds.';
+            } else {
+                errorMessage += 'Please retry later.';
+            }
+            
+            return new NotionResponse(false, null, errorMessage, statusCode, responseBody, true, retryAfterSeconds);
         }
         
         if (statusCode >= 200 && statusCode < 300) {

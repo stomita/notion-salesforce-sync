@@ -55,12 +55,12 @@ public with sharing class NotionRateLimiter {
     }
     
     /**
-     * @description Enforces rate limiting by checking time since last request
-     * Throws exception if rate limit would be exceeded, allowing caller to defer
-     * @throws RateLimitException if request should be deferred
+     * @description Enforces rate limiting by waiting if necessary
+     * Uses busy wait with CPU time monitoring to maintain 3 req/sec rate limit
+     * @throws RateLimitException if unable to wait due to governor limits
      */
     public static void throttleRequest() {
-        // First check if we're approaching governor limits
+        // First check if we're approaching callout limit
         if (Limits.getCallouts() >= Limits.getLimitCallouts() - 5) {
             throw new RateLimitException(
                 String.format('Approaching callout limit ({0}/{1}), defer to next async job',
@@ -74,12 +74,33 @@ public with sharing class NotionRateLimiter {
             Long minimumInterval = 1000 / REQUESTS_PER_SECOND; // 333ms between requests
             
             if (millisecondsSinceLastRequest < minimumInterval) {
-                // Don't busy wait - instead defer to next async job
-                // This avoids CPU consumption and allows natural spacing
-                throw new RateLimitException(
-                    String.format('Rate limit requires {0}ms delay (only {1}ms elapsed), defer to next batch',
-                        new List<Object>{minimumInterval, millisecondsSinceLastRequest})
-                );
+                Long waitTime = minimumInterval - millisecondsSinceLastRequest;
+                
+                // Check if we have enough CPU time to wait
+                // Leave 5 second buffer for safety
+                Integer currentCpuTime = Limits.getCpuTime();
+                Integer cpuLimit = Limits.getLimitCpuTime();
+                Integer cpuBuffer = 5000; // 5 seconds
+                
+                if (currentCpuTime + waitTime > cpuLimit - cpuBuffer) {
+                    throw new RateLimitException(
+                        String.format('Insufficient CPU time for {0}ms wait. Current: {1}ms, Limit: {2}ms',
+                            new List<Object>{waitTime, currentCpuTime, cpuLimit})
+                    );
+                }
+                
+                // Perform busy wait to maintain rate limit
+                Long startTime = System.currentTimeMillis();
+                while (System.currentTimeMillis() - startTime < waitTime) {
+                    // Busy wait - this burns CPU but maintains precise rate limiting
+                    // Check CPU time periodically to avoid hitting limit
+                    if (Limits.getCpuTime() > cpuLimit - cpuBuffer) {
+                        throw new RateLimitException('CPU time limit exceeded during rate limit wait');
+                    }
+                }
+                
+                System.debug(String.format('Rate limiter waited {0}ms to maintain 3 req/sec limit', 
+                    new List<Object>{waitTime}));
             }
         }
         
@@ -138,6 +159,41 @@ public with sharing class NotionRateLimiter {
             return true;
         }
         return false;
+    }
+    
+    /**
+     * @description Calculate maximum batch size based on current governor limits
+     * @param callsPerRecord Average number of API calls per record
+     * @return Integer maximum safe batch size
+     */
+    public static Integer calculateMaxBatchSize(Integer callsPerRecord) {
+        if (callsPerRecord == null || callsPerRecord <= 0) {
+            callsPerRecord = 3; // Default assumption
+        }
+        
+        // Check callout limit
+        Integer remainingCallouts = Limits.getLimitCallouts() - Limits.getCallouts();
+        Integer maxByCallouts = (remainingCallouts - 5) / callsPerRecord; // Leave 5 buffer
+        
+        // Check CPU time (accounting for rate limiting waits)
+        Integer remainingCpuTime = Limits.getLimitCpuTime() - Limits.getCpuTime();
+        // Each request needs 333ms wait + ~200ms processing
+        Integer timePerRequest = 533; 
+        Integer maxByCpuTime = (remainingCpuTime - 5000) / (timePerRequest * callsPerRecord);
+        
+        // Check heap size (rough estimate: 100KB per record)
+        Integer remainingHeap = Limits.getLimitHeapSize() - Limits.getHeapSize();
+        Integer maxByHeap = remainingHeap / 102400; // 100KB per record
+        
+        // Return the most restrictive limit
+        Integer maxBatchSize = Math.min(Math.min(maxByCallouts, maxByCpuTime), maxByHeap);
+        
+        System.debug(String.format(
+            'Max batch size calculation: Callouts={0}, CPU={1}, Heap={2}, Final={3}',
+            new List<Object>{maxByCallouts, maxByCpuTime, maxByHeap, maxBatchSize}
+        ));
+        
+        return Math.max(maxBatchSize, 0); // Never return negative
     }
     
     /**

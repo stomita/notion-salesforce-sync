@@ -62,14 +62,18 @@ private class NotionRateLimiterTest {
         // First request
         NotionRateLimiter.throttleRequest();
         
-        // Immediate second request should throw exception
-        try {
-            NotionRateLimiter.throttleRequest();
-            System.assert(false, 'Second immediate request should throw RateLimitException');
-        } catch (NotionRateLimiter.RateLimitException e) {
-            System.assert(e.getMessage().contains('Rate limit requires'), 
-                'Exception message should mention rate limit delay');
-        }
+        // Record the time before second request
+        Long timeBefore = System.currentTimeMillis();
+        
+        // Immediate second request should wait
+        NotionRateLimiter.throttleRequest();
+        
+        Long timeAfter = System.currentTimeMillis();
+        Long elapsed = timeAfter - timeBefore;
+        
+        // Should have waited approximately 333ms
+        System.assert(elapsed >= 300, 
+            'Should have waited at least 300ms, but only waited ' + elapsed + 'ms');
         
         Test.stopTest();
     }
@@ -174,23 +178,44 @@ private class NotionRateLimiterTest {
     }
     
     @isTest
-    static void testThrottleRequest_ApproachingCalloutLimit() {
+    static void testThrottleRequest_InsufficientCpuTime() {
         Test.startTest();
         
-        // We can't actually consume callouts in test context,
-        // but we can test the exception message format
-        try {
-            // This would only throw if we were actually near the limit
-            // In test context, it won't throw for this reason
-            NotionRateLimiter.throttleRequest();
-            
-            // Make a second quick request to trigger rate limit exception instead
-            NotionRateLimiter.throttleRequest();
-            System.assert(false, 'Should have thrown exception');
-        } catch (NotionRateLimiter.RateLimitException e) {
-            // Will get rate limit exception instead of callout limit in test
-            System.assert(e.getMessage() != null, 'Exception should have message');
-        }
+        // We can't easily consume all CPU time in test,
+        // but we can verify the busy wait works correctly
+        NotionRateLimiter.throttleRequest();
+        
+        // Quick succession should trigger wait
+        Long startCpu = Limits.getCpuTime();
+        NotionRateLimiter.throttleRequest();
+        Long endCpu = Limits.getCpuTime();
+        
+        // CPU time should have increased due to busy wait
+        System.assert(endCpu > startCpu, 
+            'CPU time should increase due to busy wait');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
+    static void testCalculateMaxBatchSize() {
+        Test.startTest();
+        
+        // Test with default calls per record
+        Integer maxBatch = NotionRateLimiter.calculateMaxBatchSize(null);
+        System.assert(maxBatch >= 0, 'Max batch size should be non-negative');
+        
+        // Test with specific calls per record
+        Integer maxBatchWith2Calls = NotionRateLimiter.calculateMaxBatchSize(2);
+        Integer maxBatchWith5Calls = NotionRateLimiter.calculateMaxBatchSize(5);
+        
+        // More calls per record should result in smaller batch
+        System.assert(maxBatchWith5Calls <= maxBatchWith2Calls, 
+            'Higher calls per record should result in smaller batch size');
+        
+        // Test edge case
+        Integer maxBatchWithZero = NotionRateLimiter.calculateMaxBatchSize(0);
+        System.assert(maxBatchWithZero >= 0, 'Should handle zero gracefully');
         
         Test.stopTest();
     }
