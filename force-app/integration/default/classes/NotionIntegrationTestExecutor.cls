@@ -103,8 +103,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse accountResponse = NotionApiClient.getPage(accountNotionPageId);
                 assert(accountResponse.success, 'Should be able to retrieve Account from Notion: ' + accountResponse.errorMessage);
                 
-                if (accountResponse.success && accountResponse.responseData != null) {
-                    Map<String, Object> accountPage = (Map<String, Object>) accountResponse.responseData;
+                if (accountResponse.success && accountResponse.responseBody != null) {
+                    Map<String, Object> accountPage = (Map<String, Object>) JSON.deserializeUntyped(accountResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) accountPage.get('properties');
                     
                     // Verify Name property
@@ -130,8 +130,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse parentResponse = NotionApiClient.getPage(parentNotionPageId);
                 assert(parentResponse.success, 'Should be able to retrieve Test Parent from Notion: ' + parentResponse.errorMessage);
                 
-                if (parentResponse.success && parentResponse.responseData != null) {
-                    Map<String, Object> parentPage = (Map<String, Object>) parentResponse.responseData;
+                if (parentResponse.success && parentResponse.responseBody != null) {
+                    Map<String, Object> parentPage = (Map<String, Object>) JSON.deserializeUntyped(parentResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) parentPage.get('properties');
                     
                     // Verify Status property
@@ -259,7 +259,7 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse accountResponse = NotionApiClient.getPage(accountNotionPageId);
                 assert(accountResponse.success, 'Should be able to retrieve updated Account from Notion: ' + accountResponse.errorMessage);
                 
-                if (accountResponse.success && accountResponse.responseData != null) {
+                if (accountResponse.success && accountResponse.responseBody != null) {
                     // Account Description was updated, which is body content
                     // We should verify the body content was updated
                     System.debug('Account Description update should be reflected in page body content');
@@ -271,8 +271,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse parentResponse = NotionApiClient.getPage(parentNotionPageId);
                 assert(parentResponse.success, 'Should be able to retrieve updated Test Parent from Notion: ' + parentResponse.errorMessage);
                 
-                if (parentResponse.success && parentResponse.responseData != null) {
-                    Map<String, Object> parentPage = (Map<String, Object>) parentResponse.responseData;
+                if (parentResponse.success && parentResponse.responseBody != null) {
+                    Map<String, Object> parentPage = (Map<String, Object>) JSON.deserializeUntyped(parentResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) parentPage.get('properties');
                     
                     // Verify updated Status property
@@ -396,8 +396,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse contactResponse = NotionApiClient.getPage(contactNotionPageId);
                 assert(contactResponse.success, 'Should be able to retrieve Contact from Notion: ' + contactResponse.errorMessage);
                 
-                if (contactResponse.success && contactResponse.responseData != null) {
-                    Map<String, Object> contactPage = (Map<String, Object>) contactResponse.responseData;
+                if (contactResponse.success && contactResponse.responseBody != null) {
+                    Map<String, Object> contactPage = (Map<String, Object>) JSON.deserializeUntyped(contactResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) contactPage.get('properties');
                     
                     // Verify Account relation
@@ -417,8 +417,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse childResponse = NotionApiClient.getPage(childNotionPageId);
                 assert(childResponse.success, 'Should be able to retrieve Test Child from Notion: ' + childResponse.errorMessage);
                 
-                if (childResponse.success && childResponse.responseData != null) {
-                    Map<String, Object> childPage = (Map<String, Object>) childResponse.responseData;
+                if (childResponse.success && childResponse.responseBody != null) {
+                    Map<String, Object> childPage = (Map<String, Object>) JSON.deserializeUntyped(childResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) childPage.get('properties');
                     
                     // Verify Test Parent relation
@@ -608,8 +608,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse contactResponse = NotionApiClient.getPage(contactNotionPageId);
                 assert(contactResponse.success, 'Should be able to retrieve Contact from Notion: ' + contactResponse.errorMessage);
                 
-                if (contactResponse.success && contactResponse.responseData != null) {
-                    Map<String, Object> contactPage = (Map<String, Object>) contactResponse.responseData;
+                if (contactResponse.success && contactResponse.responseBody != null) {
+                    Map<String, Object> contactPage = (Map<String, Object>) JSON.deserializeUntyped(contactResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) contactPage.get('properties');
                     
                     // Verify Account relation now points to second account
@@ -631,8 +631,8 @@ public class NotionIntegrationTestExecutor {
                 NotionApiClient.NotionResponse childResponse = NotionApiClient.getPage(childNotionPageId);
                 assert(childResponse.success, 'Should be able to retrieve Test Child from Notion: ' + childResponse.errorMessage);
                 
-                if (childResponse.success && childResponse.responseData != null) {
-                    Map<String, Object> childPage = (Map<String, Object>) childResponse.responseData;
+                if (childResponse.success && childResponse.responseBody != null) {
+                    Map<String, Object> childPage = (Map<String, Object>) JSON.deserializeUntyped(childResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) childPage.get('properties');
                     
                     // Verify Account relation now points to second account
