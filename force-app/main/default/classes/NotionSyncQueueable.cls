@@ -360,6 +360,136 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new NotionSyncException('Failed to update Notion page: ' + res.getBody());
         }
+        
+        // Handle body content update if present
+        String bodyContent = (String) properties.get('body');
+        if (bodyContent != null) {
+            // Notion API doesn't support updating children directly
+            // We need to delete existing children and append new ones
+            updatePageBodyContent(pageId, bodyContent);
+        }
+    }
+    
+    private void updatePageBodyContent(String pageId, String bodyContent) {
+        // Get existing children blocks
+        List<String> existingBlockIds = getPageChildren(pageId);
+        
+        if (String.isNotBlank(bodyContent)) {
+            if (!existingBlockIds.isEmpty()) {
+                try {
+                    // Try to update the first block with new content
+                    updateBlock(existingBlockIds[0], bodyContent);
+                    
+                    // Delete any extra blocks beyond the first one
+                    for (Integer i = 1; i < existingBlockIds.size(); i++) {
+                        deleteBlock(existingBlockIds[i]);
+                    }
+                } catch (NotionSyncException e) {
+                    // If update fails, delete all and recreate
+                    for (String blockId : existingBlockIds) {
+                        deleteBlock(blockId);
+                    }
+                    appendBlockChildren(pageId, buildNotionChildren(bodyContent));
+                }
+            } else {
+                // No existing blocks, append new one
+                appendBlockChildren(pageId, buildNotionChildren(bodyContent));
+            }
+        } else {
+            // Clear all blocks when body content is null/empty
+            for (String blockId : existingBlockIds) {
+                deleteBlock(blockId);
+            }
+        }
+    }
+    
+    private List<String> getPageChildren(String pageId) {
+        List<String> blockIds = new List<String>();
+        
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('callout:Notion_API/v1/blocks/' + pageId + '/children');
+        req.setMethod('GET');
+        req.setHeader('Notion-Version', '2022-06-28');
+        
+        Http http = new Http();
+        HttpResponse res = http.send(req);
+        
+        if (res.getStatusCode() == 200) {
+            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+            List<Object> results = (List<Object>) responseBody.get('results');
+            
+            for (Object result : results) {
+                Map<String, Object> block = (Map<String, Object>) result;
+                blockIds.add((String) block.get('id'));
+            }
+        }
+        
+        return blockIds;
+    }
+    
+    private void updateBlock(String blockId, String content) {
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('callout:Notion_API/v1/blocks/' + blockId);
+        req.setMethod('PATCH');
+        req.setHeader('Content-Type', 'application/json');
+        req.setHeader('Notion-Version', '2022-06-28');
+        
+        // Build update payload based on block type (assuming paragraph for body content)
+        Map<String, Object> requestBody = new Map<String, Object>{
+            'paragraph' => new Map<String, Object>{
+                'rich_text' => new List<Object>{
+                    new Map<String, Object>{
+                        'type' => 'text',
+                        'text' => new Map<String, Object>{ 'content' => content }
+                    }
+                }
+            }
+        };
+        
+        req.setBody(JSON.serialize(requestBody));
+        
+        Http http = new Http();
+        HttpResponse res = http.send(req);
+        
+        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
+            // If update fails (e.g., block type mismatch), fall back to delete and recreate
+            deleteBlock(blockId);
+            // The parent method will handle appending new content
+            throw new NotionSyncException('Failed to update block: ' + res.getBody());
+        }
+    }
+    
+    private void deleteBlock(String blockId) {
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('callout:Notion_API/v1/blocks/' + blockId);
+        req.setMethod('DELETE');
+        req.setHeader('Notion-Version', '2022-06-28');
+        
+        Http http = new Http();
+        HttpResponse res = http.send(req);
+        
+        // Ignore errors when deleting blocks - they might already be deleted
+    }
+    
+    private void appendBlockChildren(String pageId, List<Map<String, Object>> children) {
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('callout:Notion_API/v1/blocks/' + pageId + '/children');
+        req.setMethod('PATCH');
+        req.setHeader('Content-Type', 'application/json');
+        req.setHeader('Notion-Version', '2022-06-28');
+        
+        Map<String, Object> requestBody = new Map<String, Object>{
+            'children' => children
+        };
+        
+        req.setBody(JSON.serialize(requestBody));
+        
+        Http http = new Http();
+        HttpResponse res = http.send(req);
+        
+        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
+            throw new NotionSyncException('Failed to append block children: ' + res.getBody());
+        }
     }
     
     private void deleteNotionPage(String pageId) {
@@ -396,21 +526,21 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         return notionProps;
     }
     
-    private List<Object> buildNotionChildren(String bodyContent) {
-        return new List<Object>{
-            new Map<String, Object>{
-                'object' => 'block',
-                'type' => 'paragraph',
-                'paragraph' => new Map<String, Object>{
-                    'rich_text' => new List<Object>{
-                        new Map<String, Object>{
-                            'type' => 'text',
-                            'text' => new Map<String, Object>{ 'content' => bodyContent }
-                        }
+    private List<Map<String, Object>> buildNotionChildren(String bodyContent) {
+        List<Map<String, Object>> children = new List<Map<String, Object>>();
+        children.add(new Map<String, Object>{
+            'object' => 'block',
+            'type' => 'paragraph',
+            'paragraph' => new Map<String, Object>{
+                'rich_text' => new List<Object>{
+                    new Map<String, Object>{
+                        'type' => 'text',
+                        'text' => new Map<String, Object>{ 'content' => bodyContent }
                     }
                 }
             }
-        };
+        });
+        return children;
     }
     
     private void logSuccess(SyncRequest request) {
