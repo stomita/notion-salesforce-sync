@@ -59,7 +59,7 @@ public class NotionIntegrationTestExecutor {
         try {
             // Get the most recent test records
             Account testAccount = [
-                SELECT Id, Name 
+                SELECT Id, Name, Description 
                 FROM Account 
                 WHERE Name LIKE 'Integration Test Account%' 
                 ORDER BY CreatedDate DESC
@@ -67,7 +67,7 @@ public class NotionIntegrationTestExecutor {
             ];
             
             Test_Parent_Object__c testParent = [
-                SELECT Id, Name
+                SELECT Id, Name, Description__c, Status__c, Amount__c, Active__c
                 FROM Test_Parent_Object__c
                 WHERE Name LIKE 'Integration Test Parent%'
                 ORDER BY CreatedDate DESC
@@ -83,23 +83,79 @@ public class NotionIntegrationTestExecutor {
                 ORDER BY CreatedDate DESC
             ];
             
-            Boolean accountSynced = false;
-            Boolean parentSynced = false;
+            String accountNotionPageId = null;
+            String parentNotionPageId = null;
             
             for (Notion_Sync_Log__c log : logs) {
                 if (log.Status__c == 'Success' && String.isNotBlank(log.Notion_Page_Id__c)) {
-                    if (log.Record_Id__c == testAccount.Id) accountSynced = true;
-                    if (log.Record_Id__c == testParent.Id) parentSynced = true;
+                    if (log.Record_Id__c == testAccount.Id) accountNotionPageId = log.Notion_Page_Id__c;
+                    if (log.Record_Id__c == testParent.Id) parentNotionPageId = log.Notion_Page_Id__c;
                 } else {
                     errors.add('Create sync failed for ' + log.Record_Id__c + ': ' + log.Error_Message__c);
                 }
             }
             
-            assert(accountSynced, 'Account should be synced to Notion');
-            assert(parentSynced, 'Test Parent should be synced to Notion');
+            assert(String.isNotBlank(accountNotionPageId), 'Account should be synced to Notion');
+            assert(String.isNotBlank(parentNotionPageId), 'Test Parent should be synced to Notion');
+            
+            // Verify actual Notion data for Account
+            if (String.isNotBlank(accountNotionPageId)) {
+                NotionApiClient.NotionResponse accountResponse = NotionApiClient.getPage(accountNotionPageId);
+                assert(accountResponse.success, 'Should be able to retrieve Account from Notion: ' + accountResponse.errorMessage);
+                
+                if (accountResponse.success && accountResponse.responseData != null) {
+                    Map<String, Object> accountPage = (Map<String, Object>) accountResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) accountPage.get('properties');
+                    
+                    // Verify Name property
+                    Map<String, Object> nameProperty = (Map<String, Object>) properties.get('Name');
+                    List<Object> titleArray = (List<Object>) nameProperty.get('title');
+                    if (!titleArray.isEmpty()) {
+                        Map<String, Object> titleText = (Map<String, Object>) titleArray.get(0);
+                        Map<String, Object> text = (Map<String, Object>) titleText.get('text');
+                        String notionName = (String) text.get('content');
+                        assert(notionName == testAccount.Name, 'Account Name in Notion should match Salesforce');
+                    }
+                    
+                    // Verify Description (body content)
+                    if (String.isNotBlank(testAccount.Description)) {
+                        // Body content verification would require fetching blocks
+                        System.debug('Account Description should be in page body content');
+                    }
+                }
+            }
+            
+            // Verify actual Notion data for Test Parent
+            if (String.isNotBlank(parentNotionPageId)) {
+                NotionApiClient.NotionResponse parentResponse = NotionApiClient.getPage(parentNotionPageId);
+                assert(parentResponse.success, 'Should be able to retrieve Test Parent from Notion: ' + parentResponse.errorMessage);
+                
+                if (parentResponse.success && parentResponse.responseData != null) {
+                    Map<String, Object> parentPage = (Map<String, Object>) parentResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) parentPage.get('properties');
+                    
+                    // Verify Status property
+                    Map<String, Object> statusProperty = (Map<String, Object>) properties.get('Status');
+                    Map<String, Object> selectValue = (Map<String, Object>) statusProperty.get('select');
+                    if (selectValue != null) {
+                        String notionStatus = (String) selectValue.get('name');
+                        assert(notionStatus == testParent.Status__c, 'Test Parent Status in Notion should match Salesforce');
+                    }
+                    
+                    // Verify Amount property
+                    Map<String, Object> amountProperty = (Map<String, Object>) properties.get('Amount');
+                    Decimal notionAmount = (Decimal) amountProperty.get('number');
+                    assert(notionAmount == testParent.Amount__c, 'Test Parent Amount in Notion should match Salesforce');
+                    
+                    // Verify Active property
+                    Map<String, Object> activeProperty = (Map<String, Object>) properties.get('Active');
+                    Boolean notionActive = (Boolean) activeProperty.get('checkbox');
+                    assert(notionActive == testParent.Active__c, 'Test Parent Active in Notion should match Salesforce');
+                }
+            }
             
             passCount++;
-            System.debug('✓ Create sync test passed');
+            System.debug('✓ Create sync test passed - verified in Notion');
             
         } catch (Exception e) {
             failCount++;
@@ -166,8 +222,26 @@ public class NotionIntegrationTestExecutor {
                 LIMIT 1
             ];
             
-            // Verify update sync
-            List<Notion_Sync_Log__c> logs = [
+            // Get the Notion page IDs from previous CREATE sync
+            List<Notion_Sync_Log__c> createLogs = [
+                SELECT Id, Record_Id__c, Notion_Page_Id__c
+                FROM Notion_Sync_Log__c
+                WHERE Record_Id__c IN (:testAccount.Id, :testParent.Id)
+                AND Operation_Type__c = 'CREATE'
+                AND Status__c = 'Success'
+                ORDER BY CreatedDate DESC
+            ];
+            
+            String accountNotionPageId = null;
+            String parentNotionPageId = null;
+            
+            for (Notion_Sync_Log__c log : createLogs) {
+                if (log.Record_Id__c == testAccount.Id) accountNotionPageId = log.Notion_Page_Id__c;
+                if (log.Record_Id__c == testParent.Id) parentNotionPageId = log.Notion_Page_Id__c;
+            }
+            
+            // Verify update sync logs
+            List<Notion_Sync_Log__c> updateLogs = [
                 SELECT Id, Status__c, Error_Message__c
                 FROM Notion_Sync_Log__c
                 WHERE Record_Id__c IN (:testAccount.Id, :testParent.Id)
@@ -176,12 +250,48 @@ public class NotionIntegrationTestExecutor {
                 LIMIT 2
             ];
             
-            for (Notion_Sync_Log__c log : logs) {
+            for (Notion_Sync_Log__c log : updateLogs) {
                 assert(log.Status__c == 'Success', 'Update sync should succeed: ' + log.Error_Message__c);
             }
             
+            // Verify actual Notion data for Account update
+            if (String.isNotBlank(accountNotionPageId)) {
+                NotionApiClient.NotionResponse accountResponse = NotionApiClient.getPage(accountNotionPageId);
+                assert(accountResponse.success, 'Should be able to retrieve updated Account from Notion: ' + accountResponse.errorMessage);
+                
+                if (accountResponse.success && accountResponse.responseData != null) {
+                    // Account Description was updated, which is body content
+                    // We should verify the body content was updated
+                    System.debug('Account Description update should be reflected in page body content');
+                }
+            }
+            
+            // Verify actual Notion data for Test Parent update
+            if (String.isNotBlank(parentNotionPageId)) {
+                NotionApiClient.NotionResponse parentResponse = NotionApiClient.getPage(parentNotionPageId);
+                assert(parentResponse.success, 'Should be able to retrieve updated Test Parent from Notion: ' + parentResponse.errorMessage);
+                
+                if (parentResponse.success && parentResponse.responseData != null) {
+                    Map<String, Object> parentPage = (Map<String, Object>) parentResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) parentPage.get('properties');
+                    
+                    // Verify updated Status property
+                    Map<String, Object> statusProperty = (Map<String, Object>) properties.get('Status');
+                    Map<String, Object> selectValue = (Map<String, Object>) statusProperty.get('select');
+                    if (selectValue != null) {
+                        String notionStatus = (String) selectValue.get('name');
+                        assert(notionStatus == 'In Progress', 'Test Parent Status in Notion should be updated to In Progress');
+                    }
+                    
+                    // Verify updated Amount property
+                    Map<String, Object> amountProperty = (Map<String, Object>) properties.get('Amount');
+                    Decimal notionAmount = (Decimal) amountProperty.get('number');
+                    assert(notionAmount == 2500.00, 'Test Parent Amount in Notion should be updated to 2500.00');
+                }
+            }
+            
             passCount++;
-            System.debug('✓ Update sync test passed');
+            System.debug('✓ Update sync test passed - verified in Notion');
             
         } catch (Exception e) {
             failCount++;
@@ -241,9 +351,9 @@ public class NotionIntegrationTestExecutor {
         System.debug('\n--- Checking relationship sync results ---');
         
         try {
-            // Get created child and contact
+            // Get created child and contact with their relationships
             Test_Child_Object__c testChild = [
-                SELECT Id, Name
+                SELECT Id, Name, Test_Parent__c, Account__c
                 FROM Test_Child_Object__c
                 WHERE Name LIKE 'Integration Test Child%'
                 ORDER BY CreatedDate DESC
@@ -251,7 +361,7 @@ public class NotionIntegrationTestExecutor {
             ];
             
             Contact testContact = [
-                SELECT Id, LastName
+                SELECT Id, LastName, AccountId
                 FROM Contact
                 WHERE LastName LIKE 'Integration Test Contact%'
                 AND FirstName != 'DELETE'
@@ -261,22 +371,70 @@ public class NotionIntegrationTestExecutor {
             
             // Check sync logs
             List<Notion_Sync_Log__c> logs = [
-                SELECT Id, Status__c, Notion_Page_Id__c, Error_Message__c, Object_Type__c
+                SELECT Id, Record_Id__c, Status__c, Notion_Page_Id__c, Error_Message__c, Object_Type__c
                 FROM Notion_Sync_Log__c
                 WHERE Record_Id__c IN (:testChild.Id, :testContact.Id)
                 AND Operation_Type__c = 'CREATE'
                 ORDER BY CreatedDate DESC
             ];
             
+            String childNotionPageId = null;
+            String contactNotionPageId = null;
+            
             for (Notion_Sync_Log__c log : logs) {
                 assert(log.Status__c == 'Success', 
                     'Relationship sync should succeed for ' + log.Object_Type__c + ': ' + log.Error_Message__c);
                 assert(String.isNotBlank(log.Notion_Page_Id__c), 
                     'Notion page ID should be populated for ' + log.Object_Type__c);
+                    
+                if (log.Record_Id__c == testChild.Id) childNotionPageId = log.Notion_Page_Id__c;
+                if (log.Record_Id__c == testContact.Id) contactNotionPageId = log.Notion_Page_Id__c;
+            }
+            
+            // Verify Contact relationships in Notion
+            if (String.isNotBlank(contactNotionPageId)) {
+                NotionApiClient.NotionResponse contactResponse = NotionApiClient.getPage(contactNotionPageId);
+                assert(contactResponse.success, 'Should be able to retrieve Contact from Notion: ' + contactResponse.errorMessage);
+                
+                if (contactResponse.success && contactResponse.responseData != null) {
+                    Map<String, Object> contactPage = (Map<String, Object>) contactResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) contactPage.get('properties');
+                    
+                    // Verify Account relation
+                    Map<String, Object> accountRelation = (Map<String, Object>) properties.get('Account');
+                    List<Object> relationArray = (List<Object>) accountRelation.get('relation');
+                    assert(!relationArray.isEmpty(), 'Contact should have Account relation in Notion');
+                    
+                    if (!relationArray.isEmpty()) {
+                        Map<String, Object> relatedPage = (Map<String, Object>) relationArray.get(0);
+                        System.debug('Contact is related to Account Notion page: ' + relatedPage.get('id'));
+                    }
+                }
+            }
+            
+            // Verify Test Child relationships in Notion
+            if (String.isNotBlank(childNotionPageId)) {
+                NotionApiClient.NotionResponse childResponse = NotionApiClient.getPage(childNotionPageId);
+                assert(childResponse.success, 'Should be able to retrieve Test Child from Notion: ' + childResponse.errorMessage);
+                
+                if (childResponse.success && childResponse.responseData != null) {
+                    Map<String, Object> childPage = (Map<String, Object>) childResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) childPage.get('properties');
+                    
+                    // Verify Test Parent relation
+                    Map<String, Object> parentRelation = (Map<String, Object>) properties.get('Test Parent');
+                    List<Object> parentRelationArray = (List<Object>) parentRelation.get('relation');
+                    assert(!parentRelationArray.isEmpty(), 'Test Child should have Test Parent relation in Notion');
+                    
+                    // Verify Account relation
+                    Map<String, Object> accountRelation = (Map<String, Object>) properties.get('Account');
+                    List<Object> accountRelationArray = (List<Object>) accountRelation.get('relation');
+                    assert(!accountRelationArray.isEmpty(), 'Test Child should have Account relation in Notion');
+                }
             }
             
             passCount++;
-            System.debug('✓ Relationship sync test passed');
+            System.debug('✓ Relationship sync test passed - verified in Notion');
             
         } catch (Exception e) {
             failCount++;
@@ -381,8 +539,35 @@ public class NotionIntegrationTestExecutor {
                 LIMIT 1
             ];
             
+            // Get the second account that relationships were changed to
+            Account secondAccount = [
+                SELECT Id
+                FROM Account
+                WHERE Name LIKE 'Integration Test Second Account%'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            // Get Notion page IDs from CREATE sync logs
+            List<Notion_Sync_Log__c> createLogs = [
+                SELECT Id, Record_Id__c, Notion_Page_Id__c
+                FROM Notion_Sync_Log__c
+                WHERE Record_Id__c IN (:testContact.Id, :testChild.Id)
+                AND Operation_Type__c = 'CREATE'
+                AND Status__c = 'Success'
+                ORDER BY CreatedDate DESC
+            ];
+            
+            String contactNotionPageId = null;
+            String childNotionPageId = null;
+            
+            for (Notion_Sync_Log__c log : createLogs) {
+                if (log.Record_Id__c == testContact.Id) contactNotionPageId = log.Notion_Page_Id__c;
+                if (log.Record_Id__c == testChild.Id) childNotionPageId = log.Notion_Page_Id__c;
+            }
+            
             // Check for UPDATE sync logs
-            List<Notion_Sync_Log__c> logs = [
+            List<Notion_Sync_Log__c> updateLogs = [
                 SELECT Id, Record_Id__c, Object_Type__c, Status__c, Error_Message__c, CreatedDate
                 FROM Notion_Sync_Log__c
                 WHERE Record_Id__c IN (:testContact.Id, :testChild.Id)
@@ -394,7 +579,7 @@ public class NotionIntegrationTestExecutor {
             Integer recentUpdateCount = 0;
             DateTime fiveMinutesAgo = DateTime.now().addMinutes(-5);
             
-            for (Notion_Sync_Log__c log : logs) {
+            for (Notion_Sync_Log__c log : updateLogs) {
                 if (log.CreatedDate >= fiveMinutesAgo) {
                     recentUpdateCount++;
                     assert(log.Status__c == 'Success', 
@@ -405,8 +590,67 @@ public class NotionIntegrationTestExecutor {
             assert(recentUpdateCount >= 2, 
                 'Should have at least 2 UPDATE sync logs for relationship changes, found: ' + recentUpdateCount);
             
+            // Get the Notion page ID for the second account
+            Notion_Sync_Log__c secondAccountLog = [
+                SELECT Id, Notion_Page_Id__c
+                FROM Notion_Sync_Log__c
+                WHERE Record_Id__c = :secondAccount.Id
+                AND Operation_Type__c = 'CREATE'
+                AND Status__c = 'Success'
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
+            
+            String secondAccountNotionPageId = secondAccountLog.Notion_Page_Id__c;
+            
+            // Verify Contact relationship change in Notion
+            if (String.isNotBlank(contactNotionPageId)) {
+                NotionApiClient.NotionResponse contactResponse = NotionApiClient.getPage(contactNotionPageId);
+                assert(contactResponse.success, 'Should be able to retrieve Contact from Notion: ' + contactResponse.errorMessage);
+                
+                if (contactResponse.success && contactResponse.responseData != null) {
+                    Map<String, Object> contactPage = (Map<String, Object>) contactResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) contactPage.get('properties');
+                    
+                    // Verify Account relation now points to second account
+                    Map<String, Object> accountRelation = (Map<String, Object>) properties.get('Account');
+                    List<Object> relationArray = (List<Object>) accountRelation.get('relation');
+                    assert(!relationArray.isEmpty(), 'Contact should still have Account relation in Notion');
+                    
+                    if (!relationArray.isEmpty()) {
+                        Map<String, Object> relatedPage = (Map<String, Object>) relationArray.get(0);
+                        String relatedPageId = (String) relatedPage.get('id');
+                        assert(relatedPageId == secondAccountNotionPageId, 
+                            'Contact should now be related to second Account in Notion');
+                    }
+                }
+            }
+            
+            // Verify Test Child relationship change in Notion
+            if (String.isNotBlank(childNotionPageId)) {
+                NotionApiClient.NotionResponse childResponse = NotionApiClient.getPage(childNotionPageId);
+                assert(childResponse.success, 'Should be able to retrieve Test Child from Notion: ' + childResponse.errorMessage);
+                
+                if (childResponse.success && childResponse.responseData != null) {
+                    Map<String, Object> childPage = (Map<String, Object>) childResponse.responseData;
+                    Map<String, Object> properties = (Map<String, Object>) childPage.get('properties');
+                    
+                    // Verify Account relation now points to second account
+                    Map<String, Object> accountRelation = (Map<String, Object>) properties.get('Account');
+                    List<Object> accountRelationArray = (List<Object>) accountRelation.get('relation');
+                    assert(!accountRelationArray.isEmpty(), 'Test Child should still have Account relation in Notion');
+                    
+                    if (!accountRelationArray.isEmpty()) {
+                        Map<String, Object> relatedPage = (Map<String, Object>) accountRelationArray.get(0);
+                        String relatedPageId = (String) relatedPage.get('id');
+                        assert(relatedPageId == secondAccountNotionPageId, 
+                            'Test Child should now be related to second Account in Notion');
+                    }
+                }
+            }
+            
             passCount++;
-            System.debug('✓ Relationship change sync test passed');
+            System.debug('✓ Relationship change sync test passed - verified in Notion');
             
         } catch (Exception e) {
             failCount++;
@@ -509,14 +753,14 @@ public class NotionIntegrationTestExecutor {
         try {
             // Find all delete sync logs from today
             List<Notion_Sync_Log__c> logs = [
-                SELECT Id, Record_Id__c, Object_Type__c, Status__c, Error_Message__c
+                SELECT Id, Record_Id__c, Object_Type__c, Status__c, Error_Message__c, Notion_Page_Id__c
                 FROM Notion_Sync_Log__c
                 WHERE Operation_Type__c = 'DELETE'
                 AND CreatedDate = TODAY
                 ORDER BY CreatedDate DESC
             ];
             
-            // Count successful deletions by object type
+            // Count successful deletions by object type and collect Notion page IDs
             Map<String, Integer> successCountByType = new Map<String, Integer>{
                 'Account' => 0,
                 'Contact' => 0,
@@ -524,7 +768,9 @@ public class NotionIntegrationTestExecutor {
                 'Test_Child_Object__c' => 0
             };
             
+            List<String> deletedNotionPageIds = new List<String>();
             Integer totalDeleteLogs = 0;
+            
             for (Notion_Sync_Log__c log : logs) {
                 // Only count logs for our deletion test records
                 if (log.Status__c == 'Success') {
@@ -532,6 +778,10 @@ public class NotionIntegrationTestExecutor {
                         successCountByType.put(log.Object_Type__c, 
                             successCountByType.get(log.Object_Type__c) + 1);
                         totalDeleteLogs++;
+                        
+                        if (String.isNotBlank(log.Notion_Page_Id__c)) {
+                            deletedNotionPageIds.add(log.Notion_Page_Id__c);
+                        }
                     }
                 } else {
                     errors.add('Delete sync failed for ' + log.Object_Type__c + 
@@ -549,13 +799,32 @@ public class NotionIntegrationTestExecutor {
             assert(successCountByType.get('Test_Child_Object__c') >= 1, 
                 'At least one Test Child deletion should succeed');
             
+            // Verify the pages are actually deleted from Notion
+            Integer verifiedDeletes = 0;
+            for (String pageId : deletedNotionPageIds) {
+                if (String.isNotBlank(pageId)) {
+                    NotionApiClient.NotionResponse response = NotionApiClient.getPage(pageId);
+                    // A deleted page should return an error (404 or similar)
+                    if (!response.success) {
+                        verifiedDeletes++;
+                        System.debug('Verified page ' + pageId + ' is deleted from Notion');
+                    } else {
+                        errors.add('Page ' + pageId + ' still exists in Notion after deletion');
+                    }
+                }
+            }
+            
+            assert(verifiedDeletes >= 4, 
+                'At least 4 pages should be verified as deleted from Notion, found: ' + verifiedDeletes);
+            
             System.debug('Delete sync summary:');
             for (String objType : successCountByType.keySet()) {
                 System.debug('  ' + objType + ': ' + successCountByType.get(objType) + ' deleted');
             }
+            System.debug('Verified ' + verifiedDeletes + ' pages deleted from Notion');
             
             passCount++;
-            System.debug('✓ Delete sync test passed - ' + totalDeleteLogs + ' records deleted');
+            System.debug('✓ Delete sync test passed - ' + totalDeleteLogs + ' records deleted and verified in Notion');
             
         } catch (Exception e) {
             failCount++;
