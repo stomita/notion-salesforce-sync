@@ -147,6 +147,9 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     
     private void processSingleRequest(SyncRequest request, NotionSyncObject__mdt syncConfig, 
                                     List<NotionSyncField__mdt> fieldMappings, SObject record) {
+        Integer startCpuTime = Limits.getCpuTime();
+        Integer startCallouts = Limits.getCallouts();
+        
         try {
             String notionPageId = null;
             
@@ -156,10 +159,15 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                 notionPageId = handleCreateOrUpdateOperation(request, syncConfig, fieldMappings, record);
             }
             
-            logSuccess(request, notionPageId);
+            // Log success with governor limit information
+            logSuccessWithMetrics(request, notionPageId, startCpuTime, startCallouts);
             
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Handle rate limit specifically
+            logRateLimitError(request, e.getMessage(), startCpuTime, startCallouts);
         } catch (Exception e) {
-            logError(request, e.getMessage());
+            // Log error with metrics
+            logErrorWithMetrics(request, e.getMessage(), startCpuTime, startCallouts);
         }
     }
     
@@ -287,98 +295,100 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     }
     
     private String findNotionPageId(String salesforceId, NotionSyncObject__mdt syncConfig) {
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Notion_API/v1/databases/' + syncConfig.NotionDatabaseId__c + '/query');
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Notion-Version', '2022-06-28');
-        
-        Map<String, Object> requestBody = new Map<String, Object>{
-            'filter' => new Map<String, Object>{
-                'property' => syncConfig.SalesforceIdPropertyName__c,
-                'rich_text' => new Map<String, Object>{
-                    'equals' => salesforceId
-                }
+        Map<String, Object> filter = new Map<String, Object>{
+            'property' => syncConfig.SalesforceIdPropertyName__c,
+            'rich_text' => new Map<String, Object>{
+                'equals' => salesforceId
             }
         };
         
-        req.setBody(JSON.serialize(requestBody));
+        NotionApiClient.NotionResponse response = NotionApiClient.queryDatabase(
+            syncConfig.NotionDatabaseId__c, 
+            filter
+        );
         
-        Http http = new Http();
-        HttpResponse res = http.send(req);
-        
-        if (res.getStatusCode() == 200) {
-            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+        if (response.success && String.isNotBlank(response.responseBody)) {
+            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
             List<Object> results = (List<Object>) responseBody.get('results');
             
             if (!results.isEmpty()) {
                 Map<String, Object> page = (Map<String, Object>) results[0];
                 return (String) page.get('id');
             }
+        } else if (response.isRateLimited) {
+            throw new NotionRateLimiter.RateLimitException(
+                'Rate limited while querying database. Retry after: ' + response.retryAfterSeconds
+            );
+        } else if (!response.success) {
+            throw new NotionSyncException('Failed to query Notion database: ' + response.errorMessage);
         }
         
         return null;
     }
     
     private String createNotionPage(String databaseId, Map<String, Object> properties) {
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Notion_API/v1/pages');
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Notion-Version', '2022-06-28');
-        
-        Map<String, Object> requestBody = new Map<String, Object>{
-            'parent' => new Map<String, Object>{ 'database_id' => databaseId },
-            'properties' => buildNotionProperties(properties)
-        };
-        
+        // Extract body content before building properties
         String bodyContent = (String) properties.get('body');
+        List<Object> children = null;
+        
         if (String.isNotBlank(bodyContent)) {
-            requestBody.put('children', buildNotionChildren(bodyContent));
+            children = buildNotionChildren(bodyContent);
         }
         
-        req.setBody(JSON.serialize(requestBody));
+        // Build properties (excluding body)
+        Map<String, Object> notionProps = buildNotionProperties(properties);
         
-        Http http = new Http();
-        HttpResponse res = http.send(req);
+        NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+            databaseId,
+            notionProps,
+            children
+        );
         
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new NotionSyncException('Failed to create Notion page: ' + res.getBody());
+        NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+        
+        if (response.success) {
+            return response.pageId;
+        } else if (response.isRateLimited) {
+            throw new NotionRateLimiter.RateLimitException(
+                'Rate limited while creating page. Retry after: ' + response.retryAfterSeconds
+            );
+        } else {
+            throw new NotionSyncException('Failed to create Notion page: ' + response.errorMessage);
         }
-        
-        // Parse response to get the created page ID
-        Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-        return (String) responseBody.get('id');
     }
     
-    private void updateNotionPage(String pageId, Map<String, Object> properties) {
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Notion_API/v1/pages/' + pageId);
-        req.setMethod('PATCH');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Notion-Version', '2022-06-28');
+    private String updateNotionPage(String pageId, Map<String, Object> properties) {
+        // Build properties (excluding body)
+        Map<String, Object> notionProps = buildNotionProperties(properties);
         
-        Map<String, Object> requestBody = new Map<String, Object>{
-            'properties' => buildNotionProperties(properties)
-        };
+        NotionApiClient.NotionResponse response = NotionApiClient.updatePage(pageId, notionProps);
         
-        req.setBody(JSON.serialize(requestBody));
-        
-        Http http = new Http();
-        HttpResponse res = http.send(req);
-        
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new NotionSyncException('Failed to update Notion page: ' + res.getBody());
-        }
-        
-        // Handle body content update if present
-        String bodyContent = (String) properties.get('body');
-        if (bodyContent != null) {
-            // Notion API doesn't support updating children directly
-            // We need to delete existing children and append new ones
-            updatePageBodyContent(pageId, bodyContent);
+        if (response.success) {
+            return response.pageId;
+        } else if (response.isRateLimited) {
+            throw new NotionRateLimiter.RateLimitException(
+                'Rate limited while updating page. Retry after: ' + response.retryAfterSeconds
+            );
+        } else {
+            throw new NotionSyncException('Failed to update Notion page: ' + response.errorMessage);
         }
     }
+    
+    private void deleteNotionPage(String pageId) {
+        NotionApiClient.NotionResponse response = NotionApiClient.deletePage(pageId);
+        
+        if (!response.success) {
+            if (response.isRateLimited) {
+                throw new NotionRateLimiter.RateLimitException(
+                    'Rate limited while deleting page. Retry after: ' + response.retryAfterSeconds
+                );
+            } else {
+                throw new NotionSyncException('Failed to delete Notion page: ' + response.errorMessage);
+            }
+        }
+    }
+    
+    // Note: updateNotionPage implementation moved earlier in the file
     
     private void updatePageBodyContent(String pageId, String bodyContent) {
         // Get existing children blocks
@@ -502,26 +512,7 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         }
     }
     
-    private void deleteNotionPage(String pageId) {
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint('callout:Notion_API/v1/pages/' + pageId);
-        req.setMethod('PATCH');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Notion-Version', '2022-06-28');
-        
-        Map<String, Object> requestBody = new Map<String, Object>{
-            'archived' => true
-        };
-        
-        req.setBody(JSON.serialize(requestBody));
-        
-        Http http = new Http();
-        HttpResponse res = http.send(req);
-        
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new NotionSyncException('Failed to delete Notion page: ' + res.getBody());
-        }
-    }
+    // Note: deleteNotionPage implementation moved earlier in the file
     
     private Map<String, Object> buildNotionProperties(Map<String, Object> properties) {
         Map<String, Object> notionProps = new Map<String, Object>();
@@ -569,6 +560,76 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         for (SyncRequest request : requests) {
             logError(request, errorMessage);
         }
+    }
+    
+    // New logging methods with metrics
+    private void logSuccessWithMetrics(SyncRequest request, String notionPageId, Integer startCpuTime, Integer startCallouts) {
+        Integer cpuUsed = Limits.getCpuTime() - startCpuTime;
+        Integer calloutsUsed = Limits.getCallouts() - startCallouts;
+        
+        NotionSyncLogger.LogEntry logEntry = NotionSyncLogger.logWithRateLimit(
+            request.recordId,
+            request.objectType,
+            request.operationType,
+            'Success',
+            null,
+            0,
+            notionPageId,
+            false,
+            null
+        );
+        
+        // Update the API calls made field
+        logEntry.apiCallsMade = calloutsUsed;
+    }
+    
+    private void logRateLimitError(SyncRequest request, String errorMessage, Integer startCpuTime, Integer startCallouts) {
+        Integer cpuUsed = Limits.getCpuTime() - startCpuTime;
+        Integer calloutsUsed = Limits.getCallouts() - startCallouts;
+        
+        // Extract retry after seconds from error message if available
+        Integer retryAfter = null;
+        if (errorMessage.contains('Retry after:')) {
+            String retryStr = errorMessage.substringAfter('Retry after:').trim();
+            if (retryStr.isNumeric()) {
+                retryAfter = Integer.valueOf(retryStr);
+            }
+        }
+        
+        NotionSyncLogger.LogEntry logEntry = NotionSyncLogger.logWithRateLimit(
+            request.recordId,
+            request.objectType,
+            request.operationType,
+            'Failed',
+            errorMessage,
+            0,
+            null,
+            true,
+            retryAfter
+        );
+        
+        // Update the API calls made field
+        logEntry.apiCallsMade = calloutsUsed;
+    }
+    
+    private void logErrorWithMetrics(SyncRequest request, String errorMessage, Integer startCpuTime, Integer startCallouts) {
+        Integer cpuUsed = Limits.getCpuTime() - startCpuTime;
+        Integer calloutsUsed = Limits.getCallouts() - startCallouts;
+        
+        NotionSyncLogger.LogEntry logEntry = NotionSyncLogger.logWithRateLimit(
+            request.recordId,
+            request.objectType,
+            request.operationType,
+            'Failed',
+            errorMessage,
+            0,
+            null,
+            false,
+            null
+        );
+        
+        // Update the API calls made field
+        logEntry.apiCallsMade = calloutsUsed;
     }
     
     private void logResult(SyncRequest request, String status, String errorMessage) {
