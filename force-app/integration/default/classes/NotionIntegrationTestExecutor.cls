@@ -834,6 +834,181 @@ public class NotionIntegrationTestExecutor {
     }
     
     /**
+     * Create bulk records for batch processing test (Phase 1)
+     */
+    public void createBatchTestRecords() {
+        System.debug('\n--- Creating bulk records for batch processing test ---');
+        
+        // Clean up any existing batch test data
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Batch Test Account%'];
+        delete [SELECT Id FROM Contact WHERE LastName LIKE 'Batch Test Contact%'];
+        
+        // Create 75 accounts to trigger batch processing (default batch size is 50)
+        List<Account> batchAccounts = new List<Account>();
+        for (Integer i = 1; i <= 75; i++) {
+            Account acc = new Account(
+                Name = 'Batch Test Account ' + String.valueOf(i).leftPad(3, '0'),
+                Description = 'Batch test account #' + i + ' created at ' + DateTime.now(),
+                Type = 'Customer',
+                Industry = 'Technology',
+                AnnualRevenue = 100000 + (i * 1000)
+            );
+            batchAccounts.add(acc);
+        }
+        
+        insert batchAccounts;
+        System.debug('Created ' + batchAccounts.size() + ' accounts for batch testing');
+        
+        // Create contacts for the first 25 accounts
+        List<Contact> batchContacts = new List<Contact>();
+        for (Integer i = 0; i < 25; i++) {
+            Contact con = new Contact(
+                FirstName = 'Batch',
+                LastName = 'Batch Test Contact ' + String.valueOf(i+1).leftPad(3, '0'),
+                Email = 'batch.test.' + (i+1) + '@example.com',
+                AccountId = batchAccounts[i].Id,
+                Title = 'Test Contact #' + (i+1)
+            );
+            batchContacts.add(con);
+        }
+        
+        insert batchContacts;
+        System.debug('Created ' + batchContacts.size() + ' contacts for batch testing');
+        System.debug('Total batch test records: ' + (batchAccounts.size() + batchContacts.size()));
+    }
+    
+    /**
+     * Check batch processing results (Phase 2)
+     */
+    public void checkBatchProcessingResults() {
+        System.debug('\n--- Checking batch processing results ---');
+        
+        try {
+            // Get the batch test records
+            List<Account> batchAccounts = [
+                SELECT Id, Name 
+                FROM Account 
+                WHERE Name LIKE 'Batch Test Account%'
+                ORDER BY Name
+            ];
+            
+            List<Contact> batchContacts = [
+                SELECT Id, LastName, AccountId
+                FROM Contact
+                WHERE LastName LIKE 'Batch Test Contact%'
+                ORDER BY LastName
+            ];
+            
+            System.debug('Found ' + batchAccounts.size() + ' batch accounts');
+            System.debug('Found ' + batchContacts.size() + ' batch contacts');
+            
+            // Get record IDs for SOQL query
+            Set<Id> batchAccountIds = new Set<Id>();
+            for (Account acc : batchAccounts) {
+                batchAccountIds.add(acc.Id);
+            }
+            
+            Set<Id> batchContactIds = new Set<Id>();
+            for (Contact con : batchContacts) {
+                batchContactIds.add(con.Id);
+            }
+            
+            // Check sync logs
+            List<Notion_Sync_Log__c> batchLogs = [
+                SELECT Id, Record_Id__c, Object_Type__c, Operation_Type__c, Status__c, 
+                       Notion_Page_Id__c, Error_Message__c, API_Calls_Made__c, 
+                       CPU_Time_Used__c, Callouts_Used__c
+                FROM Notion_Sync_Log__c
+                WHERE ((Object_Type__c = 'Account' AND Record_Id__c IN :batchAccountIds)
+                   OR (Object_Type__c = 'Contact' AND Record_Id__c IN :batchContactIds))
+                AND Operation_Type__c = 'CREATE'
+                ORDER BY CreatedDate DESC
+            ];
+            
+            // Count successes
+            Map<String, Integer> successByType = new Map<String, Integer>{
+                'Account' => 0,
+                'Contact' => 0
+            };
+            Set<String> syncedAccountIds = new Set<String>();
+            Set<String> syncedContactIds = new Set<String>();
+            
+            for (Notion_Sync_Log__c log : batchLogs) {
+                if (log.Status__c == 'Success') {
+                    successByType.put(log.Object_Type__c, successByType.get(log.Object_Type__c) + 1);
+                    if (log.Object_Type__c == 'Account') {
+                        syncedAccountIds.add(log.Record_Id__c);
+                    } else if (log.Object_Type__c == 'Contact') {
+                        syncedContactIds.add(log.Record_Id__c);
+                    }
+                }
+            }
+            
+            System.debug('Accounts synced: ' + successByType.get('Account') + '/' + batchAccounts.size());
+            System.debug('Contacts synced: ' + successByType.get('Contact') + '/' + batchContacts.size());
+            
+            // Check for batch processing indicators
+            List<Notion_Sync_Log__c> batchProcessLogs = [
+                SELECT Id, Object_Type__c, Operation_Type__c, Status__c, 
+                       API_Calls_Made__c, CPU_Time_Used__c, Callouts_Used__c
+                FROM Notion_Sync_Log__c
+                WHERE Object_Type__c = 'BatchProcess'
+                AND Operation_Type__c = 'BATCH'
+                AND CreatedDate >= :DateTime.now().addMinutes(-10)
+                ORDER BY CreatedDate DESC
+            ];
+            
+            if (!batchProcessLogs.isEmpty()) {
+                System.debug('Found ' + batchProcessLogs.size() + ' batch process log entries');
+            }
+            
+            // Verify a sample of Notion pages
+            Integer sampleSize = 5;
+            Integer verified = 0;
+            for (String accountId : syncedAccountIds) {
+                if (verified >= sampleSize) break;
+                
+                Notion_Sync_Log__c log = [
+                    SELECT Notion_Page_Id__c 
+                    FROM Notion_Sync_Log__c 
+                    WHERE Record_Id__c = :accountId
+                    AND Status__c = 'Success'
+                    AND Notion_Page_Id__c != null
+                    LIMIT 1
+                ];
+                
+                if (String.isNotBlank(log.Notion_Page_Id__c)) {
+                    try {
+                        NotionApiClient.NotionResponse response = NotionApiClient.getPage(log.Notion_Page_Id__c);
+                        if (response.success) {
+                            verified++;
+                        }
+                    } catch (Exception e) {
+                        // Ignore individual verification errors
+                    }
+                }
+            }
+            
+            System.debug('Verified ' + verified + ' sample Notion pages');
+            
+            // Assert batch processing worked
+            assert(syncedAccountIds.size() >= 70, 
+                'At least 70 accounts should be synced, found: ' + syncedAccountIds.size());
+            assert(syncedContactIds.size() >= 20, 
+                'At least 20 contacts should be synced, found: ' + syncedContactIds.size());
+            
+            passCount++;
+            System.debug('✓ Batch processing test passed - ' + 
+                        (syncedAccountIds.size() + syncedContactIds.size()) + ' records synced');
+            
+        } catch (Exception e) {
+            failCount++;
+            errors.add('Batch processing test failed: ' + e.getMessage());
+            System.debug('✗ Batch processing test failed: ' + e.getMessage());
+        }
+    }
+    
+    /**
      * Report test results
      */
     public void reportResults() {

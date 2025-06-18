@@ -1,4 +1,5 @@
 public with sharing class NotionSyncLogger {
+    @TestVisible
     private static List<LogEntry> pendingLogs = new List<LogEntry>();
     
     @future
@@ -20,7 +21,12 @@ public with sharing class NotionSyncLogger {
                 Status__c = entry.status,
                 Error_Message__c = entry.errorMessage,
                 Retry_Count__c = entry.retryCount,
-                Notion_Page_Id__c = entry.notionPageId
+                Notion_Page_Id__c = entry.notionPageId,
+                Rate_Limited__c = entry.rateLimited,
+                Rate_Limit_Retry_After__c = entry.rateLimitRetryAfter,
+                API_Calls_Made__c = entry.apiCallsMade,
+                CPU_Time_Used__c = entry.cpuTimeUsed,
+                Callouts_Used__c = entry.calloutsUsed
             );
             
             logs.add(log);
@@ -47,6 +53,23 @@ public with sharing class NotionSyncLogger {
         pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId));
     }
     
+    // Add a log entry with rate limit information
+    public static LogEntry logWithRateLimit(String recordId, String objectType, String operationType, 
+                                       String status, String errorMessage, Integer retryCount, String notionPageId,
+                                       Boolean rateLimited, Integer rateLimitRetryAfter) {
+        LogEntry entry = new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId);
+        entry.rateLimited = rateLimited;
+        entry.rateLimitRetryAfter = rateLimitRetryAfter;
+        
+        // Capture current governor limits
+        entry.apiCallsMade = 1; // Will be updated by caller if different
+        entry.cpuTimeUsed = Limits.getCpuTime();
+        entry.calloutsUsed = Limits.getCallouts();
+        
+        pendingLogs.add(entry);
+        return entry; // Return the entry so caller can update fields
+    }
+    
     // Flush all pending logs
     public static void flush() {
         if (!pendingLogs.isEmpty()) {
@@ -71,7 +94,12 @@ public with sharing class NotionSyncLogger {
                         Status__c = entry.status,
                         Error_Message__c = entry.errorMessage,
                         Retry_Count__c = entry.retryCount,
-                        Notion_Page_Id__c = entry.notionPageId
+                        Notion_Page_Id__c = entry.notionPageId,
+                        Rate_Limited__c = entry.rateLimited,
+                        Rate_Limit_Retry_After__c = entry.rateLimitRetryAfter,
+                        API_Calls_Made__c = entry.apiCallsMade,
+                        CPU_Time_Used__c = entry.cpuTimeUsed,
+                        Callouts_Used__c = entry.calloutsUsed
                     ));
                 }
                 
@@ -105,6 +133,11 @@ public with sharing class NotionSyncLogger {
         public String errorMessage;
         public Integer retryCount;
         public String notionPageId;
+        public Boolean rateLimited;
+        public Integer rateLimitRetryAfter;
+        public Integer apiCallsMade;
+        public Integer cpuTimeUsed;
+        public Integer calloutsUsed;
         
         public LogEntry(String recordId, String objectType, String operationType, 
                        String status, String errorMessage, Integer retryCount, String notionPageId) {
@@ -115,6 +148,11 @@ public with sharing class NotionSyncLogger {
             this.errorMessage = errorMessage;
             this.retryCount = retryCount;
             this.notionPageId = notionPageId;
+            this.rateLimited = false;
+            this.rateLimitRetryAfter = null;
+            this.apiCallsMade = 0;
+            this.cpuTimeUsed = 0;
+            this.calloutsUsed = 0;
         }
     }
 }

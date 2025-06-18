@@ -40,7 +40,17 @@ public with sharing class NotionSyncInvocable {
                 );
                 results.add(new SyncResult(true, 'Sync initiated successfully'));
             }
-            // For bulk operations or deletes, use Queueable
+            // For large bulk operations, use batch processing
+            else if (requests.size() > NotionSyncBatchProcessor.DEFAULT_BATCH_SIZE) {
+                // Use batch processor for large volumes
+                processBatchSync(requests);
+                
+                // Return success for all
+                for (SyncRequest request : requests) {
+                    results.add(new SyncResult(true, 'Sync queued for batch processing'));
+                }
+            }
+            // For moderate bulk operations or deletes, use Queueable
             else {
                 List<NotionSyncQueueable.SyncRequest> queueableRequests = 
                     new List<NotionSyncQueueable.SyncRequest>();
@@ -70,6 +80,32 @@ public with sharing class NotionSyncInvocable {
         }
         
         return results;
+    }
+    
+    /**
+     * Process requests in batches for large volumes
+     */
+    private static void processBatchSync(List<SyncRequest> requests) {
+        // Convert to queueable requests
+        List<NotionSyncQueueable.SyncRequest> queueableRequests = 
+            new List<NotionSyncQueueable.SyncRequest>();
+        
+        for (SyncRequest request : requests) {
+            queueableRequests.add(new NotionSyncQueueable.SyncRequest(
+                request.recordId,
+                request.objectType,
+                request.operationType
+            ));
+        }
+        
+        // If we're in an async context, process directly with batch processor
+        if (System.isFuture() || System.isQueueable() || System.isBatch()) {
+            NotionSyncBatchProcessor processor = new NotionSyncBatchProcessor();
+            processor.processBatches(queueableRequests);
+        } else {
+            // Queue the batch job
+            System.enqueueJob(new NotionSyncBatchQueueable(queueableRequests));
+        }
     }
     
     /**

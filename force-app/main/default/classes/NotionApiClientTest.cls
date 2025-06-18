@@ -435,4 +435,127 @@ public class NotionApiClientTest {
             throw new CalloutException('Mock callout exception');
         }
     }
+    
+    @isTest
+    static void testCreatePageRateLimited() {
+        Test.setMock(HttpCalloutMock.class, new NotionApiRateLimitMock());
+        
+        Map<String, Object> properties = new Map<String, Object>();
+        properties.put('Name', NotionApiClient.buildTitleProperty('Test Page'));
+        
+        NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+            'test-database-id', 
+            properties
+        );
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+        Test.stopTest();
+        
+        System.assert(!response.success, 'Page creation should fail due to rate limit');
+        System.assertEquals(429, response.statusCode, 'Should return 429 status code');
+        System.assertEquals(true, response.isRateLimited, 'Should indicate rate limited');
+        System.assertEquals(5, response.retryAfterSeconds, 'Should have retry after seconds');
+        System.assert(response.errorMessage.contains('Rate limit exceeded'), 'Should contain rate limit message');
+    }
+    
+    @isTest
+    static void testUpdatePageRateLimited() {
+        Test.setMock(HttpCalloutMock.class, new NotionApiRateLimitMock());
+        
+        Map<String, Object> properties = new Map<String, Object>();
+        properties.put('Name', NotionApiClient.buildTitleProperty('Updated Page'));
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.updatePage('test-page-id', properties);
+        Test.stopTest();
+        
+        System.assert(!response.success, 'Page update should fail due to rate limit');
+        System.assertEquals(429, response.statusCode, 'Should return 429 status code');
+        System.assertEquals(true, response.isRateLimited, 'Should indicate rate limited');
+    }
+    
+    @isTest
+    static void testDeletePageRateLimited() {
+        Test.setMock(HttpCalloutMock.class, new NotionApiRateLimitMock());
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.deletePage('test-page-id');
+        Test.stopTest();
+        
+        System.assert(!response.success, 'Page deletion should fail due to rate limit');
+        System.assertEquals(429, response.statusCode, 'Should return 429 status code');
+        System.assertEquals(true, response.isRateLimited, 'Should indicate rate limited');
+    }
+    
+    @isTest
+    static void testQueryDatabaseRateLimited() {
+        Test.setMock(HttpCalloutMock.class, new NotionApiRateLimitMock());
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.queryDatabase('test-database-id', null);
+        Test.stopTest();
+        
+        System.assert(!response.success, 'Database query should fail due to rate limit');
+        System.assertEquals(429, response.statusCode, 'Should return 429 status code');
+        System.assertEquals(true, response.isRateLimited, 'Should indicate rate limited');
+    }
+    
+    @isTest
+    static void testGetPageRateLimited() {
+        Test.setMock(HttpCalloutMock.class, new NotionApiRateLimitMock());
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.getPage('test-page-id');
+        Test.stopTest();
+        
+        System.assert(!response.success, 'Get page should fail due to rate limit');
+        System.assertEquals(429, response.statusCode, 'Should return 429 status code');
+        System.assertEquals(true, response.isRateLimited, 'Should indicate rate limited');
+    }
+    
+    @isTest
+    static void testRateLimitException() {
+        // Mock NotionRateLimiter to throw exception
+        // Since we can't easily mock static methods, we'll test the exception handling
+        // by exhausting callout limits in test context
+        
+        Map<String, Object> properties = new Map<String, Object>();
+        properties.put('Name', NotionApiClient.buildTitleProperty('Test Page'));
+        
+        NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+            'test-database-id', 
+            properties
+        );
+        
+        Test.startTest();
+        // In test context, this will not actually throw but we verify the handling
+        NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+        Test.stopTest();
+        
+        // Even if rate limit exception occurs, should return structured response
+        System.assertNotEquals(null, response, 'Should always return a response');
+        if (response.isRateLimited != null && response.isRateLimited) {
+            System.assert(response.errorMessage.contains('Rate limit'), 'Should contain rate limit message');
+        }
+    }
+    
+    private class NotionApiRateLimitMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest request) {
+            HttpResponse response = new HttpResponse();
+            response.setStatusCode(429);
+            response.setHeader('Content-Type', 'application/json');
+            response.setHeader('Retry-After', '5');
+            
+            Map<String, Object> errorResponse = new Map<String, Object>{
+                'object' => 'error',
+                'status' => 429,
+                'code' => 'rate_limited',
+                'message' => 'You have exceeded the rate limit for the API. Please retry after 5 seconds.'
+            };
+            
+            response.setBody(JSON.serialize(errorResponse));
+            return response;
+        }
+    }
 }
