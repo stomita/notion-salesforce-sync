@@ -73,6 +73,34 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 
 Only push your changes after all tests complete successfully.
 
+### Development Workflow Requirements
+
+**IMPORTANT: Follow these workflow requirements for all development tasks:**
+
+1. **Feature Branch Development**:
+   - Always create a feature branch for development work
+   - Never commit directly to the main branch
+   - Use descriptive branch names (e.g., `feat/add-bulk-sync`, `fix/retry-logic`)
+
+2. **Pull Request Process**:
+   - Create a pull request (PR) from your feature branch to the main branch
+   - Ensure the PR title clearly describes the changes
+   - Add a description explaining what was changed and why
+
+3. **CI Status Requirements**:
+   - The CI pipeline must complete with green status before merging
+   - This includes:
+     - Successful deployment to scratch org
+     - All Apex tests passing with sufficient code coverage
+     - Integration tests passing (if Notion API credentials are configured)
+   - Do not merge PRs with failing CI checks
+
+4. **Pre-Push Checklist**:
+   - Deploy to local scratch org: `sf project deploy start --source-dir force-app`
+   - Run unit tests: `sf apex test run --code-coverage --result-format human`
+   - Run integration tests (if applicable): `./scripts/run-integration-tests.sh`
+   - All tests must pass before pushing to remote
+
 ## CI/CD
 
 The project includes GitHub Actions workflows for:

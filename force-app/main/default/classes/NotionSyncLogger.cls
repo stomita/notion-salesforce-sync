@@ -15,7 +15,7 @@ public with sharing class NotionSyncLogger {
         }
         
         // Check custom setting
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         if (settings == null) {
             return false;
         }
@@ -33,7 +33,7 @@ public with sharing class NotionSyncLogger {
             return true;
         }
         
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         
         // If logging is disabled, don't log
         if (settings == null) {
