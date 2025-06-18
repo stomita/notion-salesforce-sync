@@ -4,13 +4,12 @@ private class NotionSyncLoggerTest {
     @testSetup
     static void setup() {
         // Create org-wide default settings for tests
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
-        if (settings.Id == null) {
-            settings = new Notion_Sync_Settings__c();
-        }
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
-        upsert settings;
+        insert settings;
     }
     
     @isTest
@@ -61,10 +60,19 @@ private class NotionSyncLoggerTest {
     
     @future
     static void testLoggingDisabledAsync() {
-        // Disable logging in async context
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
-        if (settings.Id == null) {
-            settings = new Notion_Sync_Settings__c();
+        // Disable logging in async context - get and update existing settings
+        List<Notion_Sync_Settings__c> settingsList = [
+            SELECT Id FROM Notion_Sync_Settings__c 
+            WHERE SetupOwnerId = :UserInfo.getOrganizationId()
+        ];
+        
+        Notion_Sync_Settings__c settings;
+        if (!settingsList.isEmpty()) {
+            settings = settingsList[0];
+        } else {
+            settings = new Notion_Sync_Settings__c(
+                SetupOwnerId = UserInfo.getOrganizationId()
+            );
         }
         settings.put('Enable_Logging__c', false);
         upsert settings;
@@ -84,7 +92,9 @@ private class NotionSyncLoggerTest {
         delete [SELECT Id FROM Notion_Sync_Settings__c];
         
         // Create new settings with ERROR log level
-        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'ERROR');
         insert settings;
@@ -120,7 +130,9 @@ private class NotionSyncLoggerTest {
         delete [SELECT Id FROM Notion_Sync_Settings__c];
         
         // Create new settings with INFO log level
-        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'INFO');
         insert settings;
@@ -155,7 +167,9 @@ private class NotionSyncLoggerTest {
         delete [SELECT Id FROM Notion_Sync_Settings__c];
         
         // Create new settings with DEBUG log level
-        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
         insert settings;

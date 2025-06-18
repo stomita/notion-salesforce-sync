@@ -9,16 +9,12 @@ public with sharing class NotionSyncLogger {
     
     // Check if logging is enabled
     private static Boolean isLoggingEnabled() {
-        // Check custom setting - always get fresh instance to avoid caching issues
+        // Check custom setting
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         if (settings == null || settings.Id == null) {
             return false;
         }
         try {
-            // Re-query to ensure we have the latest values
-            if (Test.isRunningTest()) {
-                settings = [SELECT Enable_Logging__c FROM Notion_Sync_Settings__c WHERE SetupOwnerId = :UserInfo.getOrganizationId() LIMIT 1];
-            }
             return (Boolean) settings.get('Enable_Logging__c') == true;
         } catch (Exception e) {
             return false;
@@ -28,6 +24,7 @@ public with sharing class NotionSyncLogger {
     // Determine if we should log based on status and settings
     private static Boolean shouldLog(String status) {
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        System.debug('NotionSyncLogger.shouldLog - status: ' + status + ', settings: ' + settings);
         
         // If logging is disabled, don't log
         if (settings == null || settings.Id == null) {
@@ -35,13 +32,6 @@ public with sharing class NotionSyncLogger {
         }
         
         try {
-            // Re-query to ensure we have the latest values in test context
-            if (Test.isRunningTest()) {
-                settings = [SELECT Enable_Logging__c, Log_Level__c FROM Notion_Sync_Settings__c WHERE SetupOwnerId = :UserInfo.getOrganizationId() LIMIT 1];
-            }
-            
-            System.debug('NotionSyncLogger.shouldLog - status: ' + status + ', settings: ' + settings);
-            
             Boolean isEnabled = (Boolean) settings.get('Enable_Logging__c');
             if (isEnabled != true) {
                 return false;
