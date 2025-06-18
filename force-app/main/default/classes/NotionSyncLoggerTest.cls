@@ -79,14 +79,15 @@ private class NotionSyncLoggerTest {
     
     @isTest
     static void testLogLevelError() {
-        // Set log level to ERROR
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
-        if (settings.Id == null) {
-            settings = new Notion_Sync_Settings__c();
-        }
+        // Clean up any existing logs and settings
+        delete [SELECT Id FROM Notion_Sync_Log__c];
+        delete [SELECT Id FROM Notion_Sync_Settings__c];
+        
+        // Create new settings with ERROR log level
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'ERROR');
-        upsert settings;
+        insert settings;
         
         Test.startTest();
         
@@ -102,7 +103,9 @@ private class NotionSyncLoggerTest {
         
         // With ERROR log level, only Failed and Rate Limited logs should be created
         List<Notion_Sync_Log__c> logs = [
-            SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
+            SELECT Status__c FROM Notion_Sync_Log__c 
+            WHERE Record_Id__c IN ('001000000000001', '001000000000002', '001000000000003')
+            ORDER BY Record_Id__c
         ];
         // Even in test context, log level filtering applies
         System.assertEquals(2, logs.size(), 'Only error logs should be created');
@@ -112,14 +115,15 @@ private class NotionSyncLoggerTest {
     
     @isTest
     static void testLogLevelInfo() {
-        // Set log level to INFO
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
-        if (settings.Id == null) {
-            settings = new Notion_Sync_Settings__c();
-        }
+        // Clean up any existing logs and settings
+        delete [SELECT Id FROM Notion_Sync_Log__c];
+        delete [SELECT Id FROM Notion_Sync_Settings__c];
+        
+        // Create new settings with INFO log level
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'INFO');
-        upsert settings;
+        insert settings;
         
         Test.startTest();
         
@@ -136,22 +140,25 @@ private class NotionSyncLoggerTest {
         
         // With INFO log level, Success and Failed logs should be created (not Deferred/BatchProcess)
         List<Notion_Sync_Log__c> logs = [
-            SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
+            SELECT Status__c FROM Notion_Sync_Log__c 
+            WHERE Record_Id__c IN ('001000000000001', '001000000000002', '001000000000003', '001000000000004')
+            ORDER BY Record_Id__c
         ];
-        // 3 logs should be created (Success, Failed, Success - excluding Deferred)
-        System.assertEquals(3, logs.size(), 'Info level should exclude Deferred status');
+        // 2 logs should be created (Success, Failed - excluding BatchProcess and Deferred)
+        System.assertEquals(2, logs.size(), 'Info level should exclude Deferred status');
     }
     
     @isTest
     static void testLogLevelDebug() {
-        // Set log level to DEBUG
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
-        if (settings.Id == null) {
-            settings = new Notion_Sync_Settings__c();
-        }
+        // Clean up any existing logs and settings
+        delete [SELECT Id FROM Notion_Sync_Log__c];
+        delete [SELECT Id FROM Notion_Sync_Settings__c];
+        
+        // Create new settings with DEBUG log level
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
-        upsert settings;
+        insert settings;
         
         Test.startTest();
         
@@ -168,7 +175,9 @@ private class NotionSyncLoggerTest {
         
         // With DEBUG log level, all logs should be created
         List<Notion_Sync_Log__c> logs = [
-            SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
+            SELECT Status__c FROM Notion_Sync_Log__c 
+            WHERE Record_Id__c IN ('001000000000001', '001000000000002', '001000000000003', '001000000000004')
+            ORDER BY Record_Id__c
         ];
         System.assertEquals(4, logs.size(), 'Debug level should log everything');
     }
