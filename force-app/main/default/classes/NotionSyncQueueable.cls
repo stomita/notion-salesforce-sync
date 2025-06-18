@@ -16,6 +16,14 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
      * Made public to support direct invocation from InvocableMethod
      */
     public void processSyncRequests(List<SyncRequest> syncRequests) {
+        processSyncRequests(syncRequests, true);
+    }
+    
+    /**
+     * Process sync requests with option to control log flushing
+     * When called from batch processor, autoFlush should be false to avoid DML before callouts
+     */
+    public void processSyncRequests(List<SyncRequest> syncRequests, Boolean autoFlush) {
         Map<String, List<SyncRequest>> requestsByObjectType = groupRequestsByObjectType(syncRequests);
         
         List<String> processingOrder = relationshipHandler.getProcessingOrder(requestsByObjectType.keySet());
@@ -27,8 +35,11 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             }
         }
         
-        // Flush all logs to async logger after all callouts are complete
-        NotionSyncLogger.flush();
+        // Only flush logs if autoFlush is true (not in batch processing mode)
+        if (autoFlush) {
+            // Flush all logs to async logger after all callouts are complete
+            NotionSyncLogger.flush();
+        }
     }
     
     private Map<String, List<SyncRequest>> groupRequestsByObjectType(List<SyncRequest> syncRequests) {

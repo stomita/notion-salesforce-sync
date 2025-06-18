@@ -109,10 +109,18 @@ public with sharing class NotionRateLimiter {
     }
     
     /**
-     * @description Get current governor limit usage status
+     * @description Get current governor limit usage status as structured object
+     * @return GovernorLimitStatus containing current usage statistics
+     */
+    public static GovernorLimitStatus getGovernorLimitStatus() {
+        return new GovernorLimitStatus();
+    }
+    
+    /**
+     * @description Get current governor limit usage status as Map
      * @return Map containing current usage statistics
      */
-    public static Map<String, Object> getGovernorLimitStatus() {
+    public static Map<String, Object> getGovernorLimitStatusMap() {
         Map<String, Object> status = new Map<String, Object>{
             'calloutsUsed' => Limits.getCallouts(),
             'calloutLimit' => Limits.getLimitCallouts(),
@@ -210,10 +218,64 @@ public with sharing class NotionRateLimiter {
      * @param limit Maximum limit
      * @return Decimal percentage (0-100)
      */
-    private static Decimal calculatePercentage(Integer used, Integer limitValue) {
+    public static Decimal calculatePercentage(Integer used, Integer limitValue) {
         if (limitValue == null || limitValue == 0) {
             return 0;
         }
         return (Decimal.valueOf(used) / limitValue * 100).setScale(1);
+    }
+    
+    /**
+     * @description Check if processing should be deferred based on governor limits
+     * @param estimatedRecords Number of records to process
+     * @return Boolean indicating if processing should be deferred
+     */
+    public static Boolean shouldDeferProcessing(Integer estimatedRecords) {
+        Map<String, Object> status = getGovernorLimitStatusMap();
+        
+        // Check if we're approaching CPU limit (70%)
+        Decimal cpuPercentage = (Decimal) status.get('cpuPercentage');
+        if (cpuPercentage > 70) {
+            return true;
+        }
+        
+        // Check if we're approaching heap limit (70%)
+        Decimal heapPercentage = (Decimal) status.get('heapPercentage');
+        if (heapPercentage > 70) {
+            return true;
+        }
+        
+        // Check if we have enough callouts remaining
+        Integer calloutsUsed = (Integer) status.get('calloutsUsed');
+        Integer calloutLimit = (Integer) status.get('calloutLimit');
+        // More accurate estimation: 1 call for create/update, 2 for records with relationships
+        Integer estimatedCallouts = estimatedRecords * 2; // Conservative estimate: 2 calls per record
+        
+        if (calloutsUsed + estimatedCallouts > calloutLimit * 0.9) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @description Governor limit status data structure
+     */
+    public class GovernorLimitStatus {
+        public Integer cpuTimeUsed { get; set; }
+        public Integer cpuTimeLimit { get; set; }
+        public Integer heapSizeUsed { get; set; }
+        public Integer heapSizeLimit { get; set; }
+        public Integer calloutsUsed { get; set; }
+        public Integer calloutLimit { get; set; }
+        
+        public GovernorLimitStatus() {
+            this.cpuTimeUsed = Limits.getCpuTime();
+            this.cpuTimeLimit = Limits.getLimitCpuTime();
+            this.heapSizeUsed = Limits.getHeapSize();
+            this.heapSizeLimit = Limits.getLimitHeapSize();
+            this.calloutsUsed = Limits.getCallouts();
+            this.calloutLimit = Limits.getLimitCallouts();
+        }
     }
 }

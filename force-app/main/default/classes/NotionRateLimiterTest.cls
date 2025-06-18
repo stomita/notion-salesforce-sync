@@ -11,7 +11,7 @@ private class NotionRateLimiterTest {
         Test.startTest();
         
         // At start of test, limits should be low
-        Boolean shouldDefer = NotionRateLimiter.shouldDeferProcessing();
+        Boolean shouldDefer = NotionRateLimiter.shouldDeferProcessing(10);
         
         Test.stopTest();
         
@@ -27,10 +27,10 @@ private class NotionRateLimiterTest {
         
         // Make some callouts to increase the count (in real scenario)
         // For testing, we'll just verify the method executes
-        Boolean shouldDefer = NotionRateLimiter.shouldDeferProcessing();
+        Boolean shouldDefer = NotionRateLimiter.shouldDeferProcessing(10);
         
         // Get status to verify calculation
-        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatus();
+        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatusMap();
         
         Test.stopTest();
         
@@ -103,7 +103,7 @@ private class NotionRateLimiterTest {
     static void testGetGovernorLimitStatus() {
         Test.startTest();
         
-        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatus();
+        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatusMap();
         
         Test.stopTest();
         
@@ -225,7 +225,7 @@ private class NotionRateLimiterTest {
         Test.startTest();
         
         // Test with zero limit (edge case)
-        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatus();
+        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatusMap();
         
         // All percentages should be valid decimals
         for (String key : status.keySet()) {

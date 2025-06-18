@@ -76,6 +76,16 @@ sleep 5
 echo ">>> Checking results..."
 sf apex run -f scripts/apex/test-5-delete-check.apex $ORG_FLAG
 
+# Test 6: Batch Processing
+echo
+echo "=== Test 6: Batch Processing ==="
+echo ">>> Creating bulk records..."
+sf apex run -f scripts/apex/test-6-batch-setup.apex $ORG_FLAG
+echo ">>> Waiting 10 seconds for batch sync..."
+sleep 10
+echo ">>> Checking results..."
+sf apex run -f scripts/apex/test-6-batch-check.apex $ORG_FLAG
+
 # Final Report
 echo
 echo "=== Final Report ==="
