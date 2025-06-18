@@ -3,17 +3,19 @@ private class NotionSyncLoggerTest {
     
     @testSetup
     static void setup() {
-        // Create org-wide default settings for tests
+        // Don't create any default settings - let each test manage its own
+    }
+    
+    @isTest
+    static void testBasicLogging() {
+        // Enable logging for this test
         Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
             SetupOwnerId = UserInfo.getOrganizationId()
         );
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
         insert settings;
-    }
-    
-    @isTest
-    static void testBasicLogging() {
+        
         Test.startTest();
         
         // Test basic log entry
@@ -198,6 +200,14 @@ private class NotionSyncLoggerTest {
     
     @isTest
     static void testRateLimitLogging() {
+        // Enable logging for this test
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'DEBUG');
+        insert settings;
+        
         Test.startTest();
         
         // Test rate limit log entry
@@ -238,6 +248,14 @@ private class NotionSyncLoggerTest {
     
     @isTest
     static void testBulkLogging() {
+        // Enable logging for this test
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'DEBUG');
+        insert settings;
+        
         Test.startTest();
         
         // Add multiple logs
@@ -301,6 +319,14 @@ private class NotionSyncLoggerTest {
     
     @isTest
     static void testAsyncContextLogging() {
+        // Enable logging for this test
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId()
+        );
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'DEBUG');
+        insert settings;
+        
         Test.startTest();
         
         // Test logging from future context
