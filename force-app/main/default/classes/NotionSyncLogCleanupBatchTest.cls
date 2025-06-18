@@ -4,11 +4,11 @@ private class NotionSyncLogCleanupBatchTest {
     @testSetup
     static void setup() {
         // Create custom setting with 7 day retention
-        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
         settings.put('Retention_Days__c', 7);
-        insert settings;
+        upsert settings;
         
         // Create test logs with various ages
         List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();

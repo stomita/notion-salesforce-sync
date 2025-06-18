@@ -3,11 +3,11 @@ private class NotionSyncLoggerTest {
     
     @testSetup
     static void setup() {
-        // Ensure logging is enabled for tests (though Test.isRunningTest() always enables it)
-        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
+        // Create org-wide default settings for tests
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
-        insert settings;
+        upsert settings;
     }
     
     @isTest
