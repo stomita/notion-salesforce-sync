@@ -5,6 +5,9 @@ private class NotionSyncLoggerTest {
     static void setup() {
         // Create org-wide default settings for tests
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings.Id == null) {
+            settings = new Notion_Sync_Settings__c();
+        }
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
         upsert settings;
@@ -60,6 +63,9 @@ private class NotionSyncLoggerTest {
     static void testLoggingDisabledAsync() {
         // Disable logging in async context
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings.Id == null) {
+            settings = new Notion_Sync_Settings__c();
+        }
         settings.put('Enable_Logging__c', false);
         upsert settings;
         
@@ -75,6 +81,9 @@ private class NotionSyncLoggerTest {
     static void testLogLevelError() {
         // Set log level to ERROR
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings.Id == null) {
+            settings = new Notion_Sync_Settings__c();
+        }
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'ERROR');
         upsert settings;
@@ -105,6 +114,9 @@ private class NotionSyncLoggerTest {
     static void testLogLevelInfo() {
         // Set log level to INFO
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings.Id == null) {
+            settings = new Notion_Sync_Settings__c();
+        }
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'INFO');
         upsert settings;
@@ -134,6 +146,9 @@ private class NotionSyncLoggerTest {
     static void testLogLevelDebug() {
         // Set log level to DEBUG
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings.Id == null) {
+            settings = new Notion_Sync_Settings__c();
+        }
         settings.put('Enable_Logging__c', true);
         settings.put('Log_Level__c', 'DEBUG');
         upsert settings;
