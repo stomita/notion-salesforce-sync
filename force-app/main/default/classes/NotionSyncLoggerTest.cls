@@ -43,8 +43,6 @@ private class NotionSyncLoggerTest {
     @isTest
     static void testLoggingDisabled() {
         // This test verifies behavior when logging is disabled
-        // Note: In test context, logging is always enabled due to Test.isRunningTest()
-        // Even in async contexts, Test.isRunningTest() returns true
         
         Test.startTest();
         
@@ -53,9 +51,9 @@ private class NotionSyncLoggerTest {
         
         Test.stopTest();
         
-        // In test context, logs are always created due to Test.isRunningTest() override
+        // Verify no logs were created when logging was disabled
         List<Notion_Sync_Log__c> logs = [SELECT Id FROM Notion_Sync_Log__c WHERE Record_Id__c IN ('001000000000001', '001000000000002')];
-        System.assertEquals(2, logs.size(), 'In test context, logs are always created due to Test.isRunningTest()');
+        System.assertEquals(0, logs.size(), 'No logs should be created when logging is disabled');
     }
     
     @future
@@ -93,13 +91,14 @@ private class NotionSyncLoggerTest {
         
         Test.stopTest();
         
-        // In test context, all logs are created regardless of settings
-        // This is expected behavior due to Test.isRunningTest() override
+        // With ERROR log level, only Failed and Rate Limited logs should be created
         List<Notion_Sync_Log__c> logs = [
             SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
         ];
-        // All 3 logs will be created in test context
-        System.assertEquals(3, logs.size(), 'In test context, all logs are created');
+        // Even in test context, log level filtering applies
+        System.assertEquals(2, logs.size(), 'Only error logs should be created');
+        System.assertEquals('Failed', logs[0].Status__c);
+        System.assertEquals('Rate Limited', logs[1].Status__c);
     }
     
     @isTest
@@ -123,12 +122,12 @@ private class NotionSyncLoggerTest {
         
         Test.stopTest();
         
-        // In test context, all logs are created regardless of settings
+        // With INFO log level, Success and Failed logs should be created (not Deferred/BatchProcess)
         List<Notion_Sync_Log__c> logs = [
             SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
         ];
-        // All 4 logs will be created in test context
-        System.assertEquals(4, logs.size(), 'In test context, all logs are created');
+        // 3 logs should be created (Success, Failed, Success - excluding Deferred)
+        System.assertEquals(3, logs.size(), 'Info level should exclude Deferred status');
     }
     
     @isTest
@@ -152,11 +151,11 @@ private class NotionSyncLoggerTest {
         
         Test.stopTest();
         
-        // In test context, all logs are created regardless of settings
+        // With DEBUG log level, all logs should be created
         List<Notion_Sync_Log__c> logs = [
             SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
         ];
-        System.assertEquals(4, logs.size(), 'In test context, all logs are created');
+        System.assertEquals(4, logs.size(), 'Debug level should log everything');
     }
     
     @isTest

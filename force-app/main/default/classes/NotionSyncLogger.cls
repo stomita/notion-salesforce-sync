@@ -9,11 +9,6 @@ public with sharing class NotionSyncLogger {
     
     // Check if logging is enabled
     private static Boolean isLoggingEnabled() {
-        // Always enable for tests
-        if (Test.isRunningTest()) {
-            return true;
-        }
-        
         // Check custom setting
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         if (settings == null) {
@@ -28,11 +23,6 @@ public with sharing class NotionSyncLogger {
     
     // Determine if we should log based on status and settings
     private static Boolean shouldLog(String status) {
-        // Always log in test context
-        if (Test.isRunningTest()) {
-            return true;
-        }
-        
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         
         // If logging is disabled, don't log

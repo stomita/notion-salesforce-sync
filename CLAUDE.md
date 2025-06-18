@@ -70,6 +70,7 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
    ```bash
    ./scripts/run-integration-tests.sh
    ```
+   See [docs/INTEGRATION_TESTING.md](docs/INTEGRATION_TESTING.md) for detailed setup and usage instructions.
 
 Only push your changes after all tests complete successfully.
 
@@ -98,7 +99,7 @@ Only push your changes after all tests complete successfully.
 4. **Pre-Push Checklist**:
    - Deploy to local scratch org: `sf project deploy start --source-dir force-app`
    - Run unit tests: `sf apex test run --code-coverage --result-format human`
-   - Run integration tests (if applicable): `./scripts/run-integration-tests.sh`
+   - Run integration tests (if applicable): `./scripts/run-integration-tests.sh` (see [docs/INTEGRATION_TESTING.md](docs/INTEGRATION_TESTING.md) for details)
    - All tests must pass before pushing to remote
 
 ## CI/CD
