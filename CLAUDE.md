@@ -35,8 +35,12 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 3. **Notion API Client**: Handles authentication and API calls to Notion
 4. **Data Transformer**: Converts Salesforce data to Notion format
 5. **Relationship Handler**: Manages cross-object relationships
-6. **Sync Queueable**: Asynchronous processor for Notion API operations
-7. **Error Logger**: Tracks sync status and failures in custom object
+6. **Queueable Classes**:
+   - `NotionSyncQueueable`: Core worker that performs actual sync operations (API calls, data transformation)
+   - `NotionSyncBatchQueueable`: Orchestrator for large volumes - splits work into batches and chains jobs
+7. **Batch Processor**: `NotionSyncBatchProcessor` - Intelligently sizes batches based on governor limits
+8. **Rate Limiter**: `NotionRateLimiter` - Enforces 3 req/sec limit and monitors governor limits
+9. **Error Logger**: `NotionSyncLogger` - Tracks sync status and failures in custom object
 
 ## Development Commands
 
@@ -139,26 +143,33 @@ public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
    - objectType: 'Account' (or dynamic object API name)
    - operationType: 'CREATE', 'UPDATE', or 'DELETE'
 
-### Queueable Apex
-```apex
-public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
-    private List<SyncRequest> requests;
-    
-    public NotionSyncQueueable(List<SyncRequest> requests) {
-        this.requests = requests;
-    }
-    
-    public void execute(QueueableContext context) {
-        // Process sync requests
-        // Make Notion API callouts  
-        // Handle errors and retries
-    }
-    
-    public void processSyncRequests(List<SyncRequest> syncRequests) {
-        // Public method to support direct invocation
-        // Processes requests maintaining user context
-    }
-}
+### Queueable Architecture
+
+The system uses two queueable classes for different purposes:
+
+#### NotionSyncQueueable (Core Worker)
+- **Purpose**: Performs actual sync operations to Notion
+- **Responsibilities**:
+  - Makes API calls to create/update/delete Notion pages
+  - Transforms Salesforce data to Notion format
+  - Handles relationships between objects
+  - Manages individual sync requests
+- **Used by**: NotionSyncInvocable (for ≤50 records) and NotionSyncBatchQueueable
+
+#### NotionSyncBatchQueueable (Batch Orchestrator)
+- **Purpose**: Manages large volume processing
+- **Responsibilities**:
+  - Splits large record sets into manageable batches
+  - Chains multiple queueable jobs together
+  - Monitors governor limits between batches
+  - Ensures sync logs are flushed after each batch
+- **Used by**: NotionSyncInvocable (for >50 records)
+
+```
+Flow Trigger → NotionSyncInvocable
+                ├─ Small volume (≤50) → NotionSyncQueueable
+                └─ Large volume (>50) → NotionSyncBatchQueueable
+                                         └─ Multiple NotionSyncQueueable calls
 ```
 
 ## Architecture
