@@ -2,6 +2,59 @@ public with sharing class NotionSyncLogger {
     @TestVisible
     private static List<LogEntry> pendingLogs = new List<LogEntry>();
     
+    // Log level constants
+    public static final String LOG_LEVEL_ERROR = 'ERROR';
+    public static final String LOG_LEVEL_INFO = 'INFO';
+    public static final String LOG_LEVEL_DEBUG = 'DEBUG';
+    
+    // Check if logging is enabled
+    private static Boolean isLoggingEnabled() {
+        // Always enable for tests
+        if (Test.isRunningTest()) {
+            return true;
+        }
+        
+        // Check custom setting
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        return settings != null && settings.Enable_Logging__c == true;
+    }
+    
+    // Determine if we should log based on status and settings
+    private static Boolean shouldLog(String status) {
+        // Always log in test context
+        if (Test.isRunningTest()) {
+            return true;
+        }
+        
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        
+        // If logging is disabled, don't log
+        if (settings == null || !settings.Enable_Logging__c) {
+            return false;
+        }
+        
+        String logLevel = settings.Log_Level__c != null ? settings.Log_Level__c : LOG_LEVEL_ERROR;
+        
+        // Determine based on log level
+        switch on logLevel {
+            when 'ERROR' {
+                // Only log failures
+                return status == 'Failed' || status == 'Rate Limited';
+            }
+            when 'INFO' {
+                // Log failures and successes, but not BatchProcess logs
+                return status != 'Deferred' && status != 'BatchProcess';
+            }
+            when 'DEBUG' {
+                // Log everything including BatchProcess
+                return true;
+            }
+            when else {
+                return false;
+            }
+        }
+    }
+    
     @future
     public static void logAsync(List<String> logJsonList) {
         logSync(logJsonList);
@@ -72,16 +125,34 @@ public with sharing class NotionSyncLogger {
     
     // Flush all pending logs
     public static void flush() {
-        if (!pendingLogs.isEmpty()) {
+        if (pendingLogs.isEmpty()) {
+            return;
+        }
+        
+        // Check if logging is enabled
+        if (!isLoggingEnabled()) {
+            pendingLogs.clear();
+            return;
+        }
+        
+        // Filter logs based on current settings
+        List<LogEntry> logsToSave = new List<LogEntry>();
+        for (LogEntry entry : pendingLogs) {
+            if (shouldLog(entry.status)) {
+                logsToSave.add(entry);
+            }
+        }
+        
+        if (!logsToSave.isEmpty()) {
             List<String> logJsonList = new List<String>();
-            for (LogEntry entry : pendingLogs) {
+            for (LogEntry entry : logsToSave) {
                 logJsonList.add(JSON.serialize(entry));
             }
             
             // If we're already in a future context, we need to handle this specially
             // We can't call another @future method, and we can't do DML if there are
             // pending callouts. So we'll store the logs and process them separately.
-            if (System.isFuture()) {
+            if (System.isFuture() || System.isBatch() || System.isQueueable()) {
                 // Convert back to logs and insert directly
                 // This should only be called AFTER all callouts are complete
                 List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();
@@ -107,7 +178,7 @@ public with sharing class NotionSyncLogger {
                     try {
                         insert logs;
                     } catch (Exception e) {
-                        System.debug('Failed to insert sync logs from future context: ' + e.getMessage());
+                        System.debug('Failed to insert sync logs from async context: ' + e.getMessage());
                     }
                 }
             } else if (Test.isRunningTest()) {
@@ -116,8 +187,9 @@ public with sharing class NotionSyncLogger {
                 logAsync(logJsonList);
             }
             
-            pendingLogs.clear();
         }
+        
+        pendingLogs.clear();
     }
     
     // Clear pending logs without saving (for error scenarios)

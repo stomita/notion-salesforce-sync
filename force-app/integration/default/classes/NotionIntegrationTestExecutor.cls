@@ -10,10 +10,27 @@ public class NotionIntegrationTestExecutor {
     private List<String> errors = new List<String>();
     
     /**
+     * Enable logging for integration tests
+     */
+    private void ensureLoggingEnabled() {
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings.Id == null) {
+            settings = new Notion_Sync_Settings__c();
+        }
+        settings.Enable_Logging__c = true;
+        settings.Log_Level__c = 'DEBUG'; // Full logging for tests
+        upsert settings;
+        System.debug('Logging enabled for integration tests');
+    }
+    
+    /**
      * Setup test data
      */
     public void setupTestData() {
         System.debug('\n--- Setting up test data ---');
+        
+        // Enable logging first
+        ensureLoggingEnabled();
         
         // Clean up any existing test data including deletion test records
         delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];

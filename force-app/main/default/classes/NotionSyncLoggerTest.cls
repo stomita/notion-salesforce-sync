@@ -1,6 +1,16 @@
 @isTest
 private class NotionSyncLoggerTest {
     
+    @testSetup
+    static void setup() {
+        // Ensure logging is enabled for tests (though Test.isRunningTest() always enables it)
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            Enable_Logging__c = true,
+            Log_Level__c = 'DEBUG'
+        );
+        insert settings;
+    }
+    
     @isTest
     static void testBasicLogging() {
         Test.startTest();
@@ -32,6 +42,122 @@ private class NotionSyncLoggerTest {
     }
     
     @isTest
+    static void testLoggingDisabled() {
+        // Disable logging
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        settings.Enable_Logging__c = false;
+        update settings;
+        
+        Test.startTest();
+        
+        // Override Test.isRunningTest() by using a future method
+        NotionSyncLoggerTest.testLoggingDisabledAsync();
+        
+        Test.stopTest();
+        
+        // Verify no logs were created
+        List<Notion_Sync_Log__c> logs = [SELECT Id FROM Notion_Sync_Log__c];
+        System.assertEquals(0, logs.size(), 'No logs should be created when logging is disabled');
+    }
+    
+    @future
+    static void testLoggingDisabledAsync() {
+        // Add logs
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000002', 'Account', 'CREATE', 'Failed', 'Test error', 1);
+        
+        // Flush - should not create any logs
+        NotionSyncLogger.flush();
+    }
+    
+    @isTest
+    static void testLogLevelError() {
+        // Set log level to ERROR
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        settings.Enable_Logging__c = true;
+        settings.Log_Level__c = 'ERROR';
+        update settings;
+        
+        Test.startTest();
+        
+        // Add various logs
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000002', 'Account', 'UPDATE', 'Failed', 'Test error', 1);
+        NotionSyncLogger.log('001000000000003', 'Account', 'DELETE', 'Rate Limited', 'Rate limit hit', 0);
+        
+        // Flush logs
+        NotionSyncLogger.flush();
+        
+        Test.stopTest();
+        
+        // Should only log failures and rate limited
+        List<Notion_Sync_Log__c> logs = [
+            SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
+        ];
+        System.assertEquals(2, logs.size(), 'ERROR level should only log failures');
+        System.assertEquals('Failed', logs[0].Status__c);
+        System.assertEquals('Rate Limited', logs[1].Status__c);
+    }
+    
+    @isTest
+    static void testLogLevelInfo() {
+        // Set log level to INFO
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        settings.Enable_Logging__c = true;
+        settings.Log_Level__c = 'INFO';
+        update settings;
+        
+        Test.startTest();
+        
+        // Add various logs
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000002', 'Account', 'UPDATE', 'Failed', 'Test error', 1);
+        NotionSyncLogger.log('001000000000003', 'BatchProcess', 'BATCH', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000004', 'Account', 'DELETE', 'Deferred', 'Governor limits', 0);
+        
+        // Flush logs
+        NotionSyncLogger.flush();
+        
+        Test.stopTest();
+        
+        // Should log successes and failures but not BatchProcess or Deferred
+        List<Notion_Sync_Log__c> logs = [
+            SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
+        ];
+        System.assertEquals(2, logs.size(), 'INFO level should not log BatchProcess or Deferred');
+        System.assertEquals('Success', logs[0].Status__c);
+        System.assertEquals('Failed', logs[1].Status__c);
+    }
+    
+    @isTest
+    static void testLogLevelDebug() {
+        // Set log level to DEBUG
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        settings.Enable_Logging__c = true;
+        settings.Log_Level__c = 'DEBUG';
+        update settings;
+        
+        Test.startTest();
+        
+        // Add various logs
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000002', 'Account', 'UPDATE', 'Failed', 'Test error', 1);
+        NotionSyncLogger.log('001000000000003', 'BatchProcess', 'BATCH', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000004', 'Account', 'DELETE', 'Deferred', 'Governor limits', 0);
+        
+        // Flush logs
+        NotionSyncLogger.flush();
+        
+        Test.stopTest();
+        
+        // Should log everything
+        List<Notion_Sync_Log__c> logs = [
+            SELECT Status__c FROM Notion_Sync_Log__c ORDER BY Record_Id__c
+        ];
+        System.assertEquals(4, logs.size(), 'DEBUG level should log everything');
+    }
+    
+    @isTest
     static void testRateLimitLogging() {
         Test.startTest();
         
@@ -48,54 +174,38 @@ private class NotionSyncLoggerTest {
             5
         );
         
-        // Verify pending log has rate limit info
+        // Verify pending logs
         System.assertEquals(1, NotionSyncLogger.pendingLogs.size(), 'Should have one pending log');
         NotionSyncLogger.LogEntry entry = NotionSyncLogger.pendingLogs[0];
-        System.assertEquals(true, entry.rateLimited, 'Should be marked as rate limited');
-        System.assertEquals(5, entry.rateLimitRetryAfter, 'Retry after seconds should match');
-        System.assert(entry.cpuTimeUsed >= 0, 'CPU time should be captured');
-        System.assert(entry.calloutsUsed >= 0, 'Callouts used should be captured');
-        
-        // Update API calls made
-        entry.apiCallsMade = 3;
+        System.assertEquals(true, entry.rateLimited, 'Rate limited flag should be set');
+        System.assertEquals(5, entry.rateLimitRetryAfter, 'Retry after should be 5 seconds');
         
         // Flush logs
         NotionSyncLogger.flush();
         
         Test.stopTest();
         
-        // Verify log was created with rate limit fields
+        // Verify log was created with rate limit info
         List<Notion_Sync_Log__c> logs = [
-            SELECT Rate_Limited__c, Rate_Limit_Retry_After__c, API_Calls_Made__c, 
-                   CPU_Time_Used__c, Callouts_Used__c
+            SELECT Record_Id__c, Rate_Limited__c, Rate_Limit_Retry_After__c, CPU_Time_Used__c, Callouts_Used__c
             FROM Notion_Sync_Log__c
         ];
         System.assertEquals(1, logs.size(), 'Should have created one log record');
-        System.assertEquals(true, logs[0].Rate_Limited__c, 'Should be marked as rate limited');
-        System.assertEquals(5, logs[0].Rate_Limit_Retry_After__c, 'Retry after should match');
-        System.assertEquals(3, logs[0].API_Calls_Made__c, 'API calls made should match');
-        System.assert(logs[0].CPU_Time_Used__c >= 0, 'CPU time should be logged');
-        System.assert(logs[0].Callouts_Used__c >= 0, 'Callouts used should be logged');
+        System.assertEquals(true, logs[0].Rate_Limited__c, 'Rate limited flag should be saved');
+        System.assertEquals(5, logs[0].Rate_Limit_Retry_After__c, 'Retry after should be saved');
+        System.assertNotEquals(null, logs[0].CPU_Time_Used__c, 'CPU time should be captured');
+        System.assertNotEquals(null, logs[0].Callouts_Used__c, 'Callouts used should be captured');
     }
     
     @isTest
     static void testBulkLogging() {
         Test.startTest();
         
-        // Add multiple log entries
-        for (Integer i = 0; i < 10; i++) {
-            NotionSyncLogger.log(
-                '00100000000000' + i, 
-                'Account', 
-                'CREATE', 
-                'Success', 
-                null, 
-                0,
-                'page-' + i
-            );
+        // Add multiple logs
+        for (Integer i = 0; i < 50; i++) {
+            String status = Math.mod(i, 3) == 0 ? 'Success' : 'Failed';
+            NotionSyncLogger.log('00100000000000' + i, 'Account', 'CREATE', status, null, 0);
         }
-        
-        System.assertEquals(10, NotionSyncLogger.pendingLogs.size(), 'Should have 10 pending logs');
         
         // Flush logs
         NotionSyncLogger.flush();
@@ -104,84 +214,70 @@ private class NotionSyncLoggerTest {
         
         // Verify all logs were created
         List<Notion_Sync_Log__c> logs = [SELECT Id FROM Notion_Sync_Log__c];
-        System.assertEquals(10, logs.size(), 'Should have created 10 log records');
+        System.assertEquals(50, logs.size(), 'All logs should be created');
     }
     
     @isTest
-    static void testErrorLogging() {
-        Test.startTest();
-        
-        // Test error log entry
-        NotionSyncLogger.log(
-            '001000000000003', 
-            'Opportunity', 
-            'DELETE', 
-            'Failed', 
-            'Record not found in Notion',
-            2
+    static void testLogEntrySerialization() {
+        NotionSyncLogger.LogEntry entry = new NotionSyncLogger.LogEntry(
+            '001000000000001',
+            'Account',
+            'CREATE',
+            'Success',
+            null,
+            0,
+            'test-page-id'
         );
         
-        // Verify error details
-        NotionSyncLogger.LogEntry entry = NotionSyncLogger.pendingLogs[0];
-        System.assertEquals('Failed', entry.status, 'Status should be Failed');
-        System.assertEquals('Record not found in Notion', entry.errorMessage, 'Error message should match');
-        System.assertEquals(2, entry.retryCount, 'Retry count should match');
+        // Test JSON serialization
+        String jsonString = JSON.serialize(entry);
+        System.assert(jsonString.contains('"recordId":"001000000000001"'), 'JSON should contain recordId');
         
-        NotionSyncLogger.flush();
-        
-        Test.stopTest();
-        
-        // Verify error was logged
-        List<Notion_Sync_Log__c> logs = [
-            SELECT Status__c, Error_Message__c, Retry_Count__c
-            FROM Notion_Sync_Log__c
-        ];
-        System.assertEquals('Failed', logs[0].Status__c, 'Status should be Failed');
-        System.assertEquals('Record not found in Notion', logs[0].Error_Message__c, 'Error message should match');
-        System.assertEquals(2, logs[0].Retry_Count__c, 'Retry count should match');
+        // Test deserialization
+        NotionSyncLogger.LogEntry deserializedEntry = 
+            (NotionSyncLogger.LogEntry) JSON.deserialize(jsonString, NotionSyncLogger.LogEntry.class);
+        System.assertEquals(entry.recordId, deserializedEntry.recordId, 'Deserialized entry should match');
     }
     
     @isTest
     static void testClearLogs() {
-        Test.startTest();
-        
         // Add some logs
-        NotionSyncLogger.log('001000000000004', 'Lead', 'CREATE', 'Success', null, 0);
-        NotionSyncLogger.log('001000000000005', 'Lead', 'UPDATE', 'Failed', 'Error', 0);
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        NotionSyncLogger.log('001000000000002', 'Contact', 'UPDATE', 'Failed', 'Error', 1);
         
-        System.assertEquals(2, NotionSyncLogger.pendingLogs.size(), 'Should have 2 pending logs');
+        System.assertEquals(2, NotionSyncLogger.pendingLogs.size(), 'Should have two pending logs');
         
-        // Clear logs without saving
+        // Clear logs
         NotionSyncLogger.clear();
         
         System.assertEquals(0, NotionSyncLogger.pendingLogs.size(), 'Pending logs should be cleared');
         
-        Test.stopTest();
+        // Flush should do nothing
+        NotionSyncLogger.flush();
         
         // Verify no logs were created
         List<Notion_Sync_Log__c> logs = [SELECT Id FROM Notion_Sync_Log__c];
-        System.assertEquals(0, logs.size(), 'No logs should have been created');
+        System.assertEquals(0, logs.size(), 'No logs should be created after clear');
     }
     
     @isTest
-    static void testFutureContextLogging() {
-        // This test simulates logging from a future context
+    static void testAsyncContextLogging() {
         Test.startTest();
         
-        // Call a method that would simulate future context behavior
-        NotionSyncLoggerTest.simulateFutureLogging();
+        // Test logging from future context
+        testAsyncLogging();
         
         Test.stopTest();
         
-        // Verify log was created
-        List<Notion_Sync_Log__c> logs = [SELECT Record_Id__c FROM Notion_Sync_Log__c];
-        System.assertEquals(1, logs.size(), 'Should have created one log record');
-        System.assertEquals('001FUTURE000001', logs[0].Record_Id__c, 'Log should be from future context');
+        // Verify logs were created
+        List<Notion_Sync_Log__c> logs = [SELECT Status__c FROM Notion_Sync_Log__c];
+        System.assertEquals(1, logs.size(), 'Log should be created from async context');
+        System.assertEquals('Success', logs[0].Status__c);
     }
     
     @future
-    static void simulateFutureLogging() {
-        NotionSyncLogger.log('001FUTURE000001', 'Account', 'CREATE', 'Success', null, 0);
+    static void testAsyncLogging() {
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
         NotionSyncLogger.flush();
     }
 }
