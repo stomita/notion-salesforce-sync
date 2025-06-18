@@ -17,8 +17,8 @@ public class NotionIntegrationTestExecutor {
         if (settings.Id == null) {
             settings = new Notion_Sync_Settings__c();
         }
-        settings.Enable_Logging__c = true;
-        settings.Log_Level__c = 'DEBUG'; // Full logging for tests
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'DEBUG'); // Full logging for tests
         upsert settings;
         System.debug('Logging enabled for integration tests');
     }

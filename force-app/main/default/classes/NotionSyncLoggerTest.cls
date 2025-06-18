@@ -4,10 +4,9 @@ private class NotionSyncLoggerTest {
     @testSetup
     static void setup() {
         // Ensure logging is enabled for tests (though Test.isRunningTest() always enables it)
-        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
-            Enable_Logging__c = true,
-            Log_Level__c = 'DEBUG'
-        );
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c();
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'DEBUG');
         insert settings;
     }
     
@@ -45,7 +44,7 @@ private class NotionSyncLoggerTest {
     static void testLoggingDisabled() {
         // Disable logging
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
-        settings.Enable_Logging__c = false;
+        settings.put('Enable_Logging__c', false);
         update settings;
         
         Test.startTest();
@@ -74,8 +73,8 @@ private class NotionSyncLoggerTest {
     static void testLogLevelError() {
         // Set log level to ERROR
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
-        settings.Enable_Logging__c = true;
-        settings.Log_Level__c = 'ERROR';
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'ERROR');
         update settings;
         
         Test.startTest();
@@ -103,8 +102,8 @@ private class NotionSyncLoggerTest {
     static void testLogLevelInfo() {
         // Set log level to INFO
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
-        settings.Enable_Logging__c = true;
-        settings.Log_Level__c = 'INFO';
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'INFO');
         update settings;
         
         Test.startTest();
@@ -133,8 +132,8 @@ private class NotionSyncLoggerTest {
     static void testLogLevelDebug() {
         // Set log level to DEBUG
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
-        settings.Enable_Logging__c = true;
-        settings.Log_Level__c = 'DEBUG';
+        settings.put('Enable_Logging__c', true);
+        settings.put('Log_Level__c', 'DEBUG');
         update settings;
         
         Test.startTest();

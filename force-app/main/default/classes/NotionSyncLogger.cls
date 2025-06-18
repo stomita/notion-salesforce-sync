@@ -16,7 +16,14 @@ public with sharing class NotionSyncLogger {
         
         // Check custom setting
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
-        return settings != null && settings.Enable_Logging__c == true;
+        if (settings == null) {
+            return false;
+        }
+        try {
+            return (Boolean) settings.get('Enable_Logging__c') == true;
+        } catch (Exception e) {
+            return false;
+        }
     }
     
     // Determine if we should log based on status and settings
@@ -29,11 +36,28 @@ public with sharing class NotionSyncLogger {
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
         
         // If logging is disabled, don't log
-        if (settings == null || !settings.Enable_Logging__c) {
+        if (settings == null) {
             return false;
         }
         
-        String logLevel = settings.Log_Level__c != null ? settings.Log_Level__c : LOG_LEVEL_ERROR;
+        try {
+            Boolean isEnabled = (Boolean) settings.get('Enable_Logging__c');
+            if (isEnabled != true) {
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        
+        String logLevel = LOG_LEVEL_ERROR;
+        try {
+            logLevel = (String) settings.get('Log_Level__c');
+            if (logLevel == null) {
+                logLevel = LOG_LEVEL_ERROR;
+            }
+        } catch (Exception e) {
+            logLevel = LOG_LEVEL_ERROR;
+        }
         
         // Determine based on log level
         switch on logLevel {

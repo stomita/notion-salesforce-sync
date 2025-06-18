@@ -19,8 +19,15 @@ public class NotionSyncLogCleanupBatch implements Database.Batchable<sObject>, S
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         Integer retentionDays = 7; // Default to 7 days
         
-        if (settings != null && settings.Retention_Days__c != null && settings.Retention_Days__c > 0) {
-            retentionDays = Integer.valueOf(settings.Retention_Days__c);
+        if (settings != null) {
+            try {
+                Decimal retentionValue = (Decimal) settings.get('Retention_Days__c');
+                if (retentionValue != null && retentionValue > 0) {
+                    retentionDays = Integer.valueOf(retentionValue);
+                }
+            } catch (Exception e) {
+                // Use default value
+            }
         }
         
         // Calculate cutoff date
