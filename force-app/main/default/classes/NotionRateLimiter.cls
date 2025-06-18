@@ -155,11 +155,10 @@ public with sharing class NotionRateLimiter {
             System.debug('Notion API rate limit hit. Retry-After: ' + retryAfter);
             
             if (String.isNotBlank(retryAfter)) {
-                // Store retry information for later processing
+                // Parse retry-after seconds for logging
                 Integer secondsToWait = Integer.valueOf(retryAfter);
                 
-                // Create platform event or schedule retry
-                // For now, just return true to indicate rate limiting
+                // Return true to indicate rate limiting occurred
                 return true;
             }
             
