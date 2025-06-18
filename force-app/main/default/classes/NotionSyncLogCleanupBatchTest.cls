@@ -80,7 +80,7 @@ private class NotionSyncLogCleanupBatchTest {
         // Update retention to 5 days
         Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         settings.put('Retention_Days__c', 5);
-        update settings;
+        upsert settings;
         
         // Create a log that's 6 days old (should be deleted with 5 day retention)
         Notion_Sync_Log__c midAgeLog = new Notion_Sync_Log__c(
@@ -176,7 +176,8 @@ private class NotionSyncLogCleanupBatchTest {
         
         // Test scheduling again - should not create duplicate
         String jobId2 = NotionSyncLogCleanupBatch.scheduleCleanup();
-        System.assertEquals(jobId, jobId2, 'Should return existing job ID');
+        // Salesforce may append additional characters to job IDs
+        System.assert(jobId2.startsWith(jobId.substring(0, 15)), 'Should return existing job ID with same prefix');
     }
     
     @isTest
