@@ -78,10 +78,6 @@
     </objectPermissions>
     <customMetadataTypeAccesses>
         <enabled>true</enabled>
-        <name>NotionDatabase__mdt</name>
-    </customMetadataTypeAccesses>
-    <customMetadataTypeAccesses>
-        <enabled>true</enabled>
         <name>NotionRelation__mdt</name>
     </customMetadataTypeAccesses>
     <customMetadataTypeAccesses>

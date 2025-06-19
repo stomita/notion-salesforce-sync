@@ -74,31 +74,6 @@ private class NotionMetadataServiceTest {
     }
     
     @isTest
-    static void testGetNotionDatabases() {
-        Test.startTest();
-        List<NotionDatabase__mdt> databases = NotionMetadataService.getNotionDatabases();
-        Test.stopTest();
-        
-        // In test context, this will return empty list
-        System.assertNotEquals(null, databases, 'Should return list');
-    }
-    
-    @isTest
-    static void testSaveNotionDatabase() {
-        Test.startTest();
-        try {
-            NotionMetadataService.saveNotionDatabase('test-db-id', 'Test Database', 'test-workspace-id');
-            // If we get here in a test, it means the deployment was queued but not executed
-            System.assert(true, 'Method should complete without error in non-test context');
-        } catch (System.AsyncException e) {
-            // Expected in test context - cannot deploy metadata from tests
-            System.assert(e.getMessage().contains('Metadata cannot be deployed from within a test'), 
-                'Expected AsyncException for metadata deployment in test');
-        }
-        Test.stopTest();
-    }
-    
-    @isTest
     static void testMetadataDeployCallback() {
         // Test the callback handler
         NotionMetadataService.MetadataDeployCallback callback = new NotionMetadataService.MetadataDeployCallback();

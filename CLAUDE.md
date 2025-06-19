@@ -208,11 +208,6 @@ Flow Trigger → NotionSyncInvocable
   - `NotionPropertyType__c`: Notion property type (title, rich_text, number, etc.)
   - `IsBodyContent__c`: Map Long Text Area to page body content
   
-- **NotionDatabase__mdt**: Stores Notion database configurations
-  - `DatabaseId__c`: Notion database ID
-  - `DatabaseName__c`: Friendly name for the database
-  - `WorkspaceId__c`: Notion workspace ID
-  
 - **NotionRelation__mdt**: Defines relationship mappings between objects
   - `ParentObject__c`: Reference to parent NotionSyncObject__mdt
   - `ChildObject__c`: Reference to child NotionSyncObject__mdt
