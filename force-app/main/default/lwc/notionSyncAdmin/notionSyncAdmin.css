@@ -1,0 +1,8 @@
+.slds-align-bottom {
+    display: flex;
+    align-items: flex-end;
+}
+
+lightning-accordion-section {
+    margin-bottom: 1rem;
+}

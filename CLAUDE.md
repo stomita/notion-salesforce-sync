@@ -46,11 +46,27 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 
 ### Scratch Org Setup (Initial or when expired)
 - `sf org create scratch -f config/project-scratch-def.json -a my-scratch` - Create scratch org
-- `sf org delete scratch -o my-scratch -p` - Delete scratch org
+- `sf project deploy start --source-dir force-app` - Deploy all metadata to scratch org
+- `sf org assign permset --name Notion_Integration_User` - Assign integration permission set for API access
+- `sf org assign permset --name Notion_Sync_Admin` - Assign admin permission set to access Notion Sync Admin UI
+- `sf org delete scratch -o my-scratch -p` - Delete scratch org (when done)
 
 ### Daily Development Commands
 - `sf project deploy start --source-dir force-app` - Deploy to Salesforce org
 - `sf apex test run --code-coverage --result-format human` - Run all Apex tests
+
+### UI Testing with Playwright MCP
+When testing the UI in Claude, use the Playwright MCP browser control tool:
+- Get the org URL: `sf org open --url-only -o <org-alias>`
+- Use the URL with Playwright MCP's browser_navigate tool
+- This allows interactive UI testing directly within Claude
+
+Example:
+```bash
+# Get the URL for the scratch org
+URL=$(sf org open --url-only -o notion-sync-scratch)
+# Then use browser_navigate with the URL in Claude
+```
 
 ### Important: Pre-Push Testing Requirement
 
@@ -68,7 +84,11 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 
 3. If you have Notion API credentials configured, run integration tests:
    ```bash
-   ./scripts/run-integration-tests.sh
+   # If using .env file (recommended)
+   nf run ./scripts/run-integration-tests.sh
+   
+   # Or manually export environment variables
+   export $(cat .env | xargs) && ./scripts/run-integration-tests.sh
    ```
 
 Only push your changes after all tests complete successfully.

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Grants administrative access to configure Notion synchronization settings through the admin UI</description>
+    <customPermissions>
+        <enabled>true</enabled>
+        <name>Notion_Sync_Admin</name>
+    </customPermissions>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Notion Sync Administrator</label>
+    <!-- Access to External Credentials for Notion API -->
+    <externalCredentialPrincipalAccesses>
+        <enabled>true</enabled>
+        <externalCredentialPrincipal>Notion_Credential-NotionIntegration</externalCredentialPrincipal>
+    </externalCredentialPrincipalAccesses>
+    <!-- Custom Metadata Type Access -->
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionDatabase__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionRelation__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionSyncField__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionSyncObject__mdt</name>
+    </customMetadataTypeAccesses>
+    <!-- Apex Class Access -->
+    <classAccesses>
+        <apexClass>NotionAdminController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NotionMetadataService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NotionApiClient</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <!-- User Permissions -->
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>ApiEnabled</name>
+    </userPermissions>
+    <!-- App and Tab Access -->
+    <applicationVisibilities>
+        <application>Notion_Sync</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+    <tabSettings>
+        <tab>Notion_Sync_Admin</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>Notion_Sync_Log__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <!-- Notion Sync Log Access for viewing sync status -->
+    <objectPermissions>
+        <allowCreate>false</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>false</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Notion_Sync_Log__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Error_Message__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Notion_Page_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Object_Type__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Operation_Type__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Record_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Status__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Retry_Count__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+</PermissionSet>

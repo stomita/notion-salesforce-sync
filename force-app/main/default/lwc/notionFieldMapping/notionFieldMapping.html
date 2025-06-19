@@ -1,0 +1,182 @@
+<template>
+    <div class="slds-p-horizontal_small">
+        <!-- Loading Spinner -->
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading fields" size="small"></lightning-spinner>
+        </template>
+
+        <!-- Existing Mappings -->
+        <template if:true={hasMappings}>
+            <div class="slds-m-bottom_medium">
+                <h3 class="slds-text-heading_small slds-m-bottom_small">Current Field Mappings</h3>
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <th scope="col">
+                                <div class="slds-truncate" title="Salesforce Field">Salesforce Field</div>
+                            </th>
+                            <th scope="col">
+                                <div class="slds-truncate" title="Notion Property">Notion Property</div>
+                            </th>
+                            <th scope="col">
+                                <div class="slds-truncate" title="Property Type">Property Type</div>
+                            </th>
+                            <th scope="col" style="width: 50px;">
+                                <div class="slds-truncate" title="Actions">Actions</div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={mappingsWithMetadata} for:item="mapping" for:index="index">
+                            <tr key={mapping.id} class="slds-hint-parent">
+                                <td>
+                                    <div class="slds-truncate">
+                                        <strong>{mapping.salesforceFieldApiName}</strong>
+                                        <div class="slds-text-body_small slds-text-color_weak">
+                                            {mapping.fieldLabel} ({mapping.fieldType})
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="slds-truncate">
+                                        <template if:true={mapping.isBodyContent}>
+                                            <lightning-badge label="Page Body Content" variant="inverse"></lightning-badge>
+                                        </template>
+                                        <template if:false={mapping.isBodyContent}>
+                                            {mapping.notionPropertyName}
+                                        </template>
+                                    </div>
+                                </td>
+                                <td>
+                                    <lightning-combobox
+                                        name="type"
+                                        value={mapping.notionPropertyType}
+                                        options={notionTypeOptions}
+                                        variant="label-hidden"
+                                        data-index={index}
+                                        onchange={handleMappingTypeChange}
+                                    ></lightning-combobox>
+                                </td>
+                                <td>
+                                    <lightning-button-icon
+                                        icon-name="utility:delete"
+                                        alternative-text="Remove"
+                                        title="Remove mapping"
+                                        variant="bare"
+                                        size="small"
+                                        data-index={index}
+                                        onclick={handleRemoveMapping}
+                                    ></lightning-button-icon>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+
+        <!-- Add New Mapping -->
+        <template if:false={showAddMapping}>
+            <lightning-button
+                label="Add Field Mapping"
+                icon-name="utility:add"
+                onclick={handleShowAddMapping}
+                disabled={disableAddButton}
+                variant="neutral"
+            ></lightning-button>
+            <template if:false={canAddMapping}>
+                <div class="slds-text-color_weak slds-m-top_x-small">
+                    All available fields have been mapped
+                </div>
+            </template>
+        </template>
+
+        <!-- New Mapping Form -->
+        <template if:true={showAddMapping}>
+            <div class="slds-box slds-m-top_small">
+                <h3 class="slds-text-heading_small slds-m-bottom_small">New Field Mapping</h3>
+                
+                <div class="slds-grid slds-gutters">
+                    <div class="slds-col slds-size_1-of-3">
+                        <lightning-combobox
+                            name="field"
+                            label="Salesforce Field"
+                            value={newMapping.salesforceFieldApiName}
+                            placeholder="Select a field"
+                            options={availableFields}
+                            onchange={handleFieldSelection}
+                            required
+                        ></lightning-combobox>
+                    </div>
+                    
+                    <div class="slds-col slds-size_1-of-3">
+                        <template if:false={newMapping.isBodyContent}>
+                            <lightning-combobox
+                                name="property"
+                                label="Notion Property"
+                                value={newMapping.notionPropertyName}
+                                placeholder="Select a property"
+                                options={availableProperties}
+                                onchange={handlePropertySelection}
+                                required
+                            ></lightning-combobox>
+                        </template>
+                        <template if:true={newMapping.isBodyContent}>
+                            <div class="slds-form-element">
+                                <label class="slds-form-element__label">Notion Property</label>
+                                <div class="slds-form-element__control">
+                                    <lightning-badge label="Page Body Content" variant="inverse"></lightning-badge>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div class="slds-col slds-size_1-of-3">
+                        <lightning-combobox
+                            name="type"
+                            label="Property Type"
+                            value={newMapping.notionPropertyType}
+                            options={notionTypeOptions}
+                            onchange={handleTypeChange}
+                            disabled={newMapping.isBodyContent}
+                        ></lightning-combobox>
+                    </div>
+                </div>
+
+                <div class="slds-m-top_small">
+                    <lightning-input
+                        type="checkbox"
+                        label="Map to page body content (for long text fields)"
+                        checked={newMapping.isBodyContent}
+                        onchange={handleBodyContentChange}
+                    ></lightning-input>
+                </div>
+
+                <div class="slds-m-top_medium">
+                    <lightning-button-group>
+                        <lightning-button
+                            label="Add Mapping"
+                            variant="brand"
+                            onclick={handleAddMapping}
+                        ></lightning-button>
+                        <lightning-button
+                            label="Cancel"
+                            onclick={handleCancelAdd}
+                        ></lightning-button>
+                    </lightning-button-group>
+                </div>
+            </div>
+        </template>
+
+        <!-- Help Text -->
+        <div class="slds-m-top_medium slds-text-body_small slds-text-color_weak">
+            <p><strong>Tips:</strong></p>
+            <ul class="slds-list_dotted">
+                <li>Map Salesforce fields to Notion properties with compatible types</li>
+                <li>Long text fields can be mapped to page body content</li>
+                <li>The system will auto-detect the best Notion property type based on the Salesforce field type</li>
+                <li>Ensure at least one field has a "title" property type for Notion page titles</li>
+            </ul>
+        </div>
+    </div>
+</template>
