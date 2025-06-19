@@ -113,12 +113,23 @@ public with sharing class NotionMetadataService {
         }
         
         // Query and delete all related relationships
-        List<NotionRelation__mdt> relations = [
+        // Custom Metadata doesn't support OR in WHERE clause, so we need two queries
+        List<NotionRelation__mdt> parentRelations = [
             SELECT DeveloperName
             FROM NotionRelation__mdt
             WHERE ParentObject__r.DeveloperName = :objectDeveloperName
-               OR ChildObject__r.DeveloperName = :objectDeveloperName
         ];
+        
+        List<NotionRelation__mdt> childRelations = [
+            SELECT DeveloperName
+            FROM NotionRelation__mdt
+            WHERE ChildObject__r.DeveloperName = :objectDeveloperName
+        ];
+        
+        // Combine the results
+        List<NotionRelation__mdt> relations = new List<NotionRelation__mdt>();
+        relations.addAll(parentRelations);
+        relations.addAll(childRelations);
         
         for (NotionRelation__mdt relation : relations) {
             Metadata.CustomMetadata relationMetadata = new Metadata.CustomMetadata();

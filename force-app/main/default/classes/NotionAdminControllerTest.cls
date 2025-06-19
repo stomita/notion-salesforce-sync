@@ -7,6 +7,27 @@ private class NotionAdminControllerTest {
         // Note: Custom metadata cannot be created in tests, so we'll mock the responses
     }
     
+    private static User createAdminUser() {
+        // Create a user with System Administrator profile
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'System Administrator'];
+        User u = new User(
+            Alias = 'testadm',
+            Email = 'testadmin@test.com',
+            EmailEncodingKey = 'UTF-8',
+            LastName = 'Test Admin',
+            LanguageLocaleKey = 'en_US',
+            LocaleSidKey = 'en_US',
+            ProfileId = p.Id,
+            TimeZoneSidKey = 'America/Los_Angeles',
+            UserName = 'testadmin' + DateTime.now().getTime() + '@test.com'
+        );
+        insert u;
+        
+        // Note: Custom permissions cannot be assigned in test context
+        // The permission check will need to be mocked or bypassed in tests
+        return u;
+    }
+    
     @isTest
     static void testGetDatabases() {
         // Mock the Notion API response
