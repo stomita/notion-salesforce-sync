@@ -1,6 +1,16 @@
 @isTest
 private class NotionSyncLoggerTest {
     
+    @TestSetup
+    static void setup() {
+        // Enable sync logging for tests
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId(),
+            Enable_Sync_Logging__c = true
+        );
+        insert settings;
+    }
+    
     @isTest
     static void testBasicLogging() {
         Test.startTest();
@@ -183,5 +193,28 @@ private class NotionSyncLoggerTest {
     static void simulateFutureLogging() {
         NotionSyncLogger.log('001FUTURE000001', 'Account', 'CREATE', 'Success', null, 0);
         NotionSyncLogger.flush();
+    }
+    
+    @isTest
+    static void testLoggingDisabledByDefault() {
+        // Delete the settings created in setup to test default behavior
+        delete [SELECT Id FROM Notion_Sync_Settings__c];
+        
+        Test.startTest();
+        
+        // Try to log when logging is disabled
+        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        
+        // Verify no pending logs were created
+        System.assertEquals(0, NotionSyncLogger.pendingLogs.size(), 'Should have no pending logs when disabled');
+        
+        // Try to flush (should do nothing)
+        NotionSyncLogger.flush();
+        
+        Test.stopTest();
+        
+        // Verify no logs were created
+        List<Notion_Sync_Log__c> logs = [SELECT Id FROM Notion_Sync_Log__c];
+        System.assertEquals(0, logs.size(), 'No logs should be created when logging is disabled');
     }
 }

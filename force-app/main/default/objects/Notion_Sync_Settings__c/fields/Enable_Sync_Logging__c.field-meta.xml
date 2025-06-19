@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Enable_Sync_Logging__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>When enabled, sync operations will create log records in Notion_Sync_Log__c object</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Enable this to track sync operations in the Notion Sync Log object. Disabled by default for performance.</inlineHelpText>
+    <label>Enable Sync Logging</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

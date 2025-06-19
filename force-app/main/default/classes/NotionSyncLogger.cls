@@ -2,6 +2,17 @@ public with sharing class NotionSyncLogger {
     @TestVisible
     private static List<LogEntry> pendingLogs = new List<LogEntry>();
     
+    // Cache the settings to avoid multiple queries
+    private static Notion_Sync_Settings__c cachedSettings;
+    
+    // Check if logging is enabled
+    private static Boolean isLoggingEnabled() {
+        if (cachedSettings == null) {
+            cachedSettings = Notion_Sync_Settings__c.getInstance();
+        }
+        return cachedSettings != null && cachedSettings.Enable_Sync_Logging__c == true;
+    }
+    
     @future
     public static void logAsync(List<String> logJsonList) {
         logSync(logJsonList);
@@ -9,6 +20,11 @@ public with sharing class NotionSyncLogger {
     
     // Synchronous version for testing
     public static void logSync(List<String> logJsonList) {
+        // Check if logging is enabled before processing
+        if (!isLoggingEnabled()) {
+            return;
+        }
+        
         List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();
         
         for (String logJson : logJsonList) {
@@ -44,19 +60,30 @@ public with sharing class NotionSyncLogger {
     // Add a log entry to the pending collection
     public static void log(String recordId, String objectType, String operationType, 
                           String status, String errorMessage, Integer retryCount) {
-        pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, null));
+        // Only add to pending logs if logging is enabled
+        if (isLoggingEnabled()) {
+            pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, null));
+        }
     }
     
     // Add a log entry with Notion page ID
     public static void log(String recordId, String objectType, String operationType, 
                           String status, String errorMessage, Integer retryCount, String notionPageId) {
-        pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId));
+        // Only add to pending logs if logging is enabled
+        if (isLoggingEnabled()) {
+            pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId));
+        }
     }
     
     // Add a log entry with rate limit information
     public static LogEntry logWithRateLimit(String recordId, String objectType, String operationType, 
                                        String status, String errorMessage, Integer retryCount, String notionPageId,
                                        Boolean rateLimited, Integer rateLimitRetryAfter) {
+        // Only create and add log if logging is enabled
+        if (!isLoggingEnabled()) {
+            return null;
+        }
+        
         LogEntry entry = new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId);
         entry.rateLimited = rateLimited;
         entry.rateLimitRetryAfter = rateLimitRetryAfter;
@@ -72,6 +99,12 @@ public with sharing class NotionSyncLogger {
     
     // Flush all pending logs
     public static void flush() {
+        // Check if logging is enabled and we have pending logs
+        if (!isLoggingEnabled() || pendingLogs.isEmpty()) {
+            pendingLogs.clear();
+            return;
+        }
+        
         if (!pendingLogs.isEmpty()) {
             List<String> logJsonList = new List<String>();
             for (LogEntry entry : pendingLogs) {

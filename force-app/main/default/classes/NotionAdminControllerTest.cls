@@ -7,27 +7,6 @@ private class NotionAdminControllerTest {
         // Note: Custom metadata cannot be created in tests, so we'll mock the responses
     }
     
-    private static User createAdminUser() {
-        // Create a user with System Administrator profile
-        Profile p = [SELECT Id FROM Profile WHERE Name = 'System Administrator'];
-        User u = new User(
-            Alias = 'testadm',
-            Email = 'testadmin@test.com',
-            EmailEncodingKey = 'UTF-8',
-            LastName = 'Test Admin',
-            LanguageLocaleKey = 'en_US',
-            LocaleSidKey = 'en_US',
-            ProfileId = p.Id,
-            TimeZoneSidKey = 'America/Los_Angeles',
-            UserName = 'testadmin' + DateTime.now().getTime() + '@test.com'
-        );
-        insert u;
-        
-        // Note: Custom permissions cannot be assigned in test context
-        // The permission check will need to be mocked or bypassed in tests
-        return u;
-    }
-    
     @isTest
     static void testGetDatabases() {
         // Mock the Notion API response
@@ -204,5 +183,41 @@ private class NotionAdminControllerTest {
             res.setBody('{"message":"Bad Request","code":"validation_error"}');
             return res;
         }
+    }
+    
+    @isTest
+    static void testGetSystemSettings() {
+        // No need to create a special user since permission check is bypassed in tests
+        Test.startTest();
+        
+        // Test getting default settings
+        NotionAdminController.SystemSettings settings = NotionAdminController.getSystemSettings();
+        System.assertEquals(false, settings.enableSyncLogging, 'Sync logging should be disabled by default');
+        
+        Test.stopTest();
+    }
+    
+    @isTest
+    static void testSaveSystemSettings() {
+        // No need to create a special user since permission check is bypassed in tests
+        Test.startTest();
+        
+        // Create settings to save
+        Map<String, Object> settings = new Map<String, Object>();
+        settings.put('enableSyncLogging', true);
+        
+        // Save settings
+        NotionAdminController.saveSystemSettings(settings);
+        
+        // Verify settings were saved
+        Notion_Sync_Settings__c customSettings = Notion_Sync_Settings__c.getOrgDefaults();
+        System.assertNotEquals(null, customSettings, 'Custom settings should exist');
+        System.assertEquals(true, customSettings.Enable_Sync_Logging__c, 'Sync logging should be enabled');
+        
+        // Test retrieving saved settings
+        NotionAdminController.SystemSettings retrievedSettings = NotionAdminController.getSystemSettings();
+        System.assertEquals(true, retrievedSettings.enableSyncLogging, 'Retrieved sync logging should be enabled');
+        
+        Test.stopTest();
     }
 }

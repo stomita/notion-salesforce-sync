@@ -55,6 +55,13 @@ private class NotionSyncQueueableTest {
     // Test data setup
     @testSetup
     static void setupTestData() {
+        // Enable sync logging for tests
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId(),
+            Enable_Sync_Logging__c = true
+        );
+        insert settings;
+        
         // Create test accounts
         List<Account> testAccounts = new List<Account>();
         for (Integer i = 0; i < 5; i++) {
