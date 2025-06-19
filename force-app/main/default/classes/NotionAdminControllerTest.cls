@@ -53,7 +53,7 @@ private class NotionAdminControllerTest {
             NotionAdminController.getDatabases();
             System.assert(false, 'Expected exception');
         } catch (AuraHandledException e) {
-            System.assert(e.getMessage().contains('Error fetching databases'), 'Should contain error message');
+            System.assert(e.getMessage().contains('Failed to fetch databases'), 'Should contain error message');
         }
         Test.stopTest();
     }
