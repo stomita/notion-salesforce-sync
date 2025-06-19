@@ -15,6 +15,20 @@ public class NotionIntegrationTestExecutor {
     public void setupTestData() {
         System.debug('\n--- Setting up test data ---');
         
+        // Enable sync logging for integration tests
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
+        if (settings == null || settings.Id == null) {
+            settings = new Notion_Sync_Settings__c(
+                SetupOwnerId = UserInfo.getOrganizationId(),
+                Enable_Sync_Logging__c = true
+            );
+            insert settings;
+        } else if (!settings.Enable_Sync_Logging__c) {
+            settings.Enable_Sync_Logging__c = true;
+            update settings;
+        }
+        System.debug('Sync logging enabled for tests');
+        
         // Clean up any existing test data including deletion test records
         delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];
         delete [SELECT Id FROM Contact WHERE LastName LIKE 'Integration Test%'];

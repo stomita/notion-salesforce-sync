@@ -520,4 +520,71 @@ public with sharing class NotionAdminController {
     }
     
     public class ValidationException extends Exception {}
+    
+    @AuraEnabled
+    public static SystemSettings getSystemSettings() {
+        checkAdminPermission();
+        
+        SystemSettings settings = new SystemSettings();
+        Notion_Sync_Settings__c customSettings = Notion_Sync_Settings__c.getInstance();
+        
+        if (customSettings != null) {
+            settings.enableSyncLogging = customSettings.Enable_Sync_Logging__c;
+        } else {
+            // Default values
+            settings.enableSyncLogging = false;
+        }
+        
+        return settings;
+    }
+    
+    @AuraEnabled
+    public static SaveResult saveSystemSettings(Map<String, Object> settings) {
+        checkAdminPermission();
+        
+        // Debug logging
+        System.debug('Received settings object: ' + JSON.serialize(settings));
+        System.debug('enableSyncLogging: ' + settings.get('enableSyncLogging'));
+        
+        SaveResult result = new SaveResult();
+        try {
+            // Get or create the org-wide custom settings record
+            Notion_Sync_Settings__c customSettings = Notion_Sync_Settings__c.getOrgDefaults();
+            
+            if (customSettings == null || customSettings.Id == null) {
+                customSettings = new Notion_Sync_Settings__c();
+                customSettings.SetupOwnerId = UserInfo.getOrganizationId();
+            }
+            
+            // Extract boolean value from map
+            Object enableSyncLoggingObj = settings.get('enableSyncLogging');
+            Boolean enableSyncLogging = false;
+            if (enableSyncLoggingObj != null) {
+                if (enableSyncLoggingObj instanceof Boolean) {
+                    enableSyncLogging = (Boolean)enableSyncLoggingObj;
+                } else {
+                    // Handle string values just in case
+                    String strValue = String.valueOf(enableSyncLoggingObj);
+                    enableSyncLogging = strValue.equalsIgnoreCase('true');
+                }
+            }
+            
+            customSettings.Enable_Sync_Logging__c = enableSyncLogging;
+            
+            upsert customSettings;
+            
+            result.success = true;
+            result.message = 'Settings saved successfully';
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = 'Failed to save system settings: ' + e.getMessage();
+            result.errors = new List<String>{ e.getMessage() };
+            return result;
+        }
+    }
+    
+    public class SystemSettings {
+        @AuraEnabled public Boolean enableSyncLogging {get; set;}
+    }
 }

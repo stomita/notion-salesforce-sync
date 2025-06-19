@@ -4,6 +4,8 @@ import getSalesforceObjects from '@salesforce/apex/NotionAdminController.getSale
 import getSyncConfiguration from '@salesforce/apex/NotionAdminController.getSyncConfiguration';
 import saveSyncConfiguration from '@salesforce/apex/NotionAdminController.saveSyncConfiguration';
 import testConnection from '@salesforce/apex/NotionAdminController.testConnection';
+import getSystemSettings from '@salesforce/apex/NotionAdminController.getSystemSettings';
+import saveSystemSettings from '@salesforce/apex/NotionAdminController.saveSystemSettings';
 
 export default class NotionSyncAdmin extends LightningElement {
     @track selectedObject = null;
@@ -14,6 +16,9 @@ export default class NotionSyncAdmin extends LightningElement {
     @track hasPermission = true;
     @track permissionError = '';
     @track isNewConfiguration = false;
+    
+    // System settings
+    @track enableSyncLogging = false;
 
     // View state
     @track showDatabaseBrowser = false;
@@ -27,6 +32,7 @@ export default class NotionSyncAdmin extends LightningElement {
     async checkPermissionAndLoadData() {
         try {
             await this.loadSalesforceObjects();
+            await this.loadSystemSettings();
         } catch (error) {
             // Check if it's a permission error
             if (error.body && error.body.message && error.body.message.includes('do not have permission')) {
@@ -36,6 +42,16 @@ export default class NotionSyncAdmin extends LightningElement {
                 // Re-throw if it's not a permission error
                 throw error;
             }
+        }
+    }
+    
+    async loadSystemSettings() {
+        try {
+            const settings = await getSystemSettings();
+            this.enableSyncLogging = settings.enableSyncLogging || false;
+        } catch (error) {
+            console.error('Failed to load system settings:', error);
+            // Don't show error toast as this is not critical
         }
     }
 
@@ -326,5 +342,43 @@ export default class NotionSyncAdmin extends LightningElement {
         this.isNewConfiguration = false;
         // Load the configuration
         this.loadObjectConfiguration(objectApiName);
+    }
+    
+    async handleEnableSyncLoggingChange(event) {
+        const isEnabled = event.target.checked;
+        this.isLoading = true;
+        
+        try {
+            // Create a plain object to avoid Proxy issues
+            const plainSettings = {
+                enableSyncLogging: isEnabled
+            };
+            
+            console.log('Calling saveSystemSettings with:', plainSettings);
+            const result = await saveSystemSettings({ settings: plainSettings });
+            console.log('saveSystemSettings result:', result);
+            
+            if (result && result.success) {
+                this.enableSyncLogging = isEnabled;
+                this.showSuccess(
+                    isEnabled ? 'Sync logging enabled' : 'Sync logging disabled',
+                    isEnabled 
+                        ? 'All sync operations will now be logged to the Notion Sync Log object.' 
+                        : 'Sync operations will no longer be logged.'
+                );
+            } else {
+                // Revert the checkbox
+                this.enableSyncLogging = !isEnabled;
+                const errorMessage = result && result.message ? result.message : 'Unknown error occurred';
+                this.showError('Failed to update system settings', errorMessage);
+            }
+        } catch (error) {
+            // Revert the checkbox
+            this.enableSyncLogging = !isEnabled;
+            console.error('Error in handleEnableSyncLoggingChange:', error);
+            this.showError('Failed to update system settings', error);
+        } finally {
+            this.isLoading = false;
+        }
     }
 }

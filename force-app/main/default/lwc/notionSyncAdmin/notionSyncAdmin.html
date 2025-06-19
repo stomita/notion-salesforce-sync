@@ -62,6 +62,20 @@
                             </div>
                         </div>
                         
+                        <!-- System Settings Section -->
+                        <div class="slds-box slds-m-bottom_medium">
+                            <h3 class="slds-text-heading_small slds-m-bottom_small">System Settings</h3>
+                            <div class="slds-form slds-form_horizontal">
+                                <lightning-input
+                                    type="checkbox"
+                                    label="Enable Sync Logging"
+                                    checked={enableSyncLogging}
+                                    onchange={handleEnableSyncLoggingChange}
+                                    field-level-help="When enabled, all sync operations will be logged to the Notion Sync Log object. Disabled by default for performance."
+                                ></lightning-input>
+                            </div>
+                        </div>
+                        
                         <!-- Summary Component -->
                         <c-notion-sync-summary
                             oneditconfiguration={handleEditConfiguration}

@@ -590,8 +590,10 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             null
         );
         
-        // Update the API calls made field
-        logEntry.apiCallsMade = calloutsUsed;
+        // Update the API calls made field if log entry was created
+        if (logEntry != null) {
+            logEntry.apiCallsMade = calloutsUsed;
+        }
     }
     
     private void logRateLimitError(SyncRequest request, String errorMessage, Integer startCpuTime, Integer startCallouts) {
@@ -619,8 +621,10 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             retryAfter
         );
         
-        // Update the API calls made field
-        logEntry.apiCallsMade = calloutsUsed;
+        // Update the API calls made field if log entry was created
+        if (logEntry != null) {
+            logEntry.apiCallsMade = calloutsUsed;
+        }
     }
     
     private void logErrorWithMetrics(SyncRequest request, String errorMessage, Integer startCpuTime, Integer startCallouts) {
@@ -639,8 +643,10 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             null
         );
         
-        // Update the API calls made field
-        logEntry.apiCallsMade = calloutsUsed;
+        // Update the API calls made field if log entry was created
+        if (logEntry != null) {
+            logEntry.apiCallsMade = calloutsUsed;
+        }
     }
     
     private void logResult(SyncRequest request, String status, String errorMessage) {
