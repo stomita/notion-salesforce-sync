@@ -24,6 +24,7 @@ export default class NotionSyncAdmin extends LightningElement {
     @track showDatabaseBrowser = false;
     @track showFieldMapping = false;
     @track showRelationshipConfig = false;
+    @track activeTab = 'configurations';
 
     connectedCallback() {
         this.checkPermissionAndLoadData();
