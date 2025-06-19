@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>All_Recent</fullName>
+    <columns>CREATED_DATE</columns>
+    <columns>Status__c</columns>
+    <columns>NAME</columns>
+    <columns>Object_Type__c</columns>
+    <columns>Record_Id__c</columns>
+    <columns>Operation_Type__c</columns>
+    <columns>Notion_Page_Id__c</columns>
+    <columns>Error_Message__c</columns>
+    <columns>Retry_Count__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>All</label>
+    <sharedTo>
+        <allInternalUsers></allInternalUsers>
+    </sharedTo>
+</ListView>

@@ -408,4 +408,50 @@ public class NotionApiClient {
             'relation' => relations
         };
     }
+    
+    public static NotionResponse searchDatabases() {
+        try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
+            HttpRequest request = buildHttpRequest('POST', '/v1/search');
+            
+            Map<String, Object> requestBody = new Map<String, Object>{
+                'filter' => new Map<String, Object>{
+                    'value' => 'database',
+                    'property' => 'object'
+                },
+                'page_size' => 100
+            };
+            
+            request.setBody(JSON.serialize(requestBody));
+            
+            HttpResponse response = new Http().send(request);
+            return processResponse(response);
+            
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, null, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (Exception e) {
+            return new NotionResponse(false, null, 'Exception during database search: ' + e.getMessage(), null, null);
+        }
+    }
+    
+    public static NotionResponse getDatabase(String databaseId) {
+        try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
+            HttpRequest request = buildHttpRequest('GET', '/v1/databases/' + databaseId);
+            
+            HttpResponse response = new Http().send(request);
+            return processResponse(response);
+            
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, databaseId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (Exception e) {
+            return new NotionResponse(false, databaseId, 'Exception during database retrieval: ' + e.getMessage(), null, null);
+        }
+    }
 }

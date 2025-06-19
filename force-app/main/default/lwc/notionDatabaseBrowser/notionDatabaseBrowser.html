@@ -1,0 +1,126 @@
+<template>
+    <div class="slds-p-around_small">
+        <!-- Header -->
+        <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+            <div class="slds-col">
+                <h2 class="slds-text-heading_small">Notion Databases</h2>
+            </div>
+            <div class="slds-col_bump-left">
+                <lightning-button
+                    icon-name="utility:refresh"
+                    label="Refresh"
+                    onclick={handleRefresh}
+                    disabled={isLoading}
+                ></lightning-button>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <lightning-input
+            type="search"
+            label="Search databases"
+            placeholder="Search by name or ID..."
+            value={searchTerm}
+            onchange={handleSearch}
+            variant="label-hidden"
+            class="slds-m-bottom_small"
+        ></lightning-input>
+
+        <!-- Loading -->
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading databases" size="medium"></lightning-spinner>
+        </template>
+
+        <!-- Error -->
+        <template if:true={error}>
+            <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                <span class="slds-assistive-text">error</span>
+                <h2>{error}</h2>
+            </div>
+        </template>
+
+        <!-- Database List -->
+        <template if:false={isLoading}>
+            <template if:true={hasData}>
+                <lightning-datatable
+                    key-field="id"
+                    data={filteredDatabases}
+                    columns={columns}
+                    onrowselection={handleRowSelection}
+                    max-row-selection="1"
+                    hide-checkbox-column={hideCheckboxColumn}
+                ></lightning-datatable>
+
+                <!-- Selection Button (for modal mode) -->
+                <template if:true={showSelectionOnly}>
+                    <div class="slds-m-top_medium slds-text-align_center">
+                        <lightning-button
+                            label="Select Database"
+                            variant="brand"
+                            onclick={handleSelectDatabase}
+                            disabled={selectionDisabled}
+                        ></lightning-button>
+                    </div>
+                </template>
+            </template>
+
+            <!-- No Data -->
+            <template if:false={hasData}>
+                <div class="slds-illustration slds-illustration_small">
+                    <div class="slds-text-align_center slds-text-color_weak">
+                        <p>{noDataMessage}</p>
+                    </div>
+                </div>
+            </template>
+        </template>
+
+        <!-- Database Schema Modal -->
+        <template if:true={showSchema}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse" 
+                                title="Close" onclick={handleCloseSchema}>
+                            <lightning-icon icon-name="utility:close" alternative-text="close" variant="inverse" size="small"></lightning-icon>
+                        </button>
+                        <h2 class="slds-modal__title">Database Properties</h2>
+                        <p class="slds-m-top_x-small">{selectedDatabase.title}</p>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <template if:true={schemaProperties}>
+                            <div class="slds-grid slds-wrap">
+                                <template for:each={schemaProperties} for:item="prop">
+                                    <div key={prop.id} class="slds-col slds-size_1-of-2 slds-p-around_x-small">
+                                        <div class="slds-box slds-box_x-small">
+                                            <div class="slds-media">
+                                                <div class="slds-media__figure">
+                                                    <lightning-icon 
+                                                        icon-name={prop.typeIcon} 
+                                                        size="small"
+                                                    ></lightning-icon>
+                                                </div>
+                                                <div class="slds-media__body">
+                                                    <h3 class="slds-text-heading_small">{prop.name}</h3>
+                                                    <p class="slds-text-body_small slds-text-color_weak">
+                                                        {prop.typeLabel}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button
+                            label="Close"
+                            onclick={handleCloseSchema}
+                        ></lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+    </div>
+</template>

@@ -1,0 +1,226 @@
+<template>
+    <lightning-card title="Notion Sync Admin" icon-name="custom:custom14">
+        <!-- Permission Error -->
+        <template if:false={hasPermission}>
+            <div class="slds-illustration slds-illustration_large">
+                <div class="slds-text-align_center slds-m-vertical_xx-large">
+                    <svg class="slds-illustration__svg" viewBox="0 0 468 194" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                        <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                            <g transform="translate(-64.000000, -103.000000)">
+                                <g>
+                                    <g transform="translate(77.000000, 110.000000)">
+                                        <polyline vector-effect="non-scaling-stroke" stroke="#E6E6E6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="111 68.4 111 100.5 190.7 100.5"></polyline>
+                                        <polyline vector-effect="non-scaling-stroke" stroke="#E6E6E6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="295 97.7 295 68.7 233 68.7"></polyline>
+                                        <g transform="translate(160.000000, 0.000000)" fill="#FFFFFF">
+                                            <path vector-effect="non-scaling-stroke" d="M84,138.5 L84,54.2 C84,47.5 78.7,42.2 72,42.2 L12,42.2 C5.3,42.2 0,47.5 0,54.2 L0,138.5 L84,138.5 Z"></path>
+                                        </g>
+                                        <g transform="translate(160.000000, 0.000000)">
+                                            <path vector-effect="non-scaling-stroke" d="M84,138.5 L84,54.2 C84,47.5 78.7,42.2 72,42.2 L12,42.2 C5.3,42.2 0,47.5 0,54.2 L0,138.5 L84,138.5 Z" stroke="#C7C7C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                                            <rect fill="#F8F8F8" x="8.1" y="50.2" width="67.8" height="80.3"></rect>
+                                            <circle vector-effect="non-scaling-stroke" stroke="#C7C7C7" stroke-width="3" cx="42" cy="42.2" r="42"></circle>
+                                            <path vector-effect="non-scaling-stroke" d="M42,0.2 C65.2,0.2 84,19 84,42.2" stroke="#C7C7C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                                        </g>
+                                    </g>
+                                </g>
+                            </g>
+                        </g>
+                    </svg>
+                    <h3 class="slds-text-heading_medium slds-m-top_large">Access Denied</h3>
+                    <p class="slds-text-body_regular slds-m-top_medium slds-m-horizontal_large">
+                        You don't have permission to access the Notion Sync Admin interface.
+                    </p>
+                    <p class="slds-text-body_regular slds-m-top_small">
+                        Please contact your system administrator to request access to the "Notion Sync Administrator" permission set.
+                    </p>
+                </div>
+            </div>
+        </template>
+
+        <!-- Main Content -->
+        <template if:true={hasPermission}>
+            <!-- Loading Spinner -->
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </template>
+
+            <div class="slds-p-horizontal_medium">
+                <!-- Current Configurations View (Default) -->
+                <template if:false={selectedObject}>
+                    <div class="slds-p-around_medium">
+                        <!-- Header with New Button -->
+                        <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
+                            <div class="slds-col">
+                                <h2 class="slds-text-heading_medium">Sync Configurations</h2>
+                            </div>
+                            <div class="slds-col_bump-left">
+                                <lightning-button
+                                    label="New Sync Configuration"
+                                    variant="brand"
+                                    icon-name="utility:add"
+                                    onclick={handleNewConfiguration}
+                                ></lightning-button>
+                            </div>
+                        </div>
+                        
+                        <!-- Summary Component -->
+                        <c-notion-sync-summary
+                            oneditconfiguration={handleEditConfiguration}
+                        ></c-notion-sync-summary>
+                    </div>
+                </template>
+
+                <!-- Object Configuration View -->
+                <template if:true={selectedObject}>
+                    <div class="slds-p-around_medium">
+                        <!-- Back Button and Title -->
+                        <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
+                            <div class="slds-col">
+                                <div class="slds-media slds-media_center">
+                                    <div class="slds-media__figure">
+                                        <lightning-button-icon
+                                            icon-name="utility:back"
+                                            alternative-text="Back"
+                                            onclick={handleBack}
+                                        ></lightning-button-icon>
+                                    </div>
+                                    <div class="slds-media__body">
+                                        <h2 class="slds-text-heading_medium">
+                                            {configurationTitle}
+                                        </h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Object Selection (for new configs) -->
+                        <template if:false={isConfigurationLoaded}>
+                            <lightning-combobox
+                                name="object"
+                                label="Select Salesforce Object"
+                                value={selectedObject}
+                                placeholder="Choose an object to configure"
+                                options={objectOptions}
+                                onchange={handleObjectSelection}
+                                required
+                                class="slds-m-bottom_large"
+                            ></lightning-combobox>
+                        </template>
+
+                        <!-- Configuration Form -->
+                        <template if:true={isConfigurationLoaded}>
+                            <!-- Basic Configuration -->
+                            <div class="slds-box slds-m-bottom_medium">
+                                <h3 class="slds-text-heading_small slds-m-bottom_small">Basic Configuration</h3>
+                                
+                                <!-- Active Toggle -->
+                                <lightning-input
+                                    type="checkbox"
+                                    label="Active"
+                                    checked={currentConfiguration.isActive}
+                                    onchange={handleActiveToggle}
+                                    class="slds-m-bottom_small"
+                                ></lightning-input>
+
+                                <!-- Database Selection -->
+                                <div class="slds-grid slds-gutters slds-m-bottom_small">
+                                    <div class="slds-col slds-size_2-of-3">
+                                        <lightning-input
+                                            label="Notion Database"
+                                            value={notionDatabaseDisplay}
+                                            placeholder="Select a database"
+                                            readonly
+                                            required
+                                        ></lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-size_1-of-3 slds-align-bottom">
+                                        <lightning-button
+                                            label="Browse Databases"
+                                            onclick={handleShowDatabaseBrowser}
+                                            variant="brand"
+                                        ></lightning-button>
+                                    </div>
+                                </div>
+
+                                <!-- Salesforce ID Property -->
+                                <lightning-input
+                                    label="Salesforce ID Property Name"
+                                    value={currentConfiguration.salesforceIdPropertyName}
+                                    onchange={handleSalesforceIdPropertyChange}
+                                    placeholder="e.g., Salesforce_ID"
+                                    required
+                                    field-level-help="Name of the Notion property that will store Salesforce record IDs"
+                                ></lightning-input>
+                            </div>
+
+                            <!-- Field Mappings -->
+                            <div class="slds-box slds-m-bottom_medium">
+                                <h3 class="slds-text-heading_small slds-m-bottom_small">Field Mappings</h3>
+                                <c-notion-field-mapping
+                                    object-api-name={selectedObject}
+                                    notion-database-id={currentConfiguration.notionDatabaseId}
+                                    existing-mappings={currentConfiguration.fieldMappings}
+                                    onmappingchange={handleFieldMappingChange}
+                                ></c-notion-field-mapping>
+                            </div>
+
+                            <!-- Relationship Mappings -->
+                            <div class="slds-box slds-m-bottom_medium">
+                                <h3 class="slds-text-heading_small slds-m-bottom_small">Relationship Mappings</h3>
+                                <c-notion-relationship-config
+                                    object-api-name={selectedObject}
+                                    notion-database-id={currentConfiguration.notionDatabaseId}
+                                    existing-mappings={currentConfiguration.relationshipMappings}
+                                    onmappingchange={handleRelationshipChange}
+                                ></c-notion-relationship-config>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="slds-clearfix">
+                                <div class="slds-float_right">
+                                    <lightning-button-group>
+                                        <lightning-button
+                                            label="Cancel"
+                                            onclick={handleCancel}
+                                        ></lightning-button>
+                                        <lightning-button
+                                            label="Test Connection"
+                                            onclick={handleTestConnection}
+                                        ></lightning-button>
+                                        <lightning-button
+                                            label="Save"
+                                            variant="brand"
+                                            onclick={handleSave}
+                                            disabled={saveDisabled}
+                                        ></lightning-button>
+                                    </lightning-button-group>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Database Browser Modal -->
+            <template if:true={showDatabaseBrowser}>
+                <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                    <div class="slds-modal__container">
+                        <header class="slds-modal__header">
+                            <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse" 
+                                    title="Close" onclick={handleCloseDatabaseBrowser}>
+                                <lightning-icon icon-name="utility:close" alternative-text="close" variant="inverse" size="small"></lightning-icon>
+                            </button>
+                            <h2 class="slds-modal__title">Select Notion Database</h2>
+                        </header>
+                        <div class="slds-modal__content slds-p-around_medium">
+                            <c-notion-database-browser
+                                ondatabaseselect={handleDatabaseSelection}
+                                show-selection-only="true"
+                            ></c-notion-database-browser>
+                        </div>
+                    </div>
+                </section>
+                <div class="slds-backdrop slds-backdrop_open"></div>
+            </template>
+        </template>
+    </lightning-card>
+</template>

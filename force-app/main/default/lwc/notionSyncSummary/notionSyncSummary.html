@@ -1,0 +1,124 @@
+<template>
+    <div class="slds-p-around_medium">
+        <!-- Loading -->
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading configurations" size="medium"></lightning-spinner>
+        </template>
+
+        <!-- Content -->
+        <template if:false={isLoading}>
+            <!-- Summary Cards -->
+            <div class="slds-grid slds-gutters slds-m-bottom_large">
+                <div class="slds-col slds-size_1-of-3">
+                    <div class="slds-box">
+                        <div class="slds-text-align_center">
+                            <div class="slds-text-heading_large">{configurations.length}</div>
+                            <div class="slds-text-color_weak">Configured Objects</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-col slds-size_1-of-3">
+                    <div class="slds-box">
+                        <div class="slds-text-align_center">
+                            <div class="slds-text-heading_large">{activeConfigCount}</div>
+                            <div class="slds-text-color_weak">Active Syncs</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-col slds-size_1-of-3">
+                    <div class="slds-box">
+                        <div class="slds-text-align_center">
+                            <div class="slds-text-heading_large">{totalFieldMappings}</div>
+                            <div class="slds-text-color_weak">Field Mappings</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration List -->
+            <template if:true={hasConfigurations}>
+                <h2 class="slds-text-heading_small slds-m-bottom_small">Configured Objects</h2>
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                    <thead>
+                        <tr>
+                            <th scope="col">Salesforce Object</th>
+                            <th scope="col">Notion Database</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Field Mappings</th>
+                            <th scope="col">Relationships</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={configurations} for:item="config">
+                            <tr key={config.objectApiName}>
+                                <td>
+                                    <div class="slds-truncate">
+                                        <strong>{config.objectName}</strong>
+                                        <div class="slds-text-body_small slds-text-color_weak">
+                                            {config.objectApiName}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="slds-truncate" title={config.notionDatabaseName}>
+                                        {config.notionDatabaseName}
+                                    </div>
+                                </td>
+                                <td>
+                                    <template if:true={config.isActive}>
+                                        <lightning-badge label="Active" variant="success"></lightning-badge>
+                                    </template>
+                                    <template if:false={config.isActive}>
+                                        <lightning-badge label="Inactive"></lightning-badge>
+                                    </template>
+                                </td>
+                                <td>{config.fieldCount}</td>
+                                <td>{config.relationshipCount}</td>
+                                <td>
+                                    <lightning-button
+                                        label="Edit"
+                                        variant="base"
+                                        size="small"
+                                        data-object={config.objectApiName}
+                                        onclick={handleEdit}
+                                    ></lightning-button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+
+            <!-- No Configurations -->
+            <template if:false={hasConfigurations}>
+                <div class="slds-illustration slds-illustration_small">
+                    <div class="slds-text-align_center">
+                        <div class="slds-m-bottom_medium">
+                            <svg class="slds-illustration__svg" viewBox="0 0 224 140" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                                    <g transform="translate(-63.000000, -64.000000)">
+                                        <g>
+                                            <g transform="translate(77.000000, 82.000000)">
+                                                <polyline vector-effect="non-scaling-stroke" stroke="#C9C7C5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="115 60 115 20 0 20"></polyline>
+                                                <path vector-effect="non-scaling-stroke" d="M113,2 L117,2 C118.104569,2 119,2.8954305 119,4 L119,16 C119,17.1045695 118.104569,18 117,18 L113,18 C111.895431,18 111,17.1045695 111,16 L111,4 C111,2.8954305 111.895431,2 113,2 Z" stroke="#C9C7C5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                                                <path vector-effect="non-scaling-stroke" d="M111,17 L119,17" stroke="#C9C7C5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                                                <path vector-effect="non-scaling-stroke" d="M115,12 L115,7" stroke="#C9C7C5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                                            </g>
+                                        </g>
+                                    </g>
+                                </g>
+                            </svg>
+                        </div>
+                        <h3 class="slds-text-heading_small slds-text-color_weak slds-m-bottom_small">
+                            No sync configurations found
+                        </h3>
+                        <p class="slds-text-body_regular slds-text-color_weak slds-m-bottom_medium">
+                            Get started by creating your first sync configuration
+                        </p>
+                    </div>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

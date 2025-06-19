@@ -1,0 +1,66 @@
+<template>
+    <div class="slds-p-horizontal_small">
+        <!-- Loading -->
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading relationships" size="small"></lightning-spinner>
+        </template>
+
+        <!-- Content -->
+        <template if:false={isLoading}>
+            <template if:true={canConfigureRelationships}>
+                <!-- Existing Mappings -->
+                <template if:true={relationshipMappings.length}>
+                    <div class="slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">Current Relationship Mappings</h3>
+                        <template for:each={relationshipMappings} for:item="mapping" for:index="index">
+                            <div key={mapping.salesforceRelationshipField} class="slds-box slds-m-bottom_x-small">
+                                <div class="slds-grid slds-grid_align-spread">
+                                    <div>
+                                        <strong>{mapping.salesforceRelationshipField}</strong> → 
+                                        {mapping.notionRelationPropertyName}
+                                    </div>
+                                    <lightning-button-icon
+                                        icon-name="utility:delete"
+                                        alternative-text="Remove"
+                                        title="Remove mapping"
+                                        variant="bare"
+                                        size="small"
+                                        data-index={index}
+                                        onclick={handleRemoveRelationship}
+                                    ></lightning-button-icon>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Add Button -->
+                <lightning-button
+                    label="Add Relationship Mapping"
+                    icon-name="utility:add"
+                    onclick={handleAddRelationship}
+                    variant="neutral"
+                ></lightning-button>
+
+                <!-- Help Text -->
+                <div class="slds-m-top_medium slds-text-body_small slds-text-color_weak">
+                    <p><strong>Note:</strong> Relationship configuration allows you to maintain Salesforce relationships in Notion.</p>
+                    <p>Map lookup and master-detail fields to Notion relation properties to preserve data relationships.</p>
+                </div>
+            </template>
+
+            <!-- No Relationships Available -->
+            <template if:false={canConfigureRelationships}>
+                <div class="slds-text-align_center slds-text-color_weak slds-p-around_large">
+                    <template if:false={hasRelationshipFields}>
+                        <p>No relationship fields found on this object.</p>
+                    </template>
+                    <template if:false={hasRelationProperties}>
+                        <p>No relation properties found in the selected Notion database.</p>
+                        <p class="slds-m-top_small">Add relation properties in Notion to enable relationship mapping.</p>
+                    </template>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>
