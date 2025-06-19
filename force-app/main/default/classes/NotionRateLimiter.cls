@@ -60,11 +60,6 @@ public with sharing class NotionRateLimiter {
      * @throws RateLimitException if unable to wait due to governor limits
      */
     public static void throttleRequest() {
-        // Skip rate limiting in test context to avoid timing issues
-        if (Test.isRunningTest()) {
-            return;
-        }
-        
         // First check if we're approaching callout limit
         if (Limits.getCallouts() >= Limits.getLimitCallouts() - 5) {
             throw new RateLimitException(
