@@ -178,32 +178,4 @@ public with sharing class NotionMetadataService {
             }
         }
     }
-    
-    @AuraEnabled(cacheable=true)
-    public static List<NotionDatabase__mdt> getNotionDatabases() {
-        return [
-            SELECT Id, DeveloperName, DatabaseId__c, DatabaseName__c, WorkspaceId__c
-            FROM NotionDatabase__mdt
-            ORDER BY DatabaseName__c
-        ];
-    }
-    
-    @AuraEnabled
-    public static void saveNotionDatabase(String databaseId, String databaseName, String workspaceId) {
-        String developerName = sanitizeDeveloperName(databaseName);
-        
-        Metadata.DeployContainer deployContainer = new Metadata.DeployContainer();
-        
-        Metadata.CustomMetadata databaseMetadata = new Metadata.CustomMetadata();
-        databaseMetadata.fullName = 'NotionDatabase__mdt.' + developerName;
-        databaseMetadata.label = databaseName;
-        
-        addCustomMetadataValue(databaseMetadata, 'DatabaseId__c', databaseId);
-        addCustomMetadataValue(databaseMetadata, 'DatabaseName__c', databaseName);
-        addCustomMetadataValue(databaseMetadata, 'WorkspaceId__c', workspaceId);
-        
-        deployContainer.addMetadata(databaseMetadata);
-        
-        Metadata.Operations.enqueueDeployment(deployContainer, new MetadataDeployCallback());
-    }
 }
