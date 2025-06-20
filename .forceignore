@@ -1,3 +1,6 @@
 **/jsconfig.json
 
 **/.eslintrc.json
+
+# LWC Test Files
+**/__tests__/**
