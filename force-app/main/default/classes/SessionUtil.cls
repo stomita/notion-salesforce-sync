@@ -21,24 +21,29 @@ public with sharing class SessionUtil {
             
             Integer startIndex = pageContent.indexOf(SESSION_ID_START);
             if (startIndex == -1) {
-                throw new AuraHandledException('Unable to retrieve session ID - start marker not found');
+                throw new CalloutException('Unable to retrieve session ID - start marker not found');
             }
             startIndex += SESSION_ID_START.length();
             
             Integer endIndex = pageContent.indexOf(SESSION_ID_END);
             if (endIndex == -1) {
-                throw new AuraHandledException('Unable to retrieve session ID - end marker not found');
+                throw new CalloutException('Unable to retrieve session ID - end marker not found');
             }
             
             String sessionId = pageContent.substring(startIndex, endIndex);
             
             if (String.isBlank(sessionId)) {
-                throw new AuraHandledException('Retrieved session ID is blank');
+                throw new CalloutException('Retrieved session ID is blank');
             }
             
             return sessionId;
         } catch (Exception e) {
-            throw new AuraHandledException('Failed to get API-enabled session ID: ' + e.getMessage());
+            // If we can't get the session ID from VF page (e.g., in Lightning context),
+            // throw a more specific error
+            if (e.getMessage().contains('getContent()')) {
+                throw new CalloutException('Cannot retrieve session ID in Lightning context. Please use Setup menu for metadata operations.');
+            }
+            throw new CalloutException('Failed to get API-enabled session ID: ' + e.getMessage());
         }
     }
 }

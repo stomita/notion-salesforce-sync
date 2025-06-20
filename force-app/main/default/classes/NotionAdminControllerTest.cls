@@ -126,7 +126,7 @@ private class NotionAdminControllerTest {
         config.fieldMappings.add(mapping);
         
         Test.startTest();
-        NotionAdminController.SaveResult result = NotionAdminController.saveSyncConfiguration(config);
+        NotionAdminController.SaveResult result = NotionAdminController.saveSyncConfiguration(JSON.serialize(config));
         Test.stopTest();
         
         // Can't actually save metadata in tests, but verify the method runs
@@ -139,7 +139,7 @@ private class NotionAdminControllerTest {
         // Missing required fields
         
         Test.startTest();
-        NotionAdminController.SaveResult result = NotionAdminController.saveSyncConfiguration(config);
+        NotionAdminController.SaveResult result = NotionAdminController.saveSyncConfiguration(JSON.serialize(config));
         Test.stopTest();
         
         System.assertEquals(false, result.success, 'Should fail validation');
@@ -207,7 +207,7 @@ private class NotionAdminControllerTest {
         settings.put('enableSyncLogging', true);
         
         // Save settings
-        NotionAdminController.saveSystemSettings(settings);
+        NotionAdminController.SaveResult saveResult = NotionAdminController.saveSystemSettings(JSON.serialize(settings));
         
         // Verify settings were saved
         Notion_Sync_Settings__c customSettings = Notion_Sync_Settings__c.getOrgDefaults();

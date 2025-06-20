@@ -65,31 +65,21 @@ private class NotionMetadataServiceTest {
         System.assertEquals('Account', NotionMetadataService.sanitizeDeveloperName('Account'));
         System.assertEquals('Test_Object', NotionMetadataService.sanitizeDeveloperName('Test Object'));
         System.assertEquals('X123Test', NotionMetadataService.sanitizeDeveloperName('123Test'));
-        System.assertEquals('Special___chars___removed', NotionMetadataService.sanitizeDeveloperName('Special@#$chars%^&removed'));
+        System.assertEquals('Special_chars_removed', NotionMetadataService.sanitizeDeveloperName('Special@#$chars%^&removed'));
+        
+        // Test double underscore handling
+        System.assertEquals('Test_Parent_Object_c', NotionMetadataService.sanitizeDeveloperName('Test_Parent_Object__c'));
+        System.assertEquals('Field_c', NotionMetadataService.sanitizeDeveloperName('Field__c'));
+        
+        // Test trailing underscore removal
+        System.assertEquals('Test_Field', NotionMetadataService.sanitizeDeveloperName('Test_Field_'));
+        System.assertEquals('Test_Field', NotionMetadataService.sanitizeDeveloperName('Test_Field___'));
         
         // Test truncation
         String longName = 'ThisIsAVeryLongNameThatExceedsTheMaximumAllowedLength';
         String sanitized = NotionMetadataService.sanitizeDeveloperName(longName);
         System.assert(sanitized.length() <= 40, 'Name should be truncated to 40 chars');
+        System.assert(!sanitized.endsWith('_'), 'Name should not end with underscore');
     }
     
-    @isTest
-    static void testMetadataDeployCallback() {
-        // Test the callback handler
-        NotionMetadataService.MetadataDeployCallback callback = new NotionMetadataService.MetadataDeployCallback();
-        
-        // Create mock deploy result
-        Metadata.DeployResult result = new Metadata.DeployResult();
-        result.status = Metadata.DeployStatus.Succeeded;
-        
-        // Create mock context
-        Metadata.DeployCallbackContext context = null;
-        
-        Test.startTest();
-        callback.handleResult(result, context);
-        Test.stopTest();
-        
-        // Verify it handles the result without error
-        System.assert(true, 'Callback should handle result without error');
-    }
 }

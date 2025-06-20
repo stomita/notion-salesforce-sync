@@ -315,9 +315,23 @@ public with sharing class NotionAdminController {
     }
     
     @AuraEnabled
-    public static SaveResult saveSyncConfiguration(SyncConfiguration config) {
+    public static SaveResult saveSyncConfiguration(String configJson) {
         checkAdminPermission();
         try {
+            // Debug logging
+            System.debug('SaveSyncConfiguration called with configJson: ' + configJson);
+            
+            // Parse JSON to map first to debug
+            Map<String, Object> jsonMap = (Map<String, Object>) JSON.deserializeUntyped(configJson);
+            System.debug('JSON map keys: ' + jsonMap.keySet());
+            System.debug('objectApiName from map: ' + jsonMap.get('objectApiName'));
+            
+            // Deserialize the JSON string to SyncConfiguration object
+            SyncConfiguration config = (SyncConfiguration) JSON.deserialize(configJson, SyncConfiguration.class);
+            
+            System.debug('Deserialized config: ' + JSON.serialize(config));
+            System.debug('ObjectApiName: ' + config.objectApiName);
+            
             SaveResult result = new SaveResult();
             result.success = true;
             result.errors = new List<String>();
@@ -332,6 +346,9 @@ public with sharing class NotionAdminController {
             return result;
             
         } catch (Exception e) {
+            System.debug('Error in saveSyncConfiguration: ' + e.getMessage());
+            System.debug('Stack trace: ' + e.getStackTraceString());
+            
             SaveResult result = new SaveResult();
             result.success = false;
             result.message = 'Failed to save configuration';
@@ -392,6 +409,17 @@ public with sharing class NotionAdminController {
     }
     
     private static void validateConfiguration(SyncConfiguration config) {
+        System.debug('validateConfiguration called');
+        System.debug('config: ' + config);
+        System.debug('config is null: ' + (config == null));
+        
+        if (config == null) {
+            throw new ValidationException('Configuration object is null');
+        }
+        
+        System.debug('config.objectApiName: ' + config.objectApiName);
+        System.debug('config.objectApiName is blank: ' + String.isBlank(config.objectApiName));
+        
         if (String.isBlank(config.objectApiName)) {
             throw new ValidationException('Object API name is required');
         }
@@ -408,7 +436,8 @@ public with sharing class NotionAdminController {
         Set<String> mappedFields = new Set<String>();
         Set<String> mappedProperties = new Set<String>();
         
-        for (FieldMapping mapping : config.fieldMappings) {
+        if (config.fieldMappings != null) {
+            for (FieldMapping mapping : config.fieldMappings) {
             if (String.isBlank(mapping.salesforceFieldApiName)) {
                 throw new ValidationException('Salesforce field API name is required for all mappings');
             }
@@ -425,9 +454,10 @@ public with sharing class NotionAdminController {
                 throw new ValidationException('Duplicate property mapping: ' + mapping.notionPropertyName);
             }
             
-            mappedFields.add(mapping.salesforceFieldApiName);
-            if (!mapping.isBodyContent) {
-                mappedProperties.add(mapping.notionPropertyName);
+                mappedFields.add(mapping.salesforceFieldApiName);
+                if (!mapping.isBodyContent) {
+                    mappedProperties.add(mapping.notionPropertyName);
+                }
             }
         }
     }
@@ -539,15 +569,19 @@ public with sharing class NotionAdminController {
     }
     
     @AuraEnabled
-    public static SaveResult saveSystemSettings(Map<String, Object> settings) {
+    public static SaveResult saveSystemSettings(String settingsJson) {
         checkAdminPermission();
         
         // Debug logging
-        System.debug('Received settings object: ' + JSON.serialize(settings));
-        System.debug('enableSyncLogging: ' + settings.get('enableSyncLogging'));
+        System.debug('Received settings JSON: ' + settingsJson);
         
         SaveResult result = new SaveResult();
         try {
+            // Parse JSON to get settings
+            Map<String, Object> settings = (Map<String, Object>) JSON.deserializeUntyped(settingsJson);
+            System.debug('Parsed settings: ' + settings);
+            System.debug('enableSyncLogging: ' + settings.get('enableSyncLogging'));
+            
             // Get or create the org-wide custom settings record
             Notion_Sync_Settings__c customSettings = Notion_Sync_Settings__c.getOrgDefaults();
             
