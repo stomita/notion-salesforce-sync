@@ -46,41 +46,54 @@
             <div class="slds-p-horizontal_medium">
                 <!-- Current Configurations View (Default) -->
                 <template if:false={selectedObject}>
-                    <div class="slds-p-around_medium">
-                        <!-- Header with New Button -->
-                        <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
-                            <div class="slds-col">
-                                <h2 class="slds-text-heading_medium">Sync Configurations</h2>
+                    <!-- Tab Set -->
+                    <lightning-tabset variant="standard" active-tab-value={activeTab}>
+                        <!-- Configurations Tab -->
+                        <lightning-tab label="Configurations" value="configurations">
+                            <div class="slds-p-around_medium">
+                                <!-- Header with New Button -->
+                                <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
+                                    <div class="slds-col">
+                                        <h2 class="slds-text-heading_medium">Sync Configurations</h2>
+                                    </div>
+                                    <div class="slds-col_bump-left">
+                                        <lightning-button
+                                            label="New Sync Configuration"
+                                            variant="brand"
+                                            icon-name="utility:add"
+                                            onclick={handleNewConfiguration}
+                                        ></lightning-button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Summary Component -->
+                                <c-notion-sync-summary
+                                    oneditconfiguration={handleEditConfiguration}
+                                ></c-notion-sync-summary>
                             </div>
-                            <div class="slds-col_bump-left">
-                                <lightning-button
-                                    label="New Sync Configuration"
-                                    variant="brand"
-                                    icon-name="utility:add"
-                                    onclick={handleNewConfiguration}
-                                ></lightning-button>
-                            </div>
-                        </div>
+                        </lightning-tab>
                         
-                        <!-- System Settings Section -->
-                        <div class="slds-box slds-m-bottom_medium">
-                            <h3 class="slds-text-heading_small slds-m-bottom_small">System Settings</h3>
-                            <div class="slds-form slds-form_horizontal">
-                                <lightning-input
-                                    type="checkbox"
-                                    label="Enable Sync Logging"
-                                    checked={enableSyncLogging}
-                                    onchange={handleEnableSyncLoggingChange}
-                                    field-level-help="When enabled, all sync operations will be logged to the Notion Sync Log object. Disabled by default for performance."
-                                ></lightning-input>
+                        <!-- Settings Tab -->
+                        <lightning-tab label="Settings" value="settings">
+                            <div class="slds-p-around_medium">
+                                <h2 class="slds-text-heading_medium slds-m-bottom_medium">System Settings</h2>
+                                
+                                <!-- System Settings Section -->
+                                <div class="slds-box">
+                                    <h3 class="slds-text-heading_small slds-m-bottom_small">Logging</h3>
+                                    <div class="slds-form slds-form_horizontal">
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Enable Sync Logging"
+                                            checked={enableSyncLogging}
+                                            onchange={handleEnableSyncLoggingChange}
+                                            field-level-help="When enabled, all sync operations will be logged to the Notion Sync Log object. Disabled by default for performance."
+                                        ></lightning-input>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <!-- Summary Component -->
-                        <c-notion-sync-summary
-                            oneditconfiguration={handleEditConfiguration}
-                        ></c-notion-sync-summary>
-                    </div>
+                        </lightning-tab>
+                    </lightning-tabset>
                 </template>
 
                 <!-- Object Configuration View -->
