@@ -80,7 +80,6 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             SELECT Id, ObjectApiName__c, NotionDatabaseId__c, IsActive__c, SalesforceIdPropertyName__c
             FROM NotionSyncObject__mdt
             WHERE ObjectApiName__c = :objectType
-            AND IsDeleted__c = false
             LIMIT 1
         ];
         
@@ -128,7 +127,6 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             SELECT SalesforceFieldApiName__c
             FROM NotionSyncField__mdt
             WHERE NotionSyncObject__r.ObjectApiName__c = :objectType
-            AND NotionSyncObject__r.IsDeleted__c = false
         ];
         
         Set<String> fieldsToQuery = new Set<String>();
@@ -141,7 +139,6 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             SELECT SalesforceRelationshipField__c
             FROM NotionRelation__mdt
             WHERE ChildObject__r.ObjectApiName__c = :objectType
-            AND ChildObject__r.IsDeleted__c = false
         ];
         
         for (NotionRelation__mdt relation : relations) {
