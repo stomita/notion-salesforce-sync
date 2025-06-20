@@ -90,55 +90,54 @@ public with sharing class NotionMetadataService {
     }
     
     public static void deleteObjectConfiguration(String objectApiName) {
-        String objectDeveloperName = sanitizeDeveloperName(objectApiName);
+        // First, find the actual DeveloperName for this object
+        List<NotionSyncObject__mdt> existingObjects = [
+            SELECT DeveloperName, NotionDatabaseId__c, IsActive__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = :objectApiName
+            AND (IsDeleted__c = false OR IsDeleted__c = null)
+            LIMIT 1
+        ];
+        
+        if (existingObjects.isEmpty()) {
+            throw new AuraHandledException('No sync configuration found for object: ' + objectApiName);
+        }
+        
+        NotionSyncObject__mdt existing = existingObjects[0];
+        String objectDeveloperName = existing.DeveloperName;
         
         Metadata.DeployContainer deployContainer = new Metadata.DeployContainer();
         
-        // Delete object metadata
+        // Soft delete: Update the object metadata to set IsDeleted__c = true
         Metadata.CustomMetadata objectMetadata = new Metadata.CustomMetadata();
         objectMetadata.fullName = 'NotionSyncObject__mdt.' + objectDeveloperName;
+        // Truncate label to ensure it fits within 40 character limit
+        String label = objectApiName + ' (Deleted)';
+        if (label.length() > 40) {
+            label = label.substring(0, 37) + '...';
+        }
+        objectMetadata.label = label;
+        
+        // Mark as deleted
+        addCustomMetadataValue(objectMetadata, 'IsDeleted__c', true);
+        // Preserve existing field values
+        addCustomMetadataValue(objectMetadata, 'ObjectApiName__c', objectApiName);
+        addCustomMetadataValue(objectMetadata, 'NotionDatabaseId__c', existing.NotionDatabaseId__c);
+        addCustomMetadataValue(objectMetadata, 'IsActive__c', false); // Deactivate when deleting
+        addCustomMetadataValue(objectMetadata, 'SalesforceIdPropertyName__c', existing.SalesforceIdPropertyName__c);
+        
         deployContainer.addMetadata(objectMetadata);
         
-        // Query and delete all related field mappings
-        List<NotionSyncField__mdt> fields = [
-            SELECT DeveloperName
-            FROM NotionSyncField__mdt
-            WHERE NotionSyncObject__r.DeveloperName = :objectDeveloperName
-        ];
+        // Note: We don't need to delete field mappings and relationships
+        // They will be automatically excluded when we filter by non-deleted parent objects
         
-        for (NotionSyncField__mdt field : fields) {
-            Metadata.CustomMetadata fieldMetadata = new Metadata.CustomMetadata();
-            fieldMetadata.fullName = 'NotionSyncField__mdt.' + field.DeveloperName;
-            deployContainer.addMetadata(fieldMetadata);
-        }
+        // Deploy soft deletion
+        System.debug('Enqueuing metadata deployment for soft delete');
+        System.debug('Metadata fullName: ' + objectMetadata.fullName);
+        System.debug('IsDeleted value: ' + true);
         
-        // Query and delete all related relationships
-        // Custom Metadata doesn't support OR in WHERE clause, so we need two queries
-        List<NotionRelation__mdt> parentRelations = [
-            SELECT DeveloperName
-            FROM NotionRelation__mdt
-            WHERE ParentObject__r.DeveloperName = :objectDeveloperName
-        ];
-        
-        List<NotionRelation__mdt> childRelations = [
-            SELECT DeveloperName
-            FROM NotionRelation__mdt
-            WHERE ChildObject__r.DeveloperName = :objectDeveloperName
-        ];
-        
-        // Combine the results
-        List<NotionRelation__mdt> relations = new List<NotionRelation__mdt>();
-        relations.addAll(parentRelations);
-        relations.addAll(childRelations);
-        
-        for (NotionRelation__mdt relation : relations) {
-            Metadata.CustomMetadata relationMetadata = new Metadata.CustomMetadata();
-            relationMetadata.fullName = 'NotionRelation__mdt.' + relation.DeveloperName;
-            deployContainer.addMetadata(relationMetadata);
-        }
-        
-        // Deploy deletion
-        Metadata.Operations.enqueueDeployment(deployContainer, new MetadataDeployCallback());
+        Id deploymentId = Metadata.Operations.enqueueDeployment(deployContainer, new MetadataDeployCallback());
+        System.debug('Deployment enqueued with ID: ' + deploymentId);
     }
     
     private static void addCustomMetadataValue(Metadata.CustomMetadata metadata, String field, Object value) {
@@ -168,13 +167,26 @@ public with sharing class NotionMetadataService {
     
     public class MetadataDeployCallback implements Metadata.DeployCallback {
         public void handleResult(Metadata.DeployResult result, Metadata.DeployCallbackContext context) {
+            System.debug('MetadataDeployCallback.handleResult called');
+            System.debug('Deployment status: ' + result.status);
+            System.debug('Deploy ID: ' + result.id);
+            
             if (result.status == Metadata.DeployStatus.Succeeded) {
                 System.debug('Metadata deployment succeeded');
-            } else {
+                System.debug('Number of components deployed: ' + result.numberComponentsDeployed);
+                System.debug('Number of components total: ' + result.numberComponentsTotal);
+            } else if (result.status == Metadata.DeployStatus.Failed) {
                 System.debug('Metadata deployment failed');
-                for (Metadata.DeployMessage message : result.details.componentFailures) {
-                    System.debug('Error: ' + message.fullName + ' - ' + message.problem);
+                System.debug('Error message: ' + result.errorMessage);
+                if (result.details != null && result.details.componentFailures != null) {
+                    for (Metadata.DeployMessage message : result.details.componentFailures) {
+                        System.debug('Component error: ' + message.fullName + ' - ' + message.problem);
+                    }
                 }
+            } else if (result.status == Metadata.DeployStatus.InProgress) {
+                System.debug('Metadata deployment is still in progress');
+            } else if (result.status == Metadata.DeployStatus.Pending) {
+                System.debug('Metadata deployment is pending');
             }
         }
     }

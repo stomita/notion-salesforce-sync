@@ -109,7 +109,7 @@ public with sharing class NotionAdminController {
         }
     }
     
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled(cacheable=false)
     public static List<SyncConfiguration> getAllSyncConfigurations() {
         checkAdminPermission();
         try {
@@ -586,5 +586,107 @@ public with sharing class NotionAdminController {
     
     public class SystemSettings {
         @AuraEnabled public Boolean enableSyncLogging {get; set;}
+    }
+    
+    @AuraEnabled
+    public static SaveResult deleteSyncConfiguration(String objectApiName) {
+        checkAdminPermission();
+        
+        SaveResult result = new SaveResult();
+        try {
+            // Use MetadataService with API-enabled session for real deletion
+            deleteCustomMetadataRecords(objectApiName);
+            
+            result.success = true;
+            result.message = 'Configuration deleted successfully.';
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = 'Failed to delete configuration: ' + e.getMessage();
+            result.errors = new List<String>{ e.getMessage() };
+            return result;
+        }
+    }
+    
+    private static void deleteCustomMetadataRecords(String objectApiName) {
+        // First, query to find the records to delete
+        List<NotionSyncObject__mdt> syncObjects = [
+            SELECT DeveloperName
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = :objectApiName
+            LIMIT 1
+        ];
+        
+        if (syncObjects.isEmpty()) {
+            throw new AuraHandledException('No sync configuration found for object: ' + objectApiName);
+        }
+        
+        String objectDeveloperName = syncObjects[0].DeveloperName;
+        
+        // Create MetadataService instance with API-enabled session
+        MetadataService.MetadataPort service = new MetadataService.MetadataPort();
+        service.SessionHeader = new MetadataService.SessionHeader_element();
+        
+        // Get API-enabled session ID from Visualforce page
+        service.SessionHeader.sessionId = SessionUtil.getApiEnabledSessionId();
+        
+        // Set the endpoint URL for the current org
+        String orgUrl = URL.getOrgDomainUrl().toExternalForm();
+        service.endpoint_x = orgUrl + '/services/Soap/m/61.0';
+        
+        // List of metadata to delete
+        List<String> metadataToDelete = new List<String>();
+        
+        // Query and delete field mappings
+        List<NotionSyncField__mdt> fieldMappings = [
+            SELECT DeveloperName
+            FROM NotionSyncField__mdt
+            WHERE NotionSyncObject__r.DeveloperName = :objectDeveloperName
+        ];
+        
+        for (NotionSyncField__mdt field : fieldMappings) {
+            metadataToDelete.add('NotionSyncField__mdt.' + field.DeveloperName);
+        }
+        
+        // Query and delete relationship mappings - split into two queries
+        List<NotionRelation__mdt> parentRelations = [
+            SELECT DeveloperName
+            FROM NotionRelation__mdt
+            WHERE ParentObject__r.DeveloperName = :objectDeveloperName
+        ];
+        
+        List<NotionRelation__mdt> childRelations = [
+            SELECT DeveloperName
+            FROM NotionRelation__mdt
+            WHERE ChildObject__r.DeveloperName = :objectDeveloperName
+        ];
+        
+        for (NotionRelation__mdt relation : parentRelations) {
+            metadataToDelete.add('NotionRelation__mdt.' + relation.DeveloperName);
+        }
+        
+        for (NotionRelation__mdt relation : childRelations) {
+            metadataToDelete.add('NotionRelation__mdt.' + relation.DeveloperName);
+        }
+        
+        // Add the parent object last
+        metadataToDelete.add('NotionSyncObject__mdt.' + objectDeveloperName);
+        
+        if (!metadataToDelete.isEmpty()) {
+            // Perform the deletion
+            List<MetadataService.DeleteResult> deleteResults = 
+                service.deleteMetadata('CustomMetadata', metadataToDelete);
+            
+            // Check for errors
+            for (MetadataService.DeleteResult deleteResult : deleteResults) {
+                if (!deleteResult.success) {
+                    String errorMessage = '';
+                    if (deleteResult.errors != null && deleteResult.errors.size() > 0) {
+                        errorMessage = deleteResult.errors[0].message;
+                    }
+                    throw new AuraHandledException('Failed to delete metadata: ' + errorMessage);
+                }
+            }
+        }
     }
 }
