@@ -101,6 +101,7 @@ export default class NotionSyncAdmin extends LightningElement {
             
             this.showFieldMapping = true;
         } catch (error) {
+            console.error('Error in loadObjectConfiguration:', error);
             this.showError('Failed to load object configuration', error);
         } finally {
             this.isLoading = false;
@@ -118,40 +119,64 @@ export default class NotionSyncAdmin extends LightningElement {
             relationshipMappings: []
         };
     }
+    
+    // Helper method to update configuration while preserving objectApiName
+    updateConfiguration(updates) {
+        
+        // Create new configuration object with updates
+        this.currentConfiguration = {
+            ...this.currentConfiguration,
+            ...updates,
+        };
+        
+        this.hasUnsavedChanges = true;
+    }
 
     handleDatabaseSelection(event) {
         const { databaseId, databaseName } = event.detail;
-        this.currentConfiguration.notionDatabaseId = databaseId;
-        this.currentConfiguration.notionDatabaseName = databaseName;
-        this.hasUnsavedChanges = true;
+        this.updateConfiguration({
+            notionDatabaseId: databaseId,
+            notionDatabaseName: databaseName
+        });
         this.showDatabaseBrowser = false;
         
         this.showSuccess(`Selected database: ${databaseName}`);
     }
 
     handleFieldMappingChange(event) {
-        this.currentConfiguration.fieldMappings = event.detail.mappings;
-        this.hasUnsavedChanges = true;
+        // Update only the field mappings, don't recreate the entire object
+        this.updateConfiguration({
+            fieldMappings: event.detail.mappings
+        });
     }
 
     handleRelationshipChange(event) {
-        this.currentConfiguration.relationshipMappings = event.detail.mappings;
-        this.hasUnsavedChanges = true;
+        // Update only the relationship mappings, don't recreate the entire object
+        this.updateConfiguration({
+            relationshipMappings: event.detail.mappings
+        });
     }
 
     handleActiveToggle(event) {
-        this.currentConfiguration.isActive = event.target.checked;
-        this.hasUnsavedChanges = true;
+        this.updateConfiguration({
+            isActive: event.target.checked
+        });
     }
 
     handleSalesforceIdPropertyChange(event) {
-        this.currentConfiguration.salesforceIdPropertyName = event.target.value;
-        this.hasUnsavedChanges = true;
+        this.updateConfiguration({
+            salesforceIdPropertyName: event.target.value
+        });
     }
 
     async handleSave() {
         try {
             this.isLoading = true;
+            
+            // Debug logging
+            console.log('[SAVE] Starting save operation...');
+            console.log('[SAVE] selectedObject:', this.selectedObject);
+            console.log('[SAVE] currentConfiguration.objectApiName:', this.currentConfiguration?.objectApiName);
             
             // Validate configuration
             if (!this.validateConfiguration()) {
@@ -170,6 +195,7 @@ export default class NotionSyncAdmin extends LightningElement {
                 this.showError(result.message, result.errors.join(', '));
             }
         } catch (error) {
+            console.error('[SAVE] Error:', error);
             this.showError('Failed to save configuration', error);
         } finally {
             this.isLoading = false;
@@ -242,6 +268,11 @@ export default class NotionSyncAdmin extends LightningElement {
     }
 
     validateConfiguration() {
+        if (!this.currentConfiguration) {
+            this.showError('No configuration loaded');
+            return false;
+        }
+        
         if (!this.currentConfiguration.objectApiName) {
             this.showError('Please select an object');
             return false;
@@ -338,9 +369,21 @@ export default class NotionSyncAdmin extends LightningElement {
 
     handleEditConfiguration(event) {
         const { objectApiName } = event.detail;
-        // Set the selected object
+        
+        console.log('[EDIT] Starting edit for object:', objectApiName);
+        
         this.selectedObject = objectApiName;
         this.isNewConfiguration = false;
+        this.hasUnsavedChanges = false;
+        this.showFieldMapping = false;
+        this.showRelationshipConfig = false;
+        
+        // Force a fresh load of the configuration
+        this.currentConfiguration = null;
+        
+        // Switch to configurations tab to show the edit form
+        this.activeTab = 'configurations';
+        
         // Load the configuration
         this.loadObjectConfiguration(objectApiName);
     }
@@ -355,9 +398,7 @@ export default class NotionSyncAdmin extends LightningElement {
                 enableSyncLogging: isEnabled
             };
             
-            console.log('Calling saveSystemSettings with:', plainSettings);
-            const result = await saveSystemSettings({ settings: plainSettings });
-            console.log('saveSystemSettings result:', result);
+            const result = await saveSystemSettings({ settingsJson: JSON.stringify(plainSettings) });
             
             if (result && result.success) {
                 this.enableSyncLogging = isEnabled;
