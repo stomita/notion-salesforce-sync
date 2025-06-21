@@ -383,10 +383,14 @@ export default class NotionSyncAdmin extends LightningElement {
     }
 
     get notionDatabaseDisplay() {
-        if (this.currentConfiguration && this.currentConfiguration.notionDatabaseName) {
-            return this.currentConfiguration.notionDatabaseName;
-        } else if (this.currentConfiguration && this.currentConfiguration.notionDatabaseId) {
-            return this.currentConfiguration.notionDatabaseId;
+        if (this.currentConfiguration) {
+            if (this.currentConfiguration.notionDatabaseName && this.currentConfiguration.notionDatabaseId) {
+                // Show both name and ID in parentheses
+                return `${this.currentConfiguration.notionDatabaseName} (${this.currentConfiguration.notionDatabaseId})`;
+            } else if (this.currentConfiguration.notionDatabaseId) {
+                // Fallback to just ID if name is not available
+                return this.currentConfiguration.notionDatabaseId;
+            }
         }
         return '';
     }
@@ -399,6 +403,14 @@ export default class NotionSyncAdmin extends LightningElement {
             return `Edit ${obj ? obj.label : this.selectedObject} Configuration`;
         }
         return 'Configuration';
+    }
+    
+    get selectedObjectLabel() {
+        if (this.selectedObject && this.salesforceObjects) {
+            const obj = this.salesforceObjects.find(o => o.apiName === this.selectedObject);
+            return obj ? obj.label : this.selectedObject;
+        }
+        return '';
     }
     
     get salesforceIdPropertyOptions() {

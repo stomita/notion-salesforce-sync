@@ -13,13 +13,8 @@ export default class NotionFieldMapping extends LightningElement {
     @track isLoading = false;
     @track showAddMapping = false;
 
-    // For new mapping
-    @track newMapping = {
-        salesforceFieldApiName: '',
-        notionPropertyName: '',
-        notionPropertyType: '',
-        isBodyContent: false
-    };
+    // For new mapping - Initialize with null to ensure proper initial state
+    @track newMapping = null;
 
     connectedCallback() {
         this.initializeMappings();
@@ -98,6 +93,7 @@ export default class NotionFieldMapping extends LightningElement {
 
     handleShowAddMapping() {
         this.showAddMapping = true;
+        // Initialize newMapping when showing the form
         this.newMapping = {
             salesforceFieldApiName: '',
             notionPropertyName: '',
@@ -108,47 +104,42 @@ export default class NotionFieldMapping extends LightningElement {
 
     handleCancelAdd() {
         this.showAddMapping = false;
+        // Reset to null when canceling
+        this.newMapping = null;
+    }
+
+    handleFieldSelection(event) {
+        // Create a new object to ensure reactivity
         this.newMapping = {
-            salesforceFieldApiName: '',
-            notionPropertyName: '',
-            notionPropertyType: '',
+            ...this.newMapping,
+            salesforceFieldApiName: event.detail.value,
+            notionPropertyType: this.getSuggestedNotionType(event.detail.value),
             isBodyContent: false
         };
     }
 
-    handleFieldSelection(event) {
-        this.newMapping.salesforceFieldApiName = event.detail.value;
-        this.newMapping.notionPropertyType = this.getSuggestedNotionType(event.detail.value);
-        
-        // Check if this is a long text field
-        const field = this.salesforceFields.find(f => f.apiName === event.detail.value);
-        if (field && field.isLongTextArea) {
-            this.newMapping.isBodyContent = true;
-        }
-    }
-
     handlePropertySelection(event) {
-        this.newMapping.notionPropertyName = event.detail.value;
-        
-        // Get the actual property type from Notion
         const property = this.notionProperties.find(p => p.name === event.detail.value);
-        if (property) {
-            this.newMapping.notionPropertyType = property.type;
-        }
+        
+        // Create a new object to ensure reactivity
+        this.newMapping = {
+            ...this.newMapping,
+            notionPropertyName: event.detail.value,
+            notionPropertyType: property ? property.type : this.newMapping.notionPropertyType
+        };
     }
 
-    handleTypeChange(event) {
-        this.newMapping.notionPropertyType = event.detail.value;
-    }
 
     handleBodyContentChange(event) {
-        this.newMapping.isBodyContent = event.target.checked;
-        if (event.target.checked) {
-            this.newMapping.notionPropertyName = '__body__';
-            this.newMapping.notionPropertyType = 'rich_text';
-        } else {
-            this.newMapping.notionPropertyName = '';
-        }
+        const isChecked = event.target.checked;
+        
+        // Create a new object to ensure reactivity
+        this.newMapping = {
+            ...this.newMapping,
+            isBodyContent: isChecked,
+            notionPropertyName: isChecked ? '__body__' : '',
+            notionPropertyType: isChecked ? 'rich_text' : this.newMapping.notionPropertyType
+        };
     }
 
     handleAddMapping() {
@@ -180,19 +171,6 @@ export default class NotionFieldMapping extends LightningElement {
         this.notifyMappingChange();
     }
 
-    handleMappingTypeChange(event) {
-        const index = event.target.dataset.index;
-        const newType = event.detail.value;
-        
-        this.fieldMappings = this.fieldMappings.map((mapping, i) => {
-            if (i === parseInt(index)) {
-                return { ...mapping, notionPropertyType: newType };
-            }
-            return mapping;
-        });
-        
-        this.notifyMappingChange();
-    }
 
     notifyMappingChange() {
         this.dispatchEvent(new CustomEvent('mappingchange', {
@@ -206,7 +184,7 @@ export default class NotionFieldMapping extends LightningElement {
         return this.salesforceFields
             .filter(field => !mappedFields.has(field.apiName))
             .map(field => ({
-                label: `${field.label} (${field.apiName}) - ${field.type}`,
+                label: `${field.label} - ${field.apiName} (${field.type})`,
                 value: field.apiName
             }));
     }
@@ -252,6 +230,23 @@ export default class NotionFieldMapping extends LightningElement {
 
     get disableAddButton() {
         return !this.canAddMapping;
+    }
+
+    get showBodyContentOption() {
+        // Ensure we have a field selected
+        if (!this.newMapping || !this.newMapping.salesforceFieldApiName) {
+            return false;
+        }
+        
+        // Find the selected field
+        const field = this.salesforceFields.find(f => f.apiName === this.newMapping.salesforceFieldApiName);
+        if (!field) {
+            return false;
+        }
+        
+        // Show for TEXTAREA, LONGTEXTAREA, and RICHTEXTAREA field types
+        const textAreaTypes = ['TEXTAREA', 'LONGTEXTAREA', 'RICHTEXTAREA'];
+        return textAreaTypes.includes(field.type);
     }
 
     get mappingsWithMetadata() {

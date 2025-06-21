@@ -18,9 +18,6 @@
                             <th scope="col">
                                 <div class="slds-truncate" title="Notion Property">Notion Property</div>
                             </th>
-                            <th scope="col">
-                                <div class="slds-truncate" title="Property Type">Property Type</div>
-                            </th>
                             <th scope="col" style="width: 50px;">
                                 <div class="slds-truncate" title="Actions">Actions</div>
                             </th>
@@ -31,10 +28,8 @@
                             <tr key={mapping.id} class="slds-hint-parent">
                                 <td>
                                     <div class="slds-truncate">
-                                        <strong>{mapping.salesforceFieldApiName}</strong>
-                                        <div class="slds-text-body_small slds-text-color_weak">
-                                            {mapping.fieldLabel} ({mapping.fieldType})
-                                        </div>
+                                        <strong>{mapping.fieldLabel}</strong>
+                                        <span class="slds-text-color_weak"> ({mapping.salesforceFieldApiName}) [<em>{mapping.fieldType}</em>]</span>
                                     </div>
                                 </td>
                                 <td>
@@ -44,18 +39,9 @@
                                         </template>
                                         <template if:false={mapping.isBodyContent}>
                                             {mapping.notionPropertyName}
+                                            <span class="slds-text-color_weak"> [<em>{mapping.notionPropertyType}</em>]</span>
                                         </template>
                                     </div>
-                                </td>
-                                <td>
-                                    <lightning-combobox
-                                        name="type"
-                                        value={mapping.notionPropertyType}
-                                        options={notionTypeOptions}
-                                        variant="label-hidden"
-                                        data-index={index}
-                                        onchange={handleMappingTypeChange}
-                                    ></lightning-combobox>
                                 </td>
                                 <td>
                                     <lightning-button-icon
@@ -97,7 +83,7 @@
                 <h3 class="slds-text-heading_small slds-m-bottom_small">New Field Mapping</h3>
                 
                 <div class="slds-grid slds-gutters">
-                    <div class="slds-col slds-size_1-of-3">
+                    <div class="slds-col slds-size_1-of-2">
                         <lightning-combobox
                             name="field"
                             label="Salesforce Field"
@@ -109,7 +95,7 @@
                         ></lightning-combobox>
                     </div>
                     
-                    <div class="slds-col slds-size_1-of-3">
+                    <div class="slds-col slds-size_1-of-2">
                         <template if:false={newMapping.isBodyContent}>
                             <lightning-combobox
                                 name="property"
@@ -130,27 +116,18 @@
                             </div>
                         </template>
                     </div>
-                    
-                    <div class="slds-col slds-size_1-of-3">
-                        <lightning-combobox
-                            name="type"
-                            label="Property Type"
-                            value={newMapping.notionPropertyType}
-                            options={notionTypeOptions}
-                            onchange={handleTypeChange}
-                            disabled={newMapping.isBodyContent}
-                        ></lightning-combobox>
-                    </div>
                 </div>
 
-                <div class="slds-m-top_small">
-                    <lightning-input
-                        type="checkbox"
-                        label="Map to page body content (for long text fields)"
-                        checked={newMapping.isBodyContent}
-                        onchange={handleBodyContentChange}
-                    ></lightning-input>
-                </div>
+                <template if:true={showBodyContentOption}>
+                    <div class="slds-m-top_small">
+                        <lightning-input
+                            type="checkbox"
+                            label="Map to page body content (for long text fields)"
+                            checked={newMapping.isBodyContent}
+                            onchange={handleBodyContentChange}
+                        ></lightning-input>
+                    </div>
+                </template>
 
                 <div class="slds-m-top_medium">
                     <lightning-button-group>

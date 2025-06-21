@@ -147,6 +147,9 @@ public with sharing class NotionAdminController {
                 FROM NotionSyncObject__mdt
             ];
             
+            // Create a map to store database names to avoid duplicate API calls
+            Map<String, String> databaseNameCache = new Map<String, String>();
+            
             for (NotionSyncObject__mdt syncObj : syncObjects) {
                 SyncConfiguration config = new SyncConfiguration();
                 config.objectApiName = syncObj.ObjectApiName__c;
@@ -155,9 +158,19 @@ public with sharing class NotionAdminController {
                 config.salesforceIdPropertyName = syncObj.SalesforceIdPropertyName__c;
                 config.objectMetadataId = syncObj.Id;
                 
-                // For now, just use the database ID
-                // TODO: Fetch database name from Notion API when performance allows
-                config.notionDatabaseName = syncObj.NotionDatabaseId__c;
+                // Fetch database name from cache or API
+                if (String.isNotBlank(syncObj.NotionDatabaseId__c)) {
+                    if (databaseNameCache.containsKey(syncObj.NotionDatabaseId__c)) {
+                        config.notionDatabaseName = databaseNameCache.get(syncObj.NotionDatabaseId__c);
+                    } else {
+                        // Fetch from API
+                        String databaseName = fetchDatabaseName(syncObj.NotionDatabaseId__c);
+                        config.notionDatabaseName = databaseName;
+                        databaseNameCache.put(syncObj.NotionDatabaseId__c, databaseName);
+                    }
+                } else {
+                    config.notionDatabaseName = '';
+                }
                 
                 // Get field mappings
                 List<NotionSyncField__mdt> fieldMappings = [
@@ -280,8 +293,12 @@ public with sharing class NotionAdminController {
                 config.salesforceIdPropertyName = syncObj.SalesforceIdPropertyName__c;
                 config.objectMetadataId = syncObj.Id;
                 
-                // For now, just use the database ID
-                config.notionDatabaseName = syncObj.NotionDatabaseId__c;
+                // Fetch database name from API
+                if (String.isNotBlank(syncObj.NotionDatabaseId__c)) {
+                    config.notionDatabaseName = fetchDatabaseName(syncObj.NotionDatabaseId__c);
+                } else {
+                    config.notionDatabaseName = '';
+                }
                 
                 // Get field mappings
                 List<NotionSyncField__mdt> syncFields = [
@@ -423,6 +440,21 @@ public with sharing class NotionAdminController {
             System.debug('Error extracting icon emoji: ' + e.getMessage());
         }
         return null;
+    }
+    
+    private static String fetchDatabaseName(String databaseId) {
+        try {
+            NotionApiClient.NotionResponse response = NotionApiClient.getDatabase(databaseId);
+            
+            if (response.success) {
+                Map<String, Object> responseData = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
+                return extractDatabaseTitle(responseData);
+            }
+        } catch (Exception e) {
+            System.debug('Error fetching database name for ID ' + databaseId + ': ' + e.getMessage());
+        }
+        // Return the database ID if we can't fetch the name
+        return databaseId;
     }
     
     private static void validateConfiguration(SyncConfiguration config) {

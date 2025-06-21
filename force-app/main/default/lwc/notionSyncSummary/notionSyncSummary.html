@@ -81,12 +81,13 @@
                                 </td>
                                 <td>
                                     <div class="slds-truncate" title={config.notionDatabaseName}>
-                                        {config.notionDatabaseName}
+                                        <div>{config.notionDatabaseName}</div>
+                                        <div class="slds-text-body_small slds-text-color_weak">{config.notionDatabaseId}</div>
                                     </div>
                                 </td>
                                 <td>
                                     <template if:true={config.isActive}>
-                                        <lightning-badge label="Active" variant="success"></lightning-badge>
+                                        <lightning-badge label="Active" class="slds-theme_success"></lightning-badge>
                                     </template>
                                     <template if:false={config.isActive}>
                                         <lightning-badge label="Inactive"></lightning-badge>

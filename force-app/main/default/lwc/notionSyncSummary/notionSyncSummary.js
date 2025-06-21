@@ -24,6 +24,7 @@ export default class NotionSyncSummary extends LightningElement {
                 objectName: this.getObjectLabel(config.objectApiName),
                 objectApiName: config.objectApiName,
                 notionDatabaseName: config.notionDatabaseName || config.notionDatabaseId,
+                notionDatabaseId: config.notionDatabaseId,
                 isActive: config.isActive,
                 fieldCount: config.fieldMappings ? config.fieldMappings.length : 0,
                 relationshipCount: config.relationshipMappings ? config.relationshipMappings.length : 0,

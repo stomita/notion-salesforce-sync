@@ -3,18 +3,8 @@
     <apiVersion>59.0</apiVersion>
     <isExposed>true</isExposed>
     <targets>
-        <target>lightning__AppPage</target>
-        <target>lightning__HomePage</target>
         <target>lightning__Tab</target>
     </targets>
-    <targetConfigs>
-        <targetConfig targets="lightning__AppPage,lightning__HomePage">
-            <supportedFormFactors>
-                <supportedFormFactor type="Large"></supportedFormFactor>
-                <supportedFormFactor type="Small"></supportedFormFactor>
-            </supportedFormFactors>
-        </targetConfig>
-    </targetConfigs>
     <masterLabel>Notion Sync Admin</masterLabel>
     <description>Administrative interface for configuring Notion synchronization mappings</description>
 </LightningComponentBundle>
