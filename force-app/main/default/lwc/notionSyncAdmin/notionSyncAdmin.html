@@ -169,14 +169,16 @@
                                 </div>
 
                                 <!-- Salesforce ID Property -->
-                                <lightning-input
+                                <lightning-combobox
                                     label="Salesforce ID Property Name"
                                     value={currentConfiguration.salesforceIdPropertyName}
+                                    placeholder="Select a property"
+                                    options={salesforceIdPropertyOptions}
                                     onchange={handleSalesforceIdPropertyChange}
-                                    placeholder="e.g., Salesforce_ID"
                                     required
-                                    field-level-help="Name of the Notion property that will store Salesforce record IDs"
-                                ></lightning-input>
+                                    disabled={isSalesforceIdPropertyDisabled}
+                                    field-level-help="Select the Notion property that will store Salesforce record IDs"
+                                ></lightning-combobox>
                             </div>
 
                             <!-- Field Mappings -->

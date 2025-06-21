@@ -6,6 +6,7 @@ import saveSyncConfiguration from '@salesforce/apex/NotionAdminController.saveSy
 import testConnection from '@salesforce/apex/NotionAdminController.testConnection';
 import getSystemSettings from '@salesforce/apex/NotionAdminController.getSystemSettings';
 import saveSystemSettings from '@salesforce/apex/NotionAdminController.saveSystemSettings';
+import getDatabaseSchema from '@salesforce/apex/NotionAdminController.getDatabaseSchema';
 
 export default class NotionSyncAdmin extends LightningElement {
     @track selectedObject = null;
@@ -16,6 +17,7 @@ export default class NotionSyncAdmin extends LightningElement {
     @track hasPermission = true;
     @track permissionError = '';
     @track isNewConfiguration = false;
+    @track databaseProperties = [];
     
     // System settings
     @track enableSyncLogging = false;
@@ -99,6 +101,11 @@ export default class NotionSyncAdmin extends LightningElement {
                 this.currentConfiguration = config || this.createNewConfiguration(objectApiName);
             }
             
+            // If we have a database ID, load its properties
+            if (this.currentConfiguration.notionDatabaseId) {
+                await this.loadDatabaseProperties(this.currentConfiguration.notionDatabaseId);
+            }
+            
             this.showFieldMapping = true;
         } catch (error) {
             console.error('Error in loadObjectConfiguration:', error);
@@ -114,7 +121,7 @@ export default class NotionSyncAdmin extends LightningElement {
             notionDatabaseId: '',
             notionDatabaseName: '',
             isActive: true,
-            salesforceIdPropertyName: 'Salesforce_ID',
+            salesforceIdPropertyName: '',
             fieldMappings: [],
             relationshipMappings: []
         };
@@ -132,13 +139,16 @@ export default class NotionSyncAdmin extends LightningElement {
         this.hasUnsavedChanges = true;
     }
 
-    handleDatabaseSelection(event) {
+    async handleDatabaseSelection(event) {
         const { databaseId, databaseName } = event.detail;
         this.updateConfiguration({
             notionDatabaseId: databaseId,
             notionDatabaseName: databaseName
         });
         this.showDatabaseBrowser = false;
+        
+        // Fetch database properties for Salesforce ID property selection
+        await this.loadDatabaseProperties(databaseId);
         
         this.showSuccess(`Selected database: ${databaseName}`);
     }
@@ -165,8 +175,32 @@ export default class NotionSyncAdmin extends LightningElement {
 
     handleSalesforceIdPropertyChange(event) {
         this.updateConfiguration({
-            salesforceIdPropertyName: event.target.value
+            salesforceIdPropertyName: event.detail.value
         });
+    }
+    
+    async loadDatabaseProperties(databaseId) {
+        try {
+            this.isLoading = true;
+            const schema = await getDatabaseSchema({ databaseId });
+            this.databaseProperties = schema.properties || [];
+            
+            // Check if current salesforceIdPropertyName is still valid
+            const validPropertyNames = this.databaseProperties.map(prop => prop.name);
+            if (this.currentConfiguration.salesforceIdPropertyName && 
+                !validPropertyNames.includes(this.currentConfiguration.salesforceIdPropertyName)) {
+                // Reset if the current property doesn't exist in the new database
+                this.updateConfiguration({
+                    salesforceIdPropertyName: ''
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load database properties:', error);
+            this.showError('Failed to load database properties', error);
+            this.databaseProperties = [];
+        } finally {
+            this.isLoading = false;
+        }
     }
 
     async handleSave() {
@@ -183,7 +217,7 @@ export default class NotionSyncAdmin extends LightningElement {
                 return;
             }
 
-            const result = await saveSyncConfiguration({ config: this.currentConfiguration });
+            const result = await saveSyncConfiguration({ configJson: JSON.stringify(this.currentConfiguration) });
             
             if (result.success) {
                 this.showSuccess(result.message);
@@ -284,7 +318,7 @@ export default class NotionSyncAdmin extends LightningElement {
         }
 
         if (!this.currentConfiguration.salesforceIdPropertyName) {
-            this.showError('Salesforce ID property name is required');
+            this.showError('Please select a Notion property to store Salesforce IDs');
             return false;
         }
 
@@ -365,6 +399,26 @@ export default class NotionSyncAdmin extends LightningElement {
             return `Edit ${obj ? obj.label : this.selectedObject} Configuration`;
         }
         return 'Configuration';
+    }
+    
+    get salesforceIdPropertyOptions() {
+        if (!this.databaseProperties || this.databaseProperties.length === 0) {
+            return [];
+        }
+        
+        // Filter properties that can store text (Salesforce IDs are text)
+        const textPropertyTypes = ['title', 'rich_text', 'url', 'email', 'phone_number'];
+        
+        return this.databaseProperties
+            .filter(prop => textPropertyTypes.includes(prop.type))
+            .map(prop => ({
+                label: `${prop.name} (${prop.type})`,
+                value: prop.name
+            }));
+    }
+    
+    get isSalesforceIdPropertyDisabled() {
+        return !this.currentConfiguration || !this.currentConfiguration.notionDatabaseId;
     }
 
     handleEditConfiguration(event) {
