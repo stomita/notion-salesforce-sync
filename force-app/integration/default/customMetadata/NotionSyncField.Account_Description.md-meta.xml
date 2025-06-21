@@ -16,7 +16,7 @@
     </values>
     <values>
         <field>NotionSyncObject__c</field>
-        <value xsi:type="xsd:string">Account_Test_Sync</value>
+        <value xsi:type="xsd:string">Account</value>
     </values>
     <values>
         <field>SalesforceFieldApiName__c</field>
