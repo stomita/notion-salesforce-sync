@@ -106,27 +106,24 @@ public with sharing class NotionMetadataService {
                 relationMetadata.values = new List<MetadataService.CustomMetadataValue>();
                 
                 // Both ParentObject__c and ChildObject__c are required fields
-                // The childObject field contains the metadata ID, we need to get the developer name
-                if (mapping.isParent) {
-                    // For parent relationships: current object is parent, mapping.childObject is child
-                    addMetadataServiceValue(relationMetadata, 'ParentObject__c', objectDeveloperName);
-                    if (String.isNotBlank(mapping.childObject)) {
-                        // The childObject contains the metadata ID, extract the developer name
-                        // For now, use the ID directly as it should be the developer name
-                        addMetadataServiceValue(relationMetadata, 'ChildObject__c', mapping.childObject);
+                // Current object (objectDeveloperName) is the child that has the lookup field
+                // mapping.childObject contains the parent object being referenced
+                addMetadataServiceValue(relationMetadata, 'ChildObject__c', objectDeveloperName);
+                
+                if (String.isNotBlank(mapping.parentObject)) {
+                    // Convert metadata ID to developer name if needed
+                    String parentDeveloperName = getObjectDeveloperName(mapping.parentObject);
+                    if (String.isNotBlank(parentDeveloperName)) {
+                        addMetadataServiceValue(relationMetadata, 'ParentObject__c', parentDeveloperName);
                     } else {
-                        // Fallback if childObject is not provided
-                        addMetadataServiceValue(relationMetadata, 'ChildObject__c', objectDeveloperName);
+                        // Skip this relationship if we can't resolve the parent object
+                        System.debug('Warning: Could not resolve parent object reference: ' + mapping.parentObject);
+                        continue;
                     }
                 } else {
-                    // For child relationships: mapping.childObject is parent, current object is child
-                    if (String.isNotBlank(mapping.childObject)) {
-                        addMetadataServiceValue(relationMetadata, 'ParentObject__c', mapping.childObject);
-                    } else {
-                        // Fallback if childObject is not provided
-                        addMetadataServiceValue(relationMetadata, 'ParentObject__c', objectDeveloperName);
-                    }
-                    addMetadataServiceValue(relationMetadata, 'ChildObject__c', objectDeveloperName);
+                    // Skip if no parent object is specified
+                    System.debug('Warning: No parent object specified for relationship');
+                    continue;
                 }
                 addMetadataServiceValue(relationMetadata, 'SalesforceRelationshipField__c', mapping.salesforceRelationshipField);
                 addMetadataServiceValue(relationMetadata, 'NotionRelationPropertyName__c', mapping.notionRelationPropertyName);
@@ -277,6 +274,60 @@ public with sharing class NotionMetadataService {
         sanitized = sanitized.replaceAll('_+$', '');
         
         return sanitized;
+    }
+    
+    /**
+     * Helper method to convert a metadata ID or developer name to a proper developer name
+     * This handles cases where the childObject field contains either:
+     * - A metadata ID (e.g., 'm02F3000000QE9eIAG')
+     * - A developer name (e.g., 'Account')
+     */
+    private static String getObjectDeveloperName(String objectReference) {
+        if (String.isBlank(objectReference)) {
+            return null;
+        }
+        
+        // Check if it's already a developer name (doesn't start with 'm' followed by ID pattern)
+        if (!objectReference.startsWith('m') || objectReference.length() < 15) {
+            // Assume it's already a developer name
+            return objectReference;
+        }
+        
+        // Try to query the metadata record by ID
+        try {
+            List<NotionSyncObject__mdt> objects = [
+                SELECT DeveloperName
+                FROM NotionSyncObject__mdt
+                WHERE Id = :objectReference
+                LIMIT 1
+            ];
+            
+            if (!objects.isEmpty()) {
+                return objects[0].DeveloperName;
+            }
+        } catch (Exception e) {
+            // If the query fails (e.g., invalid ID), fall through
+            System.debug('Could not query NotionSyncObject__mdt by ID: ' + e.getMessage());
+        }
+        
+        // If we can't find it by ID, check if it might be a developer name anyway
+        try {
+            List<NotionSyncObject__mdt> objects = [
+                SELECT DeveloperName
+                FROM NotionSyncObject__mdt
+                WHERE DeveloperName = :objectReference
+                LIMIT 1
+            ];
+            
+            if (!objects.isEmpty()) {
+                return objects[0].DeveloperName;
+            }
+        } catch (Exception e) {
+            System.debug('Could not query NotionSyncObject__mdt by DeveloperName: ' + e.getMessage());
+        }
+        
+        // If we still can't find it, return null
+        return null;
     }
     
 }

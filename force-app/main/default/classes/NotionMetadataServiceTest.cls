@@ -79,9 +79,9 @@ private class NotionMetadataServiceTest {
         // Add relationship mappings
         config.relationshipMappings = new List<NotionAdminController.RelationshipMapping>();
         NotionAdminController.RelationshipMapping relMapping = new NotionAdminController.RelationshipMapping();
+        relMapping.parentObject = 'Contact';
         relMapping.salesforceRelationshipField = 'ParentId';
         relMapping.notionRelationPropertyName = 'Parent';
-        relMapping.isParent = true;
         config.relationshipMappings.add(relMapping);
         
         Test.startTest();
