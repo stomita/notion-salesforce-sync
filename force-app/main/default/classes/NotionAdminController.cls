@@ -153,18 +153,20 @@ public with sharing class NotionAdminController {
                     config.fieldMappings.add(mapping);
                 }
                 
-                // Get relationship mappings
+                // Get relationship mappings where this object is the child (has lookup fields)
                 List<NotionRelation__mdt> relationMappings = [
-                    SELECT Id, ChildObject__c, SalesforceRelationshipField__c, 
-                           NotionRelationPropertyName__c
+                    SELECT Id, ParentObject__c, ParentObject__r.DeveloperName, 
+                           SalesforceRelationshipField__c, NotionRelationPropertyName__c
                     FROM NotionRelation__mdt
-                    WHERE ParentObject__c = :syncObj.Id
+                    WHERE ChildObject__c = :syncObj.Id
                 ];
                 
                 config.relationshipMappings = new List<RelationshipMapping>();
                 for (NotionRelation__mdt relation : relationMappings) {
                     RelationshipMapping mapping = new RelationshipMapping();
-                    mapping.childObject = relation.ChildObject__c;
+                    // Use the developer name from the relationship if available
+                    mapping.parentObject = relation.ParentObject__r != null ? 
+                        relation.ParentObject__r.DeveloperName : relation.ParentObject__c;
                     mapping.salesforceRelationshipField = relation.SalesforceRelationshipField__c;
                     mapping.notionRelationPropertyName = relation.NotionRelationPropertyName__c;
                     mapping.metadataId = relation.Id;
@@ -274,33 +276,23 @@ public with sharing class NotionAdminController {
                     config.fieldMappings.add(mapping);
                 }
                 
-                // Get relationship mappings - Custom Metadata doesn't support OR in WHERE clause
-                // So we need to make two separate queries
-                List<NotionRelation__mdt> parentRelations = [
-                    SELECT Id, DeveloperName, ParentObject__c, ChildObject__c,
-                           SalesforceRelationshipField__c, NotionRelationPropertyName__c
-                    FROM NotionRelation__mdt
-                    WHERE ParentObject__c = :syncObj.Id
-                ];
-                
-                List<NotionRelation__mdt> childRelations = [
-                    SELECT Id, DeveloperName, ParentObject__c, ChildObject__c,
+                // Get relationship mappings where this object has parent relationships
+                // In this model, ChildObject__c is the current object, ParentObject__c is the parent it points to
+                List<NotionRelation__mdt> relations = [
+                    SELECT Id, DeveloperName, ParentObject__c, ParentObject__r.DeveloperName,
+                           ChildObject__c, ChildObject__r.DeveloperName,
                            SalesforceRelationshipField__c, NotionRelationPropertyName__c
                     FROM NotionRelation__mdt
                     WHERE ChildObject__c = :syncObj.Id
                 ];
                 
-                // Combine the results
-                List<NotionRelation__mdt> relations = new List<NotionRelation__mdt>();
-                relations.addAll(parentRelations);
-                relations.addAll(childRelations);
-                
                 for (NotionRelation__mdt relation : relations) {
                     RelationshipMapping mapping = new RelationshipMapping();
-                    mapping.childObject = relation.ChildObject__c;
+                    // The ParentObject__c contains the parent object this field points to
+                    mapping.parentObject = relation.ParentObject__r != null ? 
+                        relation.ParentObject__r.DeveloperName : relation.ParentObject__c;
                     mapping.salesforceRelationshipField = relation.SalesforceRelationshipField__c;
                     mapping.notionRelationPropertyName = relation.NotionRelationPropertyName__c;
-                    mapping.isParent = relation.ParentObject__c == syncObj.Id;
                     mapping.metadataId = relation.Id;
                     config.relationshipMappings.add(mapping);
                 }
@@ -530,10 +522,9 @@ public with sharing class NotionAdminController {
     }
     
     public class RelationshipMapping {
-        @AuraEnabled public String childObject;
+        @AuraEnabled public String parentObject;
         @AuraEnabled public String salesforceRelationshipField;
         @AuraEnabled public String notionRelationPropertyName;
-        @AuraEnabled public Boolean isParent;
         @AuraEnabled public String metadataId;
     }
     

@@ -51,7 +51,7 @@ export default class NotionRelationshipConfig extends LightningElement {
         const newMapping = {
             salesforceRelationshipField: '',
             notionRelationPropertyName: '',
-            isParent: true
+            parentObject: ''
         };
         
         this.relationshipMappings = [...this.relationshipMappings, newMapping];
