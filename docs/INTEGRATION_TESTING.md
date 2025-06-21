@@ -170,14 +170,11 @@ export NOTION_DATABASE_ID_TEST_PARENT='parent-database-id'
 export NOTION_DATABASE_ID_TEST_CHILD='child-database-id'
 ```
 
-#### Using .env File with node-foreman
+#### Using .env File
 
-If you have a `.env` file with your environment variables, you can use `node-foreman` (nf) to automatically load them when running the integration tests:
+The integration test script automatically loads environment variables from a `.env` file if it exists in the project root:
 
 ```bash
-# Install node-foreman if not already installed
-npm install -g foreman
-
 # Create .env file with your configuration
 cat > .env << EOF
 NOTION_API_KEY=your-notion-api-key
@@ -188,8 +185,8 @@ NOTION_TEST_PARENT_DB=parent-database-id
 NOTION_TEST_CHILD_DB=child-database-id
 EOF
 
-# Run integration tests with environment variables loaded from .env
-nf run ./scripts/run-integration-tests.sh
+# Run integration tests (automatically loads .env)
+./scripts/run-integration-tests.sh
 ```
 
 This approach is particularly useful for:

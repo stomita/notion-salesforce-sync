@@ -84,11 +84,8 @@ URL=$(sf org open --url-only -o notion-sync-scratch)
 
 3. If you have Notion API credentials configured, run integration tests:
    ```bash
-   # If using .env file (recommended)
-   nf run ./scripts/run-integration-tests.sh
-   
-   # Or manually export environment variables
-   export $(cat .env | xargs) && ./scripts/run-integration-tests.sh
+   # The script will automatically load .env file if present
+   ./scripts/run-integration-tests.sh
    ```
 
 Only push your changes after all tests complete successfully.

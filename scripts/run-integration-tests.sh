@@ -8,6 +8,16 @@ set -e  # Exit on error
 echo "=== Notion Integration Test Runner ==="
 echo
 
+# Load .env file if it exists
+if [ -f ".env" ]; then
+    echo "Loading environment variables from .env file..."
+    set -a  # Mark all new variables for export
+    source .env
+    set +a  # Turn off automatic export
+    echo "Environment variables loaded from .env"
+    echo
+fi
+
 # Check required environment variables
 echo "Checking environment variables..."
 
