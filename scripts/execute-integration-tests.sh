@@ -26,6 +26,21 @@ fi
 
 echo "Running integration tests..."
 
+# First verify authentication
+echo
+echo "=== Verifying Notion API Authentication ==="
+sf apex run -f scripts/apex/verify-auth.apex $ORG_FLAG
+if [ $? -ne 0 ]; then
+    echo
+    echo "❌ Authentication verification failed!"
+    echo "Please ensure:"
+    echo "1. Notion API key is properly configured in Named Credentials"
+    echo "2. The API key has access to the workspace"
+    echo "3. The Notion integration is not restricted"
+    exit 1
+fi
+echo "✓ Authentication verified successfully"
+
 # Test 1: Create
 echo
 echo "=== Test 1: Create and Sync ==="
