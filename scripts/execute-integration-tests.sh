@@ -26,6 +26,21 @@ fi
 
 echo "Running integration tests..."
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Track test failures
+TEST_FAILED=false
+
+# Function to run test check and track failures
+run_test_check() {
+    local test_file="$1"
+    "$SCRIPT_DIR/run-apex-with-validation.sh" "$test_file" "$ORG_FLAG"
+    if [ $? -ne 0 ]; then
+        TEST_FAILED=true
+    fi
+}
+
 # Test 1: Create
 echo
 echo "=== Test 1: Create and Sync ==="
@@ -34,7 +49,7 @@ sf apex run -f scripts/apex/test-1-create-setup.apex $ORG_FLAG
 echo ">>> Waiting 5 seconds for sync..."
 sleep 5
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-1-create-check.apex $ORG_FLAG
+run_test_check scripts/apex/test-1-create-check.apex
 
 # Test 2: Update
 echo
@@ -44,7 +59,7 @@ sf apex run -f scripts/apex/test-2-update-setup.apex $ORG_FLAG
 echo ">>> Waiting 5 seconds for sync..."
 sleep 5
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-2-update-check.apex $ORG_FLAG
+run_test_check scripts/apex/test-2-update-check.apex
 
 # Test 3: Relationships
 echo
@@ -54,7 +69,7 @@ sf apex run -f scripts/apex/test-3-relationship-setup.apex $ORG_FLAG
 echo ">>> Waiting 5 seconds for sync..."
 sleep 5
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-3-relationship-check.apex $ORG_FLAG
+run_test_check scripts/apex/test-3-relationship-check.apex
 
 # Test 4: Relationship Changes
 echo
@@ -64,7 +79,7 @@ sf apex run -f scripts/apex/test-4-relationship-change-setup.apex $ORG_FLAG
 echo ">>> Waiting 5 seconds for sync..."
 sleep 5
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-4-relationship-change-check.apex $ORG_FLAG
+run_test_check scripts/apex/test-4-relationship-change-check.apex
 
 # Test 5: Delete
 echo
@@ -74,7 +89,7 @@ sf apex run -f scripts/apex/test-5-delete-setup.apex $ORG_FLAG
 echo ">>> Waiting 5 seconds for sync..."
 sleep 5
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-5-delete-check.apex $ORG_FLAG
+run_test_check scripts/apex/test-5-delete-check.apex
 
 # Test 6: Batch Processing
 echo
@@ -84,16 +99,23 @@ sf apex run -f scripts/apex/test-6-batch-setup.apex $ORG_FLAG
 echo ">>> Waiting 10 seconds for batch sync..."
 sleep 10
 echo ">>> Checking results..."
-sf apex run -f scripts/apex/test-6-batch-check.apex $ORG_FLAG
+run_test_check scripts/apex/test-6-batch-check.apex
 
-# Final Report
+# Overall summary
 echo
-echo "=== Final Report ==="
-sf apex run -f scripts/apex/test-final-report.apex $ORG_FLAG
+echo "=================================="
+echo "=== Integration Test Summary ==="
+echo "=================================="
+
+# Check if all tests passed
+if [ "$TEST_FAILED" = false ]; then
+    echo "✅ All integration tests PASSED!"
+else
+    echo "❌ One or more integration tests FAILED!"
+    echo "Check the output above for details."
+    exit 1
+fi
 
 echo
-echo "=== Integration tests completed ==="
-echo
-echo "Check the output above for test results."
 echo "To view sync logs, run:"
 echo "  sf data query -f scripts/soql/recent-sync-logs.soql $ORG_FLAG"
