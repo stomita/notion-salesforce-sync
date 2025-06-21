@@ -2,7 +2,11 @@
   "packageDirectories": [
     {
       "path": "force-app/main",
-      "default": true
+      "default": true,
+      "package": "Notion Salesforce Sync",
+      "versionName": "Version 1.0",
+      "versionNumber": "1.0.0.NEXT",
+      "versionDescription": "Salesforce to Notion synchronization tool"
     },
     {
       "path": "force-app/integration",
@@ -10,7 +14,10 @@
     }
   ],
   "name": "notion-salesforce-sync",
-  "namespace": "",
+  "namespace": "notionsync",
   "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "63.0"
+  "sourceApiVersion": "63.0",
+  "packageAliases": {
+    "Notion Salesforce Sync": "0HogL0000000FVJSA2"
+  }
 }
