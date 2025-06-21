@@ -19,7 +19,8 @@ export default class NotionRelationshipConfig extends LightningElement {
         notionRelationPropertyName: '',
         parentObject: '',
         salesforceFieldLabel: '',
-        parentObjectLabel: ''
+        parentObjectLabel: '',
+        parentSyncObjectName: ''
     };
 
     connectedCallback() {
@@ -36,11 +37,16 @@ export default class NotionRelationshipConfig extends LightningElement {
                 const field = this.relationshipFields.find(f => f.apiName === mapping.salesforceRelationshipField);
                 const parentObject = mapping.parentObject || '';
                 
+                // Find the sync object configuration name
+                const syncObject = this.configuredSyncObjects.find(obj => obj.developerName === parentObject);
+                const parentSyncObjectName = syncObject ? syncObject.objectApiName : parentObject;
+                
                 return {
                     ...mapping,
                     salesforceFieldLabel: mapping.salesforceFieldLabel || (field ? field.label : mapping.salesforceRelationshipField),
                     parentObjectLabel: mapping.parentObjectLabel || parentObject,
-                    parentObject: parentObject
+                    parentObject: parentObject,
+                    parentSyncObjectName: parentSyncObjectName
                 };
             });
         }
@@ -81,7 +87,8 @@ export default class NotionRelationshipConfig extends LightningElement {
             notionRelationPropertyName: '',
             parentObject: '',
             salesforceFieldLabel: '',
-            parentObjectLabel: ''
+            parentObjectLabel: '',
+            parentSyncObjectName: ''
         };
     }
 
@@ -107,7 +114,8 @@ export default class NotionRelationshipConfig extends LightningElement {
                     salesforceRelationshipField: fieldApiName,
                     salesforceFieldLabel: field.label,
                     parentObject: syncObject.developerName,
-                    parentObjectLabel: referencedObject
+                    parentObjectLabel: referencedObject,
+                    parentSyncObjectName: syncObject.objectApiName
                 };
             } else {
                 // If no sync object is configured for this relationship, clear the mapping
@@ -116,7 +124,8 @@ export default class NotionRelationshipConfig extends LightningElement {
                     salesforceRelationshipField: fieldApiName,
                     salesforceFieldLabel: field.label,
                     parentObject: '',
-                    parentObjectLabel: ''
+                    parentObjectLabel: '',
+                    parentSyncObjectName: ''
                 };
             }
         }
@@ -144,7 +153,8 @@ export default class NotionRelationshipConfig extends LightningElement {
             notionRelationPropertyName: '',
             parentObject: '',
             salesforceFieldLabel: '',
-            parentObjectLabel: ''
+            parentObjectLabel: '',
+            parentSyncObjectName: ''
         };
     }
 

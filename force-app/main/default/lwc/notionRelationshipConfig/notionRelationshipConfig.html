@@ -12,32 +12,49 @@
                 <template if:true={relationshipMappings.length}>
                     <div class="slds-m-bottom_medium">
                         <h3 class="slds-text-heading_small slds-m-bottom_small">Current Relationship Mappings</h3>
-                        <template for:each={relationshipMappings} for:item="mapping" for:index="index">
-                            <div key={mapping.salesforceRelationshipField} class="slds-box slds-m-bottom_x-small">
-                                <div class="slds-grid slds-grid_align-spread">
-                                    <div>
-                                        <strong>{mapping.salesforceRelationshipField}</strong>
-                                        <span class="slds-text-body_small slds-text-color_weak"> ({mapping.salesforceFieldLabel})</span>
-                                        → 
-                                        <strong>{mapping.parentObjectLabel}</strong>
-                                        <template if:true={mapping.notionRelationPropertyName}>
-                                            <span class="slds-m-left_x-small">
-                                                via Notion property: <strong>{mapping.notionRelationPropertyName}</strong>
-                                            </span>
-                                        </template>
-                                    </div>
-                                    <lightning-button-icon
-                                        icon-name="utility:delete"
-                                        alternative-text="Remove"
-                                        title="Remove mapping"
-                                        variant="bare"
-                                        size="small"
-                                        data-index={index}
-                                        onclick={handleRemoveRelationship}
-                                    ></lightning-button-icon>
-                                </div>
-                            </div>
-                        </template>
+                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Salesforce Relationship Field</th>
+                                    <th scope="col">Parent Object</th>
+                                    <th scope="col">Notion Relation Property</th>
+                                    <th scope="col" style="width: 50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={relationshipMappings} for:item="mapping" for:index="index">
+                                    <tr key={mapping.salesforceRelationshipField}>
+                                        <td>
+                                            <div>
+                                                <strong>{mapping.salesforceFieldLabel}</strong>
+                                                <span class="slds-text-color_weak"> ({mapping.salesforceRelationshipField})</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="slds-text-color_weak">
+                                                {mapping.parentSyncObjectName}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                {mapping.notionRelationPropertyName}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <lightning-button-icon
+                                                icon-name="utility:delete"
+                                                alternative-text="Remove"
+                                                title="Remove mapping"
+                                                variant="bare"
+                                                size="small"
+                                                data-index={index}
+                                                onclick={handleRemoveRelationship}
+                                            ></lightning-button-icon>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
                     </div>
                 </template>
 
