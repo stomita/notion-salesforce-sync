@@ -1,8 +1,65 @@
 @isTest
 private class NotionMetadataServiceTest {
     
+    // Inner mock class for WebServiceMock
+    private class MetadataServiceMock implements WebServiceMock {
+        private Boolean shouldSucceed;
+        
+        public MetadataServiceMock(Boolean shouldSucceed) {
+            this.shouldSucceed = shouldSucceed;
+        }
+        
+        public void doInvoke(
+            Object stub,
+            Object request,
+            Map<String, Object> response,
+            String endpoint,
+            String soapAction,
+            String requestName,
+            String responseNS,
+            String responseName,
+            String responseType
+        ) {
+            // Create mock response based on the request type
+            if (requestName == 'upsertMetadata') {
+                MetadataService.upsertMetadataResponse_element responseElement = 
+                    new MetadataService.upsertMetadataResponse_element();
+                
+                // Create successful result
+                MetadataService.UpsertResult result = new MetadataService.UpsertResult();
+                result.success = shouldSucceed;
+                result.fullName = 'TestMetadata';
+                
+                if (!shouldSucceed) {
+                    result.errors = new List<MetadataService.Error>();
+                    MetadataService.Error error = new MetadataService.Error();
+                    error.message = 'Mock error message';
+                    error.statusCode = 'INVALID_STATUS';
+                    result.errors.add(error);
+                }
+                
+                responseElement.result = new List<MetadataService.UpsertResult>{result};
+                response.put('response_x', responseElement);
+            } else if (requestName == 'deleteMetadata') {
+                MetadataService.deleteMetadataResponse_element responseElement = 
+                    new MetadataService.deleteMetadataResponse_element();
+                
+                // Create successful delete result
+                MetadataService.DeleteResult result = new MetadataService.DeleteResult();
+                result.success = true;
+                result.fullName = 'TestMetadata';
+                
+                responseElement.result = new List<MetadataService.DeleteResult>{result};
+                response.put('response_x', responseElement);
+            }
+        }
+    }
+    
     @isTest
     static void testSaveSyncConfiguration() {
+        // Set up the web service mock
+        Test.setMock(WebServiceMock.class, new MetadataServiceMock(true));
+        
         // Create test configuration
         NotionAdminController.SyncConfiguration config = new NotionAdminController.SyncConfiguration();
         config.objectApiName = 'Account';
@@ -28,54 +85,54 @@ private class NotionMetadataServiceTest {
         config.relationshipMappings.add(relMapping);
         
         Test.startTest();
-        try {
-            NotionMetadataService.saveSyncConfiguration(config);
-            // If we get here in a test, it means the deployment was queued but not executed
-            System.assert(true, 'Method should complete without error in non-test context');
-        } catch (System.CalloutException e) {
-            // Expected in test context - cannot make web service callouts from tests
-            System.assert(e.getMessage().contains('Web サービスコールアウト') || 
-                         e.getMessage().contains('web service callout') ||
-                         e.getMessage().contains('TestMethod'), 
-                'Expected CalloutException for web service callout in test');
-        } catch (System.AsyncException e) {
-            // Also acceptable - cannot deploy metadata from tests
-            System.assert(e.getMessage().contains('Metadata cannot be deployed from within a test'), 
-                'Expected AsyncException for metadata deployment in test');
-        }
+        // With mock in place, this should succeed
+        NotionMetadataService.saveSyncConfiguration(config);
         Test.stopTest();
+        
+        // If we get here, the mock worked correctly
+        System.assert(true, 'Method completed successfully with mock');
     }
     
     @isTest
     static void testDeleteObjectConfiguration() {
+        // Set up the web service mock
+        Test.setMock(WebServiceMock.class, new MetadataServiceMock(true));
+        
         // Note: We cannot insert custom metadata records in test context
         // The method will fail when trying to query for the metadata
         Test.startTest();
         try {
             NotionMetadataService.deleteObjectConfiguration('TestObject');
             // If we get here in a test, it might mean no metadata exists
-            System.assert(true, 'Method completed - likely no metadata found');
+            System.assert(false, 'Should have thrown exception for missing metadata');
         } catch (System.CalloutException e) {
-            // Multiple possible CalloutException scenarios:
-            // 1. No sync configuration found (thrown at line 188)
-            // 2. Web service callout not supported in test
-            // 3. Cannot retrieve session ID in test context
-            Boolean isExpectedError = 
-                e.getMessage().contains('No sync configuration found') ||
-                e.getMessage().contains('Web サービスコールアウト') || 
-                e.getMessage().contains('web service callout') ||
-                e.getMessage().contains('TestMethod') ||
-                e.getMessage().contains('Cannot retrieve session ID');
-            System.assert(isExpectedError, 
-                'Expected CalloutException but got unexpected message: ' + e.getMessage());
-        } catch (System.QueryException e) {
-            // Expected - Custom Metadata SOQL doesn't support OR in some contexts
-            System.assert(e.getMessage().contains('OR') || e.getMessage().contains('論理和'), 
-                'Expected QueryException for OR operator in Custom Metadata query');
-        } catch (System.AsyncException e) {
-            // Also acceptable - cannot deploy metadata from tests
-            System.assert(e.getMessage().contains('Metadata cannot be deployed from within a test'), 
-                'Expected AsyncException for metadata deployment in test');
+            // Expected - No sync configuration found (thrown at line 188)
+            System.assert(e.getMessage().contains('No sync configuration found'), 
+                'Expected CalloutException for missing metadata but got: ' + e.getMessage());
+        }
+        Test.stopTest();
+    }
+    
+    @isTest
+    static void testSaveSyncConfigurationWithError() {
+        // Set up the web service mock to return failure
+        Test.setMock(WebServiceMock.class, new MetadataServiceMock(false));
+        
+        // Create test configuration
+        NotionAdminController.SyncConfiguration config = new NotionAdminController.SyncConfiguration();
+        config.objectApiName = 'Account';
+        config.notionDatabaseId = 'test-db-id';
+        config.isActive = true;
+        config.salesforceIdPropertyName = 'Salesforce_ID';
+        
+        Test.startTest();
+        try {
+            NotionMetadataService.saveSyncConfiguration(config);
+            System.assert(false, 'Should have thrown exception for failed metadata save');
+        } catch (System.CalloutException e) {
+            // Expected - metadata save failed
+            System.assert(e.getMessage().contains('Failed to save metadata'), 
+                'Expected CalloutException for failed save but got: ' + e.getMessage());
         }
         Test.stopTest();
     }
