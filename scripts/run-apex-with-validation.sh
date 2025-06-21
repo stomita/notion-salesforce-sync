@@ -19,14 +19,29 @@ TEMP_OUTPUT="/tmp/apex-output-$$.txt"
 
 # Run the apex script and capture output
 echo "Running: $APEX_FILE"
-if sf apex run -f "$APEX_FILE" $ORG_FLAG > "$TEMP_OUTPUT" 2>&1; then
+# Use --json to get structured output including logs
+if sf apex run -f "$APEX_FILE" $ORG_FLAG --json > "$TEMP_OUTPUT" 2>&1; then
     COMMAND_SUCCESS=true
 else
     COMMAND_SUCCESS=false
 fi
 
-# Display the output
-cat "$TEMP_OUTPUT"
+# If JSON output, extract logs
+if grep -q '"status":\|"success":' "$TEMP_OUTPUT"; then
+    # Extract logs from JSON output (could be in data.logs or result.logs)
+    jq -r '.data.logs // .result.logs // ""' "$TEMP_OUTPUT" > "${TEMP_OUTPUT}.logs" 2>/dev/null || true
+    if [ -s "${TEMP_OUTPUT}.logs" ]; then
+        echo "=== Debug Logs ==="
+        cat "${TEMP_OUTPUT}.logs"
+        cp "${TEMP_OUTPUT}.logs" "$TEMP_OUTPUT"
+    else
+        # If no logs, show the error message
+        jq -r '.message // .error // ""' "$TEMP_OUTPUT" 2>/dev/null || cat "$TEMP_OUTPUT"
+    fi
+else
+    # Not JSON, display as is
+    cat "$TEMP_OUTPUT"
+fi
 
 # Check for our unique failure marker
 if grep -q "INTEGRATION_TEST_FAILURE_MARKER" "$TEMP_OUTPUT"; then
@@ -51,8 +66,8 @@ for pattern in "${SUCCESS_PATTERNS[@]}"; do
     fi
 done
 
-# Clean up temp file
-rm -f "$TEMP_OUTPUT"
+# Clean up temp files
+rm -f "$TEMP_OUTPUT" "${TEMP_OUTPUT}.logs"
 
 # Determine final status
 if [ "$COMMAND_SUCCESS" = false ]; then
