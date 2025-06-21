@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-    <label>Test Parent Sync</label>
+    <label>Test Child Sync</label>
     <protected>false</protected>
     <values>
         <field>IsActive__c</field>
@@ -8,11 +8,11 @@
     </values>
     <values>
         <field>NotionDatabaseId__c</field>
-        <value xsi:type="xsd:string">REPLACE_WITH_NOTION_DATABASE_ID_FOR_TEST_PARENT</value>
+        <value xsi:type="xsd:string">212576ee0dd580648bf4c88fd5e23334</value>
     </values>
     <values>
         <field>ObjectApiName__c</field>
-        <value xsi:type="xsd:string">Test_Parent_Object__c</value>
+        <value xsi:type="xsd:string">Test_Child_Object__c</value>
     </values>
     <values>
         <field>SalesforceIdPropertyName__c</field>
