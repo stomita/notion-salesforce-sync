@@ -42,6 +42,31 @@ public with sharing class NotionAdminController {
     }
     
     @AuraEnabled(cacheable=true)
+    public static List<Map<String, String>> getConfiguredSyncObjects() {
+        checkAdminPermission();
+        try {
+            List<Map<String, String>> syncObjects = new List<Map<String, String>>();
+            
+            for (NotionSyncObject__mdt obj : [
+                SELECT Id, DeveloperName, ObjectApiName__c, NotionDatabaseId__c
+                FROM NotionSyncObject__mdt
+                WHERE IsActive__c = true
+            ]) {
+                Map<String, String> objMap = new Map<String, String>();
+                objMap.put('id', obj.Id);
+                objMap.put('developerName', obj.DeveloperName);
+                objMap.put('objectApiName', obj.ObjectApiName__c);
+                objMap.put('notionDatabaseId', obj.NotionDatabaseId__c);
+                syncObjects.add(objMap);
+            }
+            
+            return syncObjects;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error fetching configured sync objects: ' + e.getMessage());
+        }
+    }
+    
+    @AuraEnabled(cacheable=true)
     public static DatabaseSchema getDatabaseSchema(String databaseId) {
         checkAdminPermission();
         try {

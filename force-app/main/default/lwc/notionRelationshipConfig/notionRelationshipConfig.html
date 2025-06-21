@@ -16,8 +16,15 @@
                             <div key={mapping.salesforceRelationshipField} class="slds-box slds-m-bottom_x-small">
                                 <div class="slds-grid slds-grid_align-spread">
                                     <div>
-                                        <strong>{mapping.salesforceRelationshipField}</strong> → 
-                                        {mapping.notionRelationPropertyName}
+                                        <strong>{mapping.salesforceRelationshipField}</strong>
+                                        <span class="slds-text-body_small slds-text-color_weak"> ({mapping.salesforceFieldLabel})</span>
+                                        → 
+                                        <strong>{mapping.parentObjectLabel}</strong>
+                                        <template if:true={mapping.notionRelationPropertyName}>
+                                            <span class="slds-m-left_x-small">
+                                                via Notion property: <strong>{mapping.notionRelationPropertyName}</strong>
+                                            </span>
+                                        </template>
                                     </div>
                                     <lightning-button-icon
                                         icon-name="utility:delete"
@@ -35,12 +42,75 @@
                 </template>
 
                 <!-- Add Button -->
-                <lightning-button
-                    label="Add Relationship Mapping"
-                    icon-name="utility:add"
-                    onclick={handleAddRelationship}
-                    variant="neutral"
-                ></lightning-button>
+                <template if:false={showAddMapping}>
+                    <lightning-button
+                        label="Add Relationship Mapping"
+                        icon-name="utility:add"
+                        onclick={handleShowAddMapping}
+                        variant="neutral"
+                        disabled={disableAddButton}
+                    ></lightning-button>
+                    <template if:false={canAddMoreRelationships}>
+                        <div class="slds-text-color_weak slds-m-top_x-small">
+                            <template if:true={hasUnmappedRelationshipFields}>
+                                Some relationship fields cannot be mapped because their target objects don't have sync configurations
+                            </template>
+                            <template if:false={hasUnmappedRelationshipFields}>
+                                All available relationship fields have been mapped
+                            </template>
+                        </div>
+                    </template>
+                </template>
+
+                <!-- New Mapping Form -->
+                <template if:true={showAddMapping}>
+                    <div class="slds-box slds-m-top_small">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">New Relationship Mapping</h3>
+                        
+                        <div class="slds-grid slds-gutters slds-m-bottom_small">
+                            <div class="slds-col slds-size_1-of-3">
+                                <lightning-combobox
+                                    name="field"
+                                    label="Salesforce Relationship Field"
+                                    value={newMapping.salesforceRelationshipField}
+                                    placeholder="Select a relationship field"
+                                    options={availableRelationshipFields}
+                                    onchange={handleFieldSelection}
+                                    required
+                                ></lightning-combobox>
+                            </div>
+                            
+                            <div class="slds-col slds-size_1-of-3">
+                                <lightning-combobox
+                                    name="property"
+                                    label="Notion Relation Property"
+                                    value={newMapping.notionRelationPropertyName}
+                                    placeholder="Select a relation property"
+                                    options={availableRelationProperties}
+                                    onchange={handlePropertySelection}
+                                    required
+                                    disabled={isNotionPropertyDisabled}
+                                ></lightning-combobox>
+                            </div>
+                        </div>
+
+                        <div class="slds-grid slds-gutters">
+                            <div class="slds-col">
+                                <lightning-button
+                                    label="Cancel"
+                                    onclick={handleCancelAddMapping}
+                                ></lightning-button>
+                                <lightning-button
+                                    label="Add Mapping"
+                                    variant="brand"
+                                    onclick={handleSaveNewMapping}
+                                    disabled={isSaveDisabled}
+                                    class="slds-m-left_x-small"
+                                ></lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
 
                 <!-- Help Text -->
                 <div class="slds-m-top_medium slds-text-body_small slds-text-color_weak">
