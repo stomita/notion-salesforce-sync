@@ -14,7 +14,7 @@
     }
   ],
   "name": "notion-salesforce-sync",
-  "namespace": "notionsync",
+  "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "63.0",
   "packageAliases": {
