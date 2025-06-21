@@ -44,16 +44,53 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 
 ## Development Commands
 
-### Scratch Org Setup (Initial or when expired)
-- `sf org create scratch -f config/project-scratch-def.json -a my-scratch` - Create scratch org
-- `sf project deploy start --source-dir force-app` - Deploy all metadata to scratch org
-- `sf org assign permset --name Notion_Integration_User` - Assign integration permission set for API access
-- `sf org assign permset --name Notion_Sync_Admin` - Assign admin permission set to access Notion Sync Admin UI
-- `sf org delete scratch -o my-scratch -p` - Delete scratch org (when done)
+### Scratch Org Setup - Automated (Recommended)
+Use the provided setup script for consistent scratch org initialization:
+
+```bash
+# Create and setup a new scratch org with all configurations
+./scripts/setup-scratch-org.sh
+
+# Or specify a custom org alias
+./scripts/setup-scratch-org.sh my-custom-alias
+```
+
+The setup script automatically:
+1. Creates a new scratch org with 30-day expiration
+2. Deploys all metadata (including integration test objects)
+3. Assigns all required permission sets:
+   - `Notion_Integration_User` - API access permissions
+   - `Notion_Sync_Admin` - Admin UI access
+   - `Notion_Integration_Test_User` - Test object permissions
+4. Generates a password for UI testing
+5. Provides next steps and useful commands
+
+### Scratch Org Setup - Manual (if needed)
+If you prefer manual setup or need to customize the process:
+
+```bash
+# Create scratch org
+sf org create scratch -f config/project-scratch-def.json -a notion-sync-scratch -d -y 7
+
+# Deploy all metadata (including integration folder)
+sf project deploy start --source-dir force-app -o notion-sync-scratch
+
+# Assign ALL required permission sets
+sf org assign permset --name Notion_Integration_User -o notion-sync-scratch
+sf org assign permset --name Notion_Sync_Admin -o notion-sync-scratch
+sf org assign permset --name Notion_Integration_Test_User -o notion-sync-scratch
+
+# Generate password (for UI testing)
+sf org generate password -o notion-sync-scratch
+
+# Open the org
+sf org open -o notion-sync-scratch -p /lightning/n/Notion_Sync_Admin
+```
 
 ### Daily Development Commands
 - `sf project deploy start --source-dir force-app` - Deploy to Salesforce org
 - `sf apex test run --code-coverage --result-format human` - Run all Apex tests
+- `sf org delete scratch -o notion-sync-scratch -p` - Delete scratch org (when done)
 
 ### UI Testing with Playwright MCP
 When testing the UI in Claude, use the Playwright MCP browser control tool:
