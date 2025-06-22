@@ -1,3 +1,3 @@
-// Test 2 Setup: Ensure records exist to update
+// Test Setup: Clean up test data
 NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
-executor.setupUpdateTest();
+executor.setupTestData();

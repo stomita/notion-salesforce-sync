@@ -1,19 +1,9 @@
-// Test 6 - Setup: Create many records to test batch processing
-System.debug('=== Test 6 Setup: Creating bulk records for batch processing ===');
+// Test 6 - Setup: Clean up any existing batch test data
+System.debug('=== Test 6 Setup: Cleaning up existing batch test data ===');
 
 NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
 
-try {
-    // Create batch test records
-    executor.createBatchTestRecords();
-    
-    // Report success
-    System.debug('✓ Test 6: Batch setup completed');
-    System.debug('SUCCESS: Batch test records created successfully');
-} catch (Exception e) {
-    // Report failure
-    System.debug('✗ Test 6: Batch setup FAILED');
-    System.debug('ERROR: ' + e.getMessage());
-    System.debug('INTEGRATION_TEST_FAILURE_MARKER');
-    throw e; // Re-throw to ensure non-zero exit code
-}
+// Clean up any existing batch test data
+executor.setupBatchTest();
+
+System.debug('Batch test environment ready.');

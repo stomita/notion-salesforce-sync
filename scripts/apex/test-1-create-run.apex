@@ -1,5 +1,5 @@
-// Test 1 - Setup: Create test records
-System.debug('=== Test 1 Setup: Creating test records ===');
+// Test 1 - Run: Create test records
+System.debug('=== Test 1 Run: Creating test records ===');
 
 NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
 
@@ -7,6 +7,6 @@ NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
 executor.setupTestData();
 
 // Create test records
-executor.createTestRecords();
+executor.runCreateTest();
 
 System.debug('Test records created. Wait for sync to complete.');
