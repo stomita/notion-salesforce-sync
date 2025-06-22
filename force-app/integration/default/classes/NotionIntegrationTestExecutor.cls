@@ -69,8 +69,6 @@ public class NotionIntegrationTestExecutor {
      */
     public void checkCreateSyncResults() {
         System.debug('\n--- Checking create sync results ---');
-        
-        try {
             // Get the most recent test records
             Account testAccount = [
                 SELECT Id, Name, Description 
@@ -168,14 +166,8 @@ public class NotionIntegrationTestExecutor {
                 }
             }
             
-            passCount++;
-            System.debug('✓ Create sync test passed - verified in Notion');
-            
-        } catch (Exception e) {
-            failCount++;
-            errors.add('Create sync test failed: ' + e.getMessage());
-            System.debug('✗ Create sync test failed: ' + e.getMessage());
-        }
+        passCount++;
+        System.debug('✓ Create sync test passed - verified in Notion');
     }
     
     /**
@@ -217,8 +209,6 @@ public class NotionIntegrationTestExecutor {
      */
     public void checkUpdateSyncResults() {
         System.debug('\n--- Test 2: Update and Sync ---');
-        
-        try {
             // Get existing test records
             Account testAccount = [
                 SELECT Id, Name, Description 
@@ -304,14 +294,8 @@ public class NotionIntegrationTestExecutor {
                 }
             }
             
-            passCount++;
-            System.debug('✓ Update sync test passed - verified in Notion');
-            
-        } catch (Exception e) {
-            failCount++;
-            errors.add('Update sync test failed: ' + e.getMessage());
-            System.debug('✗ Update sync test failed: ' + e.getMessage());
-        }
+        passCount++;
+        System.debug('✓ Update sync test passed - verified in Notion');
     }
     
     /**
@@ -363,8 +347,6 @@ public class NotionIntegrationTestExecutor {
      */
     public void checkRelationshipSyncResults() {
         System.debug('\n--- Checking relationship sync results ---');
-        
-        try {
             // Get created child and contact with their relationships
             Test_Child_Object__c testChild = [
                 SELECT Id, Name, Test_Parent__c, Account__c
@@ -447,14 +429,8 @@ public class NotionIntegrationTestExecutor {
                 }
             }
             
-            passCount++;
-            System.debug('✓ Relationship sync test passed - verified in Notion');
-            
-        } catch (Exception e) {
-            failCount++;
-            errors.add('Relationship sync test failed: ' + e.getMessage());
-            System.debug('✗ Relationship sync test failed: ' + e.getMessage());
-        }
+        passCount++;
+        System.debug('✓ Relationship sync test passed - verified in Notion');
     }
     
     /**
@@ -532,8 +508,6 @@ public class NotionIntegrationTestExecutor {
      */
     public void checkRelationshipChanges() {
         System.debug('\n--- Checking relationship change sync results ---');
-        
-        try {
             // Get the records that had relationships changed
             Contact testContact = [
                 SELECT Id, AccountId
@@ -663,14 +637,8 @@ public class NotionIntegrationTestExecutor {
                 }
             }
             
-            passCount++;
-            System.debug('✓ Relationship change sync test passed - verified in Notion');
-            
-        } catch (Exception e) {
-            failCount++;
-            errors.add('Relationship change sync test failed: ' + e.getMessage());
-            System.debug('✗ Relationship change sync test failed: ' + e.getMessage());
-        }
+        passCount++;
+        System.debug('✓ Relationship change sync test passed - verified in Notion');
     }
     
     /**
@@ -763,8 +731,6 @@ public class NotionIntegrationTestExecutor {
      */
     public void checkDeleteSyncResults() {
         System.debug('\n--- Checking delete sync results ---');
-        
-        try {
             // Find all delete sync logs from today
             List<Notion_Sync_Log__c> logs = [
                 SELECT Id, Record_Id__c, Object_Type__c, Status__c, Error_Message__c, Notion_Page_Id__c
@@ -837,14 +803,8 @@ public class NotionIntegrationTestExecutor {
             }
             System.debug('Verified ' + verifiedDeletes + ' pages deleted from Notion');
             
-            passCount++;
-            System.debug('✓ Delete sync test passed - ' + totalDeleteLogs + ' records deleted and verified in Notion');
-            
-        } catch (Exception e) {
-            failCount++;
-            errors.add('Delete sync test failed: ' + e.getMessage());
-            System.debug('✗ Delete sync test failed: ' + e.getMessage());
-        }
+        passCount++;
+        System.debug('✓ Delete sync test passed - ' + totalDeleteLogs + ' records deleted and verified in Notion');
     }
     
     /**
@@ -896,8 +856,6 @@ public class NotionIntegrationTestExecutor {
      */
     public void checkBatchProcessingResults() {
         System.debug('\n--- Checking batch processing results ---');
-        
-        try {
             // Get the batch test records
             List<Account> batchAccounts = [
                 SELECT Id, Name 
@@ -1011,15 +969,9 @@ public class NotionIntegrationTestExecutor {
             assert(syncedContactIds.size() >= 20, 
                 'At least 20 contacts should be synced, found: ' + syncedContactIds.size());
             
-            passCount++;
-            System.debug('✓ Batch processing test passed - ' + 
-                        (syncedAccountIds.size() + syncedContactIds.size()) + ' records synced');
-            
-        } catch (Exception e) {
-            failCount++;
-            errors.add('Batch processing test failed: ' + e.getMessage());
-            System.debug('✗ Batch processing test failed: ' + e.getMessage());
-        }
+        passCount++;
+        System.debug('✓ Batch processing test passed - ' + 
+                    (syncedAccountIds.size() + syncedContactIds.size()) + ' records synced');
     }
     
     /**

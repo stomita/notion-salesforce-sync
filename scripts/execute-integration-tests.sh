@@ -96,8 +96,8 @@ echo
 echo "=== Test 6: Batch Processing ==="
 echo ">>> Creating bulk records..."
 sf apex run -f scripts/apex/test-6-batch-setup.apex $ORG_FLAG
-echo ">>> Waiting 10 seconds for batch sync..."
-sleep 10
+echo ">>> Waiting 30 seconds for batch sync to complete (100 records)..."
+sleep 30
 echo ">>> Checking results..."
 run_test_check scripts/apex/test-6-batch-check.apex
 
