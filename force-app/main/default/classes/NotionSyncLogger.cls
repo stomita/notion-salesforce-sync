@@ -13,12 +13,7 @@ public with sharing class NotionSyncLogger {
         return cachedSettings != null && cachedSettings.Enable_Sync_Logging__c == true;
     }
     
-    @future
-    public static void logAsync(List<String> logJsonList) {
-        logSync(logJsonList);
-    }
-    
-    // Synchronous version for testing
+    // Synchronous version for testing and Platform Event processing
     public static void logSync(List<String> logJsonList) {
         // Check if logging is enabled before processing
         if (!isLoggingEnabled()) {
