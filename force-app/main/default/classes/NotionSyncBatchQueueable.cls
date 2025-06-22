@@ -3,26 +3,28 @@
  * Processes requests in optimized batches with governor limit monitoring
  */
 public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallouts {
-    private List<NotionSyncQueueable.SyncRequest> allRequests;
+    private List<NotionSync.Request> allRequests;
     private NotionSyncBatchProcessor batchProcessor;
     private Integer startIndex;
+    private NotionSyncLogger logger;
     
     /**
      * Constructor for initial batch processing
      */
-    public NotionSyncBatchQueueable(List<NotionSyncQueueable.SyncRequest> requests) {
+    public NotionSyncBatchQueueable(List<NotionSync.Request> requests) {
         this(requests, 0, null);
     }
     
     /**
      * Constructor for continued batch processing
      */
-    public NotionSyncBatchQueueable(List<NotionSyncQueueable.SyncRequest> requests, 
+    public NotionSyncBatchQueueable(List<NotionSync.Request> requests, 
                                    Integer startIndex, 
                                    NotionSyncBatchProcessor processor) {
         this.allRequests = requests;
         this.startIndex = startIndex;
         this.batchProcessor = processor != null ? processor : new NotionSyncBatchProcessor();
+        this.logger = new NotionSyncLogger();
     }
     
     /**
@@ -33,19 +35,24 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         
         try {
             // Get remaining requests to process
-            List<NotionSyncQueueable.SyncRequest> remainingRequests = getRemainingRequests();
+            List<NotionSync.Request> remainingRequests = getRemainingRequests();
             
             if (remainingRequests.isEmpty()) {
                 return;
             }
             
-            // Process batches
+            System.debug('NotionSyncBatchQueueable: Processing batch starting at index ' + startIndex + 
+                       ' with ' + remainingRequests.size() + ' remaining requests out of ' + allRequests.size() + ' total');
+            
+            // Process batches - pass the logger instance
             List<NotionSyncBatchProcessor.BatchResult> results = 
-                batchProcessor.processBatches(remainingRequests);
+                batchProcessor.processBatches(remainingRequests, logger);
             
             // Check if we need to continue processing
             Integer processedCount = getProcessedCount(results);
             nextStartIndex = startIndex + processedCount;
+            
+            System.debug('NotionSyncBatchQueueable: Processed ' + processedCount + ' records. Next start index: ' + nextStartIndex);
             
             // If we have more requests, continue processing
             // Even if deferred, we should chain another job to process remaining records
@@ -68,23 +75,26 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
                 }
             }
             
-            // Log batch processing results (without flushing)
-            logBatchResults(results);
+            // Add batch-level summary logs
+            addBatchSummaryLogs(results);
             
         } catch (Exception e) {
             handleBatchError(e);
         } finally {
-            // Flush logs after each batch to ensure they're saved
-            // This is safe because we've completed all callouts for this batch
-            NotionSyncLogger.flush();
+            // Flush logs directly - DML after callout is fine
+            try {
+                logger.flush();
+            } catch (Exception e) {
+                System.debug('Failed to flush logs: ' + e.getMessage());
+            }
         }
     }
     
     /**
      * Get remaining requests to process
      */
-    private List<NotionSyncQueueable.SyncRequest> getRemainingRequests() {
-        List<NotionSyncQueueable.SyncRequest> remaining = new List<NotionSyncQueueable.SyncRequest>();
+    private List<NotionSync.Request> getRemainingRequests() {
+        List<NotionSync.Request> remaining = new List<NotionSync.Request>();
         
         for (Integer i = startIndex; i < allRequests.size(); i++) {
             remaining.add(allRequests[i]);
@@ -120,9 +130,9 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
     }
     
     /**
-     * Log batch processing results
+     * Add batch-level summary logs
      */
-    private void logBatchResults(List<NotionSyncBatchProcessor.BatchResult> results) {
+    private void addBatchSummaryLogs(List<NotionSyncBatchProcessor.BatchResult> results) {
         for (NotionSyncBatchProcessor.BatchResult result : results) {
             // Log batch-level metrics
             String message = String.format(
@@ -136,27 +146,27 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
                 }
             );
             
-            // Create a summary log entry
-            NotionSyncLogger.LogEntry logEntry = NotionSyncLogger.logWithRateLimit(
+            // Log batch summary using cleaner API
+            NotionSyncLogger.LogEntry entry = logger.createLogEntry(
                 'BATCH_' + System.now().getTime(),
                 'BatchProcess',
-                'BATCH',
-                result.status,
-                result.errorMessage,
-                0,
-                null,
-                result.status == 'Rate Limited',
-                result.retryAfterSeconds
-            );
+                'BATCH'
+            )
+            .withStatus(result.status)
+            .withMetrics(result.calloutsUsed, result.cpuTimeUsed);
             
-            // Update metrics
-            logEntry.apiCallsMade = result.calloutsUsed;
-            logEntry.cpuTimeUsed = result.cpuTimeUsed;
+            if (result.status == 'Rate Limited') {
+                entry.withRateLimit(result.retryAfterSeconds);
+            }
+            
+            if (result.errorMessage != null) {
+                entry.withError(result.errorMessage);
+            }
+            
+            logger.log(entry);
             
             System.debug(LoggingLevel.INFO, message);
         }
-        
-        // Don't flush here - let the main execute method handle flushing
     }
     
     /**
@@ -166,17 +176,12 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         System.debug(LoggingLevel.ERROR, 'Batch processing error: ' + e.getMessage());
         System.debug(LoggingLevel.ERROR, 'Stack trace: ' + e.getStackTraceString());
         
-        // Log error for monitoring
-        NotionSyncLogger.log(
-            'BATCH_ERROR',
-            'BatchProcess',
-            'ERROR',
-            'Failed',
-            'Batch processing error: ' + e.getMessage(),
-            0
+        // Log error using instance logger
+        logger.log(
+            logger.createLogEntry('BATCH_ERROR', 'BatchProcess', 'ERROR')
+                .withError('Batch processing error: ' + e.getMessage())
         );
         
-        // Don't flush here - let the main execute method handle flushing
         // Don't rethrow - let the job complete
     }
 }

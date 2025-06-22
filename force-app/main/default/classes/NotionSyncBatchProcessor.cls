@@ -17,7 +17,6 @@ public class NotionSyncBatchProcessor {
     private static final Decimal CALLOUT_THRESHOLD = 0.8; // 80% of limit
     
     private Integer batchSize;
-    private NotionSyncQueueable queueable;
     
     public NotionSyncBatchProcessor() {
         this(DEFAULT_BATCH_SIZE);
@@ -25,26 +24,28 @@ public class NotionSyncBatchProcessor {
     
     public NotionSyncBatchProcessor(Integer batchSize) {
         this.batchSize = Math.max(MIN_BATCH_SIZE, Math.min(batchSize, MAX_BATCH_SIZE));
-        this.queueable = new NotionSyncQueueable(new List<NotionSyncQueueable.SyncRequest>());
     }
     
     /**
      * Process sync requests in optimized batches
      * @param allRequests All sync requests to process
+     * @param logger Logger instance to use for logging
      * @return List of BatchResult containing processing results
      */
-    public List<BatchResult> processBatches(List<NotionSyncQueueable.SyncRequest> allRequests) {
+    public List<BatchResult> processBatches(List<NotionSync.Request> allRequests, NotionSyncLogger logger) {
         List<BatchResult> results = new List<BatchResult>();
-        List<List<NotionSyncQueueable.SyncRequest>> batches = createBatches(allRequests);
+        List<List<NotionSync.Request>> batches = createBatches(allRequests);
         
-        for (List<NotionSyncQueueable.SyncRequest> batch : batches) {
-            BatchResult result = processSingleBatch(batch);
+        System.debug('NotionSyncBatchProcessor: Created ' + batches.size() + ' batches from ' + allRequests.size() + ' requests');
+        
+        for (List<NotionSync.Request> batch : batches) {
+            BatchResult result = processSingleBatch(batch, logger);
             results.add(result);
             
             // Check if we should defer remaining batches
             if (result.shouldDefer) {
                 // Queue remaining batches for async processing
-                List<NotionSyncQueueable.SyncRequest> remainingRequests = new List<NotionSyncQueueable.SyncRequest>();
+                List<NotionSync.Request> remainingRequests = new List<NotionSync.Request>();
                 for (Integer i = batches.indexOf(batch) + 1; i < batches.size(); i++) {
                     remainingRequests.addAll(batches[i]);
                 }
@@ -66,15 +67,15 @@ public class NotionSyncBatchProcessor {
     /**
      * Create optimized batches based on current batch size
      */
-    private List<List<NotionSyncQueueable.SyncRequest>> createBatches(List<NotionSyncQueueable.SyncRequest> requests) {
-        List<List<NotionSyncQueueable.SyncRequest>> batches = new List<List<NotionSyncQueueable.SyncRequest>>();
+    private List<List<NotionSync.Request>> createBatches(List<NotionSync.Request> requests) {
+        List<List<NotionSync.Request>> batches = new List<List<NotionSync.Request>>();
         
         // Group by object type for better processing efficiency
-        Map<String, List<NotionSyncQueueable.SyncRequest>> requestsByType = groupByObjectType(requests);
+        Map<String, List<NotionSync.Request>> requestsByType = groupByObjectType(requests);
         
         // Create batches for each object type
         for (String objectType : requestsByType.keySet()) {
-            List<NotionSyncQueueable.SyncRequest> typeRequests = requestsByType.get(objectType);
+            List<NotionSync.Request> typeRequests = requestsByType.get(objectType);
             
             // Calculate optimal batch size based on governor limits
             // Start with configured batch size and adjust down if needed
@@ -87,7 +88,7 @@ public class NotionSyncBatchProcessor {
             
             for (Integer i = 0; i < typeRequests.size(); i += effectiveBatchSize) {
                 Integer endIndex = Math.min(i + effectiveBatchSize, typeRequests.size());
-                List<NotionSyncQueueable.SyncRequest> batch = new List<NotionSyncQueueable.SyncRequest>();
+                List<NotionSync.Request> batch = new List<NotionSync.Request>();
                 for (Integer j = i; j < endIndex; j++) {
                     batch.add(typeRequests[j]);
                 }
@@ -101,12 +102,12 @@ public class NotionSyncBatchProcessor {
     /**
      * Group requests by object type for efficient processing
      */
-    private Map<String, List<NotionSyncQueueable.SyncRequest>> groupByObjectType(List<NotionSyncQueueable.SyncRequest> requests) {
-        Map<String, List<NotionSyncQueueable.SyncRequest>> grouped = new Map<String, List<NotionSyncQueueable.SyncRequest>>();
+    private Map<String, List<NotionSync.Request>> groupByObjectType(List<NotionSync.Request> requests) {
+        Map<String, List<NotionSync.Request>> grouped = new Map<String, List<NotionSync.Request>>();
         
-        for (NotionSyncQueueable.SyncRequest request : requests) {
+        for (NotionSync.Request request : requests) {
             if (!grouped.containsKey(request.objectType)) {
-                grouped.put(request.objectType, new List<NotionSyncQueueable.SyncRequest>());
+                grouped.put(request.objectType, new List<NotionSync.Request>());
             }
             grouped.get(request.objectType).add(request);
         }
@@ -117,7 +118,7 @@ public class NotionSyncBatchProcessor {
     /**
      * Process a single batch with governor limit monitoring
      */
-    private BatchResult processSingleBatch(List<NotionSyncQueueable.SyncRequest> batch) {
+    private BatchResult processSingleBatch(List<NotionSync.Request> batch, NotionSyncLogger logger) {
         BatchResult result = new BatchResult();
         result.batchSize = batch.size();
         result.startTime = System.now();
@@ -133,11 +134,15 @@ public class NotionSyncBatchProcessor {
             if (NotionRateLimiter.shouldDeferProcessing(batch.size())) {
                 result.shouldDefer = true;
                 result.deferReason = 'Governor limits approaching threshold';
+                // Important: Set processed count to 0 since we didn't process this batch
+                result.processedCount = 0;
+                result.failedCount = 0;
                 return result;
             }
             
-            // Process the batch without auto-flushing logs to avoid DML before callouts
-            queueable.processSyncRequests(batch, false);
+            // Create processor with the logger and process the batch
+            NotionSyncProcessor processor = new NotionSyncProcessor(logger);
+            processor.processSyncRequests(batch);
             
             result.processedCount = batch.size();
             result.status = 'Success';
@@ -203,33 +208,18 @@ public class NotionSyncBatchProcessor {
     /**
      * Queue remaining requests for async processing
      */
-    private void queueRemainingRequests(List<NotionSyncQueueable.SyncRequest> requests) {
+    private void queueRemainingRequests(List<NotionSync.Request> requests) {
         // Check if we're already in an async context
         if (System.isFuture() || System.isQueueable() || System.isBatch()) {
-            // Store for later processing or handle differently
-            logDeferredRequests(requests);
+            // Already in async context - cannot chain another async job
+            // This should be handled by the calling context
+            System.debug('WARNING: Cannot queue remaining requests - already in async context');
         } else {
             // Queue for async processing
             System.enqueueJob(new NotionSyncQueueable(requests));
         }
     }
     
-    /**
-     * Log deferred requests for monitoring
-     */
-    private void logDeferredRequests(List<NotionSyncQueueable.SyncRequest> requests) {
-        for (NotionSyncQueueable.SyncRequest request : requests) {
-            NotionSyncLogger.log(
-                request.recordId,
-                request.objectType,
-                request.operationType,
-                'Deferred',
-                'Batch processing deferred due to governor limits',
-                0
-            );
-        }
-        // Don't flush here - let the calling context handle it
-    }
     
     /**
      * Get current batch size

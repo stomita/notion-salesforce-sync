@@ -1,0 +1,434 @@
+/**
+ * Processor class that handles the core sync logic
+ * Accepts a logger instance for dependency injection
+ */
+public class NotionSyncProcessor {
+    private NotionRelationshipHandler relationshipHandler;
+    private NotionSyncLogger logger;
+    
+    public NotionSyncProcessor(NotionSyncLogger logger) {
+        this.relationshipHandler = new NotionRelationshipHandler();
+        this.logger = logger;
+    }
+    
+    /**
+     * Process sync requests
+     * @param syncRequests List of sync requests to process
+     */
+    public void processSyncRequests(List<NotionSync.Request> syncRequests) {
+        Map<String, List<NotionSync.Request>> requestsByObjectType = groupRequestsByObjectType(syncRequests);
+        
+        List<String> processingOrder = relationshipHandler.getProcessingOrder(requestsByObjectType.keySet());
+        
+        for (String objectType : processingOrder) {
+            if (requestsByObjectType.containsKey(objectType)) {
+                List<NotionSync.Request> objectRequests = requestsByObjectType.get(objectType);
+                processObjectRequests(objectType, objectRequests);
+            }
+        }
+    }
+    
+    private Map<String, List<NotionSync.Request>> groupRequestsByObjectType(List<NotionSync.Request> syncRequests) {
+        Map<String, List<NotionSync.Request>> grouped = new Map<String, List<NotionSync.Request>>();
+        
+        for (NotionSync.Request request : syncRequests) {
+            if (!grouped.containsKey(request.objectType)) {
+                grouped.put(request.objectType, new List<NotionSync.Request>());
+            }
+            grouped.get(request.objectType).add(request);
+        }
+        
+        return grouped;
+    }
+    
+    private void processObjectRequests(String objectType, List<NotionSync.Request> objectRequests) {
+        NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
+        if (syncConfig == null) {
+            logErrorsForRequests(objectRequests, 'No sync configuration found for object type: ' + objectType);
+            return;
+        }
+        
+        if (!syncConfig.IsActive__c) {
+            logErrorsForRequests(objectRequests, 'Sync is disabled for object type: ' + objectType);
+            return;
+        }
+        
+        List<NotionSyncField__mdt> fieldMappings = getFieldMappings(syncConfig.Id);
+        Map<Id, SObject> recordsMap = getRecords(objectType, objectRequests);
+        
+        for (NotionSync.Request request : objectRequests) {
+            processSingleRequest(request, syncConfig, fieldMappings, recordsMap.get(request.recordId));
+        }
+    }
+    
+    private void logErrorsForRequests(List<NotionSync.Request> requests, String errorMessage) {
+        for (NotionSync.Request request : requests) {
+            logger.log(
+                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                    .withError(errorMessage)
+            );
+        }
+    }
+    
+    private NotionSyncObject__mdt getSyncConfiguration(String objectType) {
+        List<NotionSyncObject__mdt> configs = [
+            SELECT Id, ObjectApiName__c, NotionDatabaseId__c, IsActive__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = :objectType
+            LIMIT 1
+        ];
+        
+        return configs.isEmpty() ? null : configs[0];
+    }
+    
+    private List<NotionSyncField__mdt> getFieldMappings(Id syncObjectId) {
+        return [
+            SELECT SalesforceFieldApiName__c, NotionPropertyName__c, NotionPropertyType__c, IsBodyContent__c
+            FROM NotionSyncField__mdt
+            WHERE NotionSyncObject__c = :syncObjectId
+        ];
+    }
+    
+    private Map<Id, SObject> getRecords(String objectType, List<NotionSync.Request> objectRequests) {
+        Set<Id> recordIds = new Set<Id>();
+        List<NotionSync.Request> nonDeleteRequests = new List<NotionSync.Request>();
+        
+        for (NotionSync.Request request : objectRequests) {
+            if (request.operationType != 'DELETE') {
+                recordIds.add(request.recordId);
+                nonDeleteRequests.add(request);
+            }
+        }
+        
+        if (recordIds.isEmpty()) {
+            return new Map<Id, SObject>();
+        }
+        
+        String query = buildDynamicQuery(objectType, recordIds);
+        List<SObject> records = Database.query(query);
+        
+        Map<Id, SObject> recordsMap = new Map<Id, SObject>();
+        for (SObject record : records) {
+            recordsMap.put(record.Id, record);
+        }
+        
+        return recordsMap;
+    }
+    
+    private String buildDynamicQuery(String objectType, Set<Id> recordIds) {
+        String baseQuery = 'SELECT Id';
+        
+        List<NotionSyncField__mdt> fieldMappings = [
+            SELECT SalesforceFieldApiName__c
+            FROM NotionSyncField__mdt
+            WHERE NotionSyncObject__r.ObjectApiName__c = :objectType
+        ];
+        
+        Set<String> fieldsToQuery = new Set<String>();
+        for (NotionSyncField__mdt mapping : fieldMappings) {
+            fieldsToQuery.add(mapping.SalesforceFieldApiName__c);
+        }
+        
+        // Also query relationship fields
+        List<NotionRelation__mdt> relations = [
+            SELECT SalesforceRelationshipField__c
+            FROM NotionRelation__mdt
+            WHERE ChildObject__r.ObjectApiName__c = :objectType
+        ];
+        
+        for (NotionRelation__mdt relation : relations) {
+            if (String.isNotBlank(relation.SalesforceRelationshipField__c)) {
+                fieldsToQuery.add(relation.SalesforceRelationshipField__c);
+            }
+        }
+        
+        if (!fieldsToQuery.isEmpty()) {
+            baseQuery += ', ' + String.join(new List<String>(fieldsToQuery), ', ');
+        }
+        
+        baseQuery += ' FROM ' + objectType + ' WHERE Id IN :recordIds';
+        
+        return baseQuery;
+    }
+    
+    private void processSingleRequest(NotionSync.Request request, NotionSyncObject__mdt syncConfig, 
+                                    List<NotionSyncField__mdt> fieldMappings, SObject record) {
+        try {
+            String notionPageId = null;
+            
+            if (request.operationType == 'DELETE') {
+                handleDeleteOperation(request, syncConfig);
+            } else {
+                notionPageId = handleCreateOrUpdateOperation(request, syncConfig, fieldMappings, record);
+            }
+            
+            // Log success
+            logger.log(
+                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                    .withStatus('Success')
+                    .withNotionPageId(notionPageId)
+            );
+            
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Handle rate limit specifically
+            logger.log(
+                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                    .withStatus('Rate Limited')
+                    .withError(e.getMessage())
+            );
+        } catch (Exception e) {
+            // Log error
+            logger.log(
+                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                    .withError(e.getMessage())
+            );
+        }
+    }
+    
+    private void handleDeleteOperation(NotionSync.Request request, NotionSyncObject__mdt syncConfig) {
+        String notionPageId = findNotionPageId(request.recordId, syncConfig);
+        if (String.isNotBlank(notionPageId)) {
+            deleteNotionPage(notionPageId);
+        }
+    }
+    
+    private String handleCreateOrUpdateOperation(NotionSync.Request request, NotionSyncObject__mdt syncConfig, 
+                                            List<NotionSyncField__mdt> fieldMappings, SObject record) {
+        if (record == null) {
+            throw new NotionSync.SyncException('Record not found: ' + request.recordId);
+        }
+        
+        Map<String, Object> notionProperties = transformDataToNotionFormat(record, fieldMappings);
+        notionProperties = relationshipHandler.enrichNotionPropertiesWithRelations(request.objectType, record, notionProperties);
+        
+        // For CREATE operations, don't check for existing page - just create
+        if (request.operationType == 'CREATE') {
+            // Add Salesforce ID as a rich_text property
+            notionProperties.put(syncConfig.SalesforceIdPropertyName__c, 
+                               NotionApiClient.buildTextProperty(request.recordId));
+            return createNotionPage(syncConfig.NotionDatabaseId__c, notionProperties);
+        }
+        
+        // For UPDATE operations, find and update existing page
+        String notionPageId = findNotionPageId(request.recordId, syncConfig);
+        
+        if (String.isNotBlank(notionPageId)) {
+            updateNotionPage(notionPageId, notionProperties);
+            return notionPageId;
+        } else {
+            // If UPDATE operation but no page found, create it (handles edge cases)
+            notionProperties.put(syncConfig.SalesforceIdPropertyName__c, 
+                               NotionApiClient.buildTextProperty(request.recordId));
+            return createNotionPage(syncConfig.NotionDatabaseId__c, notionProperties);
+        }
+    }
+    
+    private Map<String, Object> transformDataToNotionFormat(SObject record, List<NotionSyncField__mdt> fieldMappings) {
+        Map<String, Object> properties = new Map<String, Object>();
+        String bodyContent = '';
+        
+        for (NotionSyncField__mdt mapping : fieldMappings) {
+            Object fieldValue = record.get(mapping.SalesforceFieldApiName__c);
+            
+            if (mapping.IsBodyContent__c) {
+                // If this field is marked as body content, add it to body content only
+                if (fieldValue != null) {
+                    bodyContent = String.valueOf(fieldValue);
+                }
+                // Skip adding it to properties - continue to next field
+                continue;
+            }
+            
+            // For regular properties (not body content)
+            // For properties that support clearing, we need to include null values
+            String propertyType = mapping.NotionPropertyType__c.toLowerCase();
+            Boolean supportsClearing = propertyType == 'title' || 
+                                     propertyType == 'rich_text' || 
+                                     propertyType == 'number' ||
+                                     propertyType == 'select' ||
+                                     propertyType == 'date' ||
+                                     propertyType == 'email';
+            
+            if (fieldValue != null || supportsClearing) {
+                properties.put(mapping.NotionPropertyName__c, 
+                             formatValueForNotionProperty(fieldValue, mapping.NotionPropertyType__c));
+            }
+        }
+        
+        if (String.isNotBlank(bodyContent)) {
+            properties.put('body', bodyContent);
+        }
+        
+        return properties;
+    }
+    
+    private Object formatValueForNotionProperty(Object value, String propertyType) {
+        switch on propertyType {
+            when 'title' {
+                String textValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildTitleProperty(textValue);
+            }
+            when 'rich_text' {
+                String textValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildTextProperty(textValue);
+            }
+            when 'number' {
+                if (value == null) {
+                    return NotionApiClient.buildNumberProperty(null);
+                }
+                Decimal numValue = value instanceof Decimal ? (Decimal)value : Decimal.valueOf(String.valueOf(value));
+                return NotionApiClient.buildNumberProperty(numValue);
+            }
+            when 'checkbox' {
+                return NotionApiClient.buildCheckboxProperty(value != null ? Boolean.valueOf(value) : null);
+            }
+            when 'date' {
+                if (value == null) {
+                    return NotionApiClient.buildDateProperty(null);
+                } else if (value instanceof Date) {
+                    return NotionApiClient.buildDateProperty((Date)value);
+                } else if (value instanceof DateTime) {
+                    return NotionApiClient.buildDateTimeProperty((DateTime)value);
+                }
+                return null;
+            }
+            when 'select' {
+                String selectValue = value != null ? String.valueOf(value) : null;
+                return NotionApiClient.buildSelectProperty(selectValue);
+            }
+            when 'email' {
+                // Always return email property to support clearing (null) in Notion
+                String emailValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildEmailProperty(emailValue);
+            }
+            when else {
+                // Default to rich_text for unknown types
+                return NotionApiClient.buildTextProperty(String.valueOf(value));
+            }
+        }
+    }
+    
+    private String findNotionPageId(String salesforceId, NotionSyncObject__mdt syncConfig) {
+        Map<String, Object> filter = new Map<String, Object>{
+            'property' => syncConfig.SalesforceIdPropertyName__c,
+            'rich_text' => new Map<String, Object>{
+                'equals' => salesforceId
+            }
+        };
+        
+        NotionApiClient.NotionResponse response = NotionApiClient.queryDatabase(
+            syncConfig.NotionDatabaseId__c, 
+            filter
+        );
+        
+        if (response.success && String.isNotBlank(response.responseBody)) {
+            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
+            List<Object> results = (List<Object>) responseBody.get('results');
+            
+            if (!results.isEmpty()) {
+                Map<String, Object> page = (Map<String, Object>) results[0];
+                return (String) page.get('id');
+            }
+        } else if (response.isRateLimited) {
+            throw new NotionRateLimiter.RateLimitException(
+                'Rate limited while querying database. Retry after: ' + response.retryAfterSeconds
+            );
+        } else if (!response.success) {
+            throw new NotionSync.SyncException('Failed to query Notion database: ' + response.errorMessage);
+        }
+        
+        return null;
+    }
+    
+    private String createNotionPage(String databaseId, Map<String, Object> properties) {
+        // Extract body content before building properties
+        String bodyContent = (String) properties.get('body');
+        List<Object> children = null;
+        
+        if (String.isNotBlank(bodyContent)) {
+            children = buildNotionChildren(bodyContent);
+        }
+        
+        // Build properties (excluding body)
+        Map<String, Object> notionProps = buildNotionProperties(properties);
+        
+        NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+            databaseId,
+            notionProps,
+            children
+        );
+        
+        NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+        
+        if (response.success) {
+            return response.pageId;
+        } else if (response.isRateLimited) {
+            throw new NotionRateLimiter.RateLimitException(
+                'Rate limited while creating page. Retry after: ' + response.retryAfterSeconds
+            );
+        } else {
+            throw new NotionSync.SyncException('Failed to create Notion page: ' + response.errorMessage);
+        }
+    }
+    
+    private String updateNotionPage(String pageId, Map<String, Object> properties) {
+        // Build properties (excluding body)
+        Map<String, Object> notionProps = buildNotionProperties(properties);
+        
+        NotionApiClient.NotionResponse response = NotionApiClient.updatePage(pageId, notionProps);
+        
+        if (response.success) {
+            return response.pageId;
+        } else if (response.isRateLimited) {
+            throw new NotionRateLimiter.RateLimitException(
+                'Rate limited while updating page. Retry after: ' + response.retryAfterSeconds
+            );
+        } else {
+            throw new NotionSync.SyncException('Failed to update Notion page: ' + response.errorMessage);
+        }
+    }
+    
+    private void deleteNotionPage(String pageId) {
+        NotionApiClient.NotionResponse response = NotionApiClient.deletePage(pageId);
+        
+        if (!response.success) {
+            if (response.isRateLimited) {
+                throw new NotionRateLimiter.RateLimitException(
+                    'Rate limited while deleting page. Retry after: ' + response.retryAfterSeconds
+                );
+            } else {
+                throw new NotionSync.SyncException('Failed to delete Notion page: ' + response.errorMessage);
+            }
+        }
+    }
+    
+    private Map<String, Object> buildNotionProperties(Map<String, Object> properties) {
+        Map<String, Object> notionProps = new Map<String, Object>();
+        
+        for (String key : properties.keySet()) {
+            if (key != 'body') {
+                // Include all properties, even null values, to support clearing
+                notionProps.put(key, properties.get(key));
+            }
+        }
+        
+        return notionProps;
+    }
+    
+    private List<Object> buildNotionChildren(String bodyContent) {
+        List<Object> children = new List<Object>();
+        children.add(new Map<String, Object>{
+            'object' => 'block',
+            'type' => 'paragraph',
+            'paragraph' => new Map<String, Object>{
+                'rich_text' => new List<Object>{
+                    new Map<String, Object>{
+                        'type' => 'text',
+                        'text' => new Map<String, Object>{ 'content' => bodyContent }
+                    }
+                }
+            }
+        });
+        return children;
+    }
+}

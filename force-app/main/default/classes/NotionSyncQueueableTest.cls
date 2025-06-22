@@ -95,8 +95,8 @@ private class NotionSyncQueueableTest {
         
         Account testAccount = [SELECT Id, Name, Description FROM Account LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
@@ -132,8 +132,8 @@ private class NotionSyncQueueableTest {
         
         Account testAccount = [SELECT Id, Name, Description FROM Account LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'UPDATE'
@@ -163,8 +163,8 @@ private class NotionSyncQueueableTest {
         
         Account testAccount = [SELECT Id FROM Account LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'DELETE'
@@ -195,11 +195,11 @@ private class NotionSyncQueueableTest {
         List<Account> testAccounts = [SELECT Id FROM Account LIMIT 3];
         List<Contact> testContacts = [SELECT Id FROM Contact LIMIT 2];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         // Add account requests
         for (Account acc : testAccounts) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 acc.Id,
                 'Account',
                 'CREATE'
@@ -208,7 +208,7 @@ private class NotionSyncQueueableTest {
         
         // Add contact requests
         for (Contact con : testContacts) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 con.Id,
                 'Contact',
                 'UPDATE'
@@ -248,8 +248,8 @@ private class NotionSyncQueueableTest {
         
         Account testAccount = [SELECT Id FROM Account LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
@@ -281,18 +281,18 @@ private class NotionSyncQueueableTest {
         
         List<Account> testAccounts = [SELECT Id FROM Account LIMIT 3];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccounts[0].Id,
             'Account',
             'CREATE'
         ));
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        requests.add(new NotionSync.Request(
             testAccounts[1].Id,
             'Account',
             'UPDATE'
         ));
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        requests.add(new NotionSync.Request(
             testAccounts[2].Id,
             'Account',
             'DELETE'
@@ -333,8 +333,8 @@ private class NotionSyncQueueableTest {
         
         Account testAccount = [SELECT Id, Name, Description, Phone, AnnualRevenue FROM Account LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
@@ -345,7 +345,7 @@ private class NotionSyncQueueableTest {
         NotionSyncQueueable job = new NotionSyncQueueable(requests);
         
         // Test the data transformation methods directly
-        NotionSyncQueueable.SyncRequest testRequest = new NotionSyncQueueable.SyncRequest(
+        NotionSync.Request testRequest = new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
@@ -381,8 +381,8 @@ private class NotionSyncQueueableTest {
         Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('CREATE'));
         
         // Create a request with a non-existent record ID
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             '001000000000000AAA', // Non-existent Account ID
             'Account',
             'UPDATE'
@@ -413,7 +413,7 @@ private class NotionSyncQueueableTest {
         Test.startTest();
         
         // Test with empty request list
-        NotionSyncQueueable job = new NotionSyncQueueable(new List<NotionSyncQueueable.SyncRequest>());
+        NotionSyncQueueable job = new NotionSyncQueueable(new List<NotionSync.Request>());
         System.enqueueJob(job);
         
         Test.stopTest();
@@ -430,9 +430,9 @@ private class NotionSyncQueueableTest {
         List<Account> testAccounts = [SELECT Id FROM Account];
         
         // Create requests for all test accounts (bulk processing test)
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         for (Account acc : testAccounts) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 acc.Id,
                 'Account',
                 'CREATE'
@@ -458,8 +458,8 @@ private class NotionSyncQueueableTest {
         
         Account testAccount = [SELECT Id FROM Account LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
@@ -495,7 +495,7 @@ private class NotionSyncQueueableTest {
         
         Test.startTest();
         
-        NotionSyncQueueable.SyncRequest request = new NotionSyncQueueable.SyncRequest(
+        NotionSync.Request request = new NotionSync.Request(
             testRecordId,
             testObjectType,
             testOperationType
@@ -515,8 +515,8 @@ private class NotionSyncQueueableTest {
         
         // Test custom exception
         try {
-            throw new NotionSyncQueueable.NotionSyncException('Test exception message');
-        } catch (NotionSyncQueueable.NotionSyncException e) {
+            throw new NotionSync.SyncException('Test exception message');
+        } catch (NotionSync.SyncException e) {
             System.assertEquals('Test exception message', e.getMessage(), 'Exception message should match');
         }
         
@@ -530,13 +530,13 @@ private class NotionSyncQueueableTest {
         Account testAccount = [SELECT Id FROM Account LIMIT 1];
         Contact testContact = [SELECT Id, AccountId FROM Contact LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
         ));
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        requests.add(new NotionSync.Request(
             testContact.Id,
             'Contact',
             'CREATE'
@@ -577,11 +577,11 @@ private class NotionSyncQueueableTest {
         Account testAccount = [SELECT Id FROM Account LIMIT 1];
         List<Contact> testContacts = [SELECT Id, AccountId FROM Contact WHERE AccountId = :testAccount.Id LIMIT 2];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         // Add child records first to test that processing order is determined correctly
         for (Contact contact : testContacts) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 contact.Id,
                 'Contact',
                 'CREATE'
@@ -589,7 +589,7 @@ private class NotionSyncQueueableTest {
         }
         
         // Add parent record last
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        requests.add(new NotionSync.Request(
             testAccount.Id,
             'Account',
             'CREATE'
@@ -626,8 +626,8 @@ private class NotionSyncQueueableTest {
         
         Contact testContact = [SELECT Id, AccountId FROM Contact WHERE AccountId != null LIMIT 1];
         
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
-        requests.add(new NotionSyncQueueable.SyncRequest(
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        requests.add(new NotionSync.Request(
             testContact.Id,
             'Contact',
             'CREATE'
