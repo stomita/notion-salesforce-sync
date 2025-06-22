@@ -43,8 +43,8 @@ else
     cat "$TEMP_OUTPUT"
 fi
 
-# Check for our unique failure marker
-if grep -q "INTEGRATION_TEST_FAILURE_MARKER" "$TEMP_OUTPUT"; then
+# Check for our unique failure marker in actual debug output (not source code)
+if grep -E "USER_DEBUG.*INTEGRATION_TEST_FAILURE_MARKER" "$TEMP_OUTPUT" > /dev/null 2>&1; then
     ERRORS_FOUND=true
 else
     ERRORS_FOUND=false
@@ -60,7 +60,7 @@ SUCCESS_PATTERNS=(
 SUCCESS_FOUND=false
 for pattern in "${SUCCESS_PATTERNS[@]}"; do
     # Check in debug output lines
-    if grep -E "DEBUG\|.*$pattern" "$TEMP_OUTPUT" > /dev/null 2>&1; then
+    if grep -F "$pattern" "$TEMP_OUTPUT" > /dev/null 2>&1; then
         SUCCESS_FOUND=true
         break
     fi
