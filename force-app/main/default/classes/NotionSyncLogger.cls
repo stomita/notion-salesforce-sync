@@ -106,47 +106,51 @@ public with sharing class NotionSyncLogger {
         }
         
         if (!pendingLogs.isEmpty()) {
-            List<String> logJsonList = new List<String>();
-            for (LogEntry entry : pendingLogs) {
-                logJsonList.add(JSON.serialize(entry));
-            }
-            
-            // If we're already in a future context, we need to handle this specially
-            // We can't call another @future method, and we can't do DML if there are
-            // pending callouts. So we'll store the logs and process them separately.
-            if (System.isFuture()) {
-                // Convert back to logs and insert directly
-                // This should only be called AFTER all callouts are complete
-                List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();
-                for (String logJson : logJsonList) {
-                    LogEntry entry = (LogEntry) JSON.deserialize(logJson, LogEntry.class);
-                    logs.add(new Notion_Sync_Log__c(
+            // In test context, insert logs directly for verification
+            if (Test.isRunningTest()) {
+                List<String> logJsonList = new List<String>();
+                for (LogEntry entry : pendingLogs) {
+                    logJsonList.add(JSON.serialize(entry));
+                }
+                logSync(logJsonList);
+            } else {
+                // Use Platform Events for logging to avoid transaction conflicts
+                List<Notion_Sync_Log_Event__e> events = new List<Notion_Sync_Log_Event__e>();
+                
+                for (LogEntry entry : pendingLogs) {
+                    Notion_Sync_Log_Event__e event = new Notion_Sync_Log_Event__e(
                         Record_Id__c = entry.recordId,
                         Object_Type__c = entry.objectType,
                         Operation_Type__c = entry.operationType,
                         Status__c = entry.status,
                         Error_Message__c = entry.errorMessage,
-                        Retry_Count__c = entry.retryCount,
                         Notion_Page_Id__c = entry.notionPageId,
+                        Retry_Count__c = entry.retryCount,
                         Rate_Limited__c = entry.rateLimited,
-                        Rate_Limit_Retry_After__c = entry.rateLimitRetryAfter,
                         API_Calls_Made__c = entry.apiCallsMade,
-                        CPU_Time_Used__c = entry.cpuTimeUsed,
-                        Callouts_Used__c = entry.calloutsUsed
-                    ));
+                        CPU_Time_Used__c = entry.cpuTimeUsed
+                    );
+                    
+                    events.add(event);
                 }
                 
-                if (!logs.isEmpty()) {
+                if (!events.isEmpty()) {
                     try {
-                        insert logs;
+                        // Publish events - this works in all contexts
+                        List<Database.SaveResult> results = EventBus.publish(events);
+                        
+                        // Check for publish failures
+                        for (Database.SaveResult result : results) {
+                            if (!result.isSuccess()) {
+                                for (Database.Error error : result.getErrors()) {
+                                    System.debug('Failed to publish log event: ' + error.getMessage());
+                                }
+                            }
+                        }
                     } catch (Exception e) {
-                        System.debug('Failed to insert sync logs from future context: ' + e.getMessage());
+                        System.debug('Failed to publish sync log events: ' + e.getMessage());
                     }
                 }
-            } else if (Test.isRunningTest()) {
-                logSync(logJsonList);
-            } else {
-                logAsync(logJsonList);
             }
             
             pendingLogs.clear();
