@@ -1,3 +1,3 @@
-// Test 5: Relationship Change Setup
+// Test 4 Setup: Ensure relationship records exist and create second account
 NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
-executor.setupRelationshipChanges();
+executor.setupRelationshipChangeTest();
