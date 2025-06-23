@@ -3,6 +3,13 @@ private class NotionSyncBatchProcessorTest {
     
     @TestSetup
     static void makeData() {
+        // Enable sync logging for tests
+        Notion_Sync_Settings__c settings = new Notion_Sync_Settings__c(
+            SetupOwnerId = UserInfo.getOrganizationId(),
+            Enable_Sync_Logging__c = true
+        );
+        insert settings;
+        
         // Create test custom metadata records
         // Note: In real implementation, we'd use Test.loadData or mock the metadata
     }
@@ -49,10 +56,10 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testSmallBatchProcessing() {
         // Create test sync requests
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         for (Integer i = 0; i < 10; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'CREATE'
@@ -65,7 +72,8 @@ private class NotionSyncBatchProcessorTest {
         Test.startTest();
         
         NotionSyncBatchProcessor processor = new NotionSyncBatchProcessor(5);
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         
@@ -83,10 +91,10 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testLargeBatchProcessing() {
         // Create large number of test sync requests
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         for (Integer i = 0; i < 150; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'UPDATE'
@@ -99,7 +107,8 @@ private class NotionSyncBatchProcessorTest {
         Test.startTest();
         
         NotionSyncBatchProcessor processor = new NotionSyncBatchProcessor();
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         
@@ -129,10 +138,10 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testRateLimitHandling() {
         // Create test sync requests
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         for (Integer i = 0; i < 20; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'CREATE'
@@ -145,7 +154,8 @@ private class NotionSyncBatchProcessorTest {
         Test.startTest();
         
         NotionSyncBatchProcessor processor = new NotionSyncBatchProcessor(10);
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         
@@ -173,11 +183,11 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testGovernorLimitDeferral() {
         // Create large batch that would exceed limits
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         // Simulate high CPU usage scenario
         for (Integer i = 0; i < 100; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'UPDATE'
@@ -196,7 +206,8 @@ private class NotionSyncBatchProcessorTest {
             String dummy = 'test' + Math.random();
         }
         
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         
@@ -218,10 +229,10 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testBatchSizeAdjustment() {
         // Create requests that will consume significant resources
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         for (Integer i = 0; i < 30; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'CREATE'
@@ -237,7 +248,8 @@ private class NotionSyncBatchProcessorTest {
         Integer initialBatchSize = processor.getBatchSize();
         
         // Process requests
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         
@@ -256,11 +268,11 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testMixedObjectTypes() {
         // Create requests for different object types
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         // Add Accounts
         for (Integer i = 0; i < 10; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'CREATE'
@@ -269,7 +281,7 @@ private class NotionSyncBatchProcessorTest {
         
         // Add Contacts
         for (Integer i = 0; i < 10; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '003000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Contact',
                 'CREATE'
@@ -282,7 +294,8 @@ private class NotionSyncBatchProcessorTest {
         Test.startTest();
         
         NotionSyncBatchProcessor processor = new NotionSyncBatchProcessor(5);
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         
@@ -300,10 +313,10 @@ private class NotionSyncBatchProcessorTest {
     @isTest
     static void testErrorHandling() {
         // Create test sync requests
-        List<NotionSyncQueueable.SyncRequest> requests = new List<NotionSyncQueueable.SyncRequest>();
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
         
         for (Integer i = 0; i < 5; i++) {
-            requests.add(new NotionSyncQueueable.SyncRequest(
+            requests.add(new NotionSync.Request(
                 '001000000000' + String.valueOf(i).leftPad(3, '0'),
                 'Account',
                 'CREATE'
@@ -316,7 +329,8 @@ private class NotionSyncBatchProcessorTest {
         Test.startTest();
         
         NotionSyncBatchProcessor processor = new NotionSyncBatchProcessor();
-        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests);
+        NotionSyncLogger logger = new NotionSyncLogger();
+        List<NotionSyncBatchProcessor.BatchResult> results = processor.processBatches(requests, logger);
         
         Test.stopTest();
         

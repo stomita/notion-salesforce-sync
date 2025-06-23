@@ -1,3 +1,3 @@
-// Test 2 Setup: Ensure records exist to update
+// Test 4: Run relationship change test
 NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
-executor.setupUpdateTest();
+executor.runRelationshipChangeTest();
