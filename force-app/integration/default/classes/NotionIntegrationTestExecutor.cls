@@ -9,6 +9,51 @@ public class NotionIntegrationTestExecutor {
     private Integer failCount = 0;
     private List<String> errors = new List<String>();
     
+    // ============================================
+    // AUTHENTICATION VERIFICATION
+    // ============================================
+    
+    /**
+     * Verify that the Notion API credentials are properly configured
+     * This should be called before running any integration tests
+     */
+    public static void verifyAuthentication() {
+        System.debug('=== Verifying Notion API Authentication ===');
+        
+        // First ensure the user has proper permissions
+        NotionTestCredentialSetup.ensureUserPermissions();
+        
+        // Make a simple API call to verify authentication
+        // We'll use the search API with empty query to test connectivity
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint('callout:Notion_API/v1/search');
+        request.setMethod('POST');
+        request.setHeader('Content-Type', 'application/json');
+        request.setHeader('Notion-Version', '2022-06-28');
+        request.setTimeout(60000);
+        
+        // Empty search query just to test auth
+        request.setBody('{"query":"","filter":{"property":"object","value":"database"},"page_size":1}');
+        
+        HttpResponse response = new Http().send(request);
+        Integer statusCode = response.getStatusCode();
+        String responseBody = response.getBody();
+        
+        System.debug('Authentication check status code: ' + statusCode);
+        
+        if (statusCode == 200) {
+            System.debug('Authentication verification successful');
+        } else if (statusCode == 401) {
+            throw new CalloutException('Notion API authentication failed (HTTP 401): Invalid API key or unauthorized access');
+        } else {
+            String errorMessage = 'Notion API authentication failed with HTTP ' + statusCode;
+            if (String.isNotBlank(responseBody)) {
+                errorMessage += ' - Response: ' + responseBody;
+            }
+            throw new CalloutException(errorMessage);
+        }
+    }
+    
     /**
      * Setup test data
      */
