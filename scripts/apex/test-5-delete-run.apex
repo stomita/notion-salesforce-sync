@@ -1,3 +1,3 @@
-// Test 2 Setup: Ensure records exist to update
+// Test 5 - Run: Delete test records
 NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
-executor.setupUpdateTest();
+executor.runDeleteTest();

@@ -134,4 +134,65 @@ public with sharing class NotionTestCredentialSetup {
     public static void ensureUserPermissionsAsync() {
         ensureUserPermissions();
     }
+    
+    /**
+     * Verify that the Notion API credentials are properly configured and working
+     * This method should be called after credential setup to ensure authentication works
+     * @return true if authentication is successful, false otherwise
+     * @throws CalloutException if authentication check fails
+     */
+    public static Boolean verifyAuthentication() {
+        System.debug('=== Verifying Notion API Authentication ===');
+        
+        try {
+            // Make a simple API call to verify authentication
+            // We'll use the search databases endpoint as it's lightweight
+            HttpRequest request = new HttpRequest();
+            request.setEndpoint('callout:Notion_API/v1/users/me');
+            request.setMethod('GET');
+            request.setHeader('Content-Type', 'application/json');
+            request.setTimeout(60000);
+            
+            HttpResponse response = new Http().send(request);
+            Integer statusCode = response.getStatusCode();
+            String responseBody = response.getBody();
+            
+            System.debug('Authentication check status code: ' + statusCode);
+            
+            if (statusCode == 200) {
+                System.debug('Authentication verification SUCCESSFUL');
+                try {
+                    Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+                    String botId = (String) responseMap.get('id');
+                    String botName = responseMap.containsKey('name') ? (String) responseMap.get('name') : 'Notion Integration';
+                    System.debug('Bot ID: ' + botId);
+                    System.debug('Bot Name: ' + botName);
+                } catch (Exception e) {
+                    // Ignore parsing errors, authentication was successful
+                }
+                return true;
+            } else if (statusCode == 401) {
+                System.debug('Authentication verification FAILED - Unauthorized');
+                throw new CalloutException('Notion API authentication failed (HTTP 401): Invalid API key or unauthorized access');
+            } else {
+                System.debug('Authentication verification FAILED');
+                String errorMessage = 'Notion API authentication failed (HTTP ' + statusCode + ')';
+                try {
+                    Map<String, Object> errorResponse = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+                    if (errorResponse.containsKey('message')) {
+                        errorMessage += ': ' + (String) errorResponse.get('message');
+                    }
+                } catch (Exception e) {
+                    // Ignore parsing error
+                }
+                throw new CalloutException(errorMessage);
+            }
+        } catch (CalloutException e) {
+            System.debug('CalloutException during authentication verification: ' + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.debug('Exception during authentication verification: ' + e.getMessage());
+            throw new CalloutException('Unexpected error during authentication check: ' + e.getMessage());
+        }
+    }
 }

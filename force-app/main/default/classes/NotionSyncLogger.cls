@@ -1,36 +1,40 @@
 public with sharing class NotionSyncLogger {
-    @TestVisible
-    private static List<LogEntry> pendingLogs = new List<LogEntry>();
+    // Instance variables
+    private List<LogEntry> logs;
+    private Boolean loggingEnabled;
     
-    // Cache the settings to avoid multiple queries
-    private static Notion_Sync_Settings__c cachedSettings;
-    
-    // Check if logging is enabled
-    private static Boolean isLoggingEnabled() {
-        if (cachedSettings == null) {
-            cachedSettings = Notion_Sync_Settings__c.getInstance();
-        }
-        return cachedSettings != null && cachedSettings.Enable_Sync_Logging__c == true;
+    // Constructor
+    public NotionSyncLogger() {
+        this.logs = new List<LogEntry>();
+        // Check settings once during construction
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        this.loggingEnabled = (settings != null && settings.Enable_Sync_Logging__c == true);
     }
     
-    @future
-    public static void logAsync(List<String> logJsonList) {
-        logSync(logJsonList);
-    }
     
-    // Synchronous version for testing
-    public static void logSync(List<String> logJsonList) {
-        // Check if logging is enabled before processing
-        if (!isLoggingEnabled()) {
+    // Log with a LogEntry object
+    public void log(LogEntry entry) {
+        if (!loggingEnabled) {
             return;
         }
         
-        List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();
+        // Set callouts used at the time of logging
+        entry.calloutsUsed = Limits.getCallouts();
         
-        for (String logJson : logJsonList) {
-            LogEntry entry = (LogEntry) JSON.deserialize(logJson, LogEntry.class);
-            
-            Notion_Sync_Log__c log = new Notion_Sync_Log__c(
+        logs.add(entry);
+    }
+    
+    // Flush all logs to database
+    public void flush() {
+        if (!loggingEnabled || logs.isEmpty()) {
+            return;
+        }
+        
+        // Create log records
+        List<Notion_Sync_Log__c> logRecords = new List<Notion_Sync_Log__c>();
+        
+        for (LogEntry entry : logs) {
+            Notion_Sync_Log__c logRecord = new Notion_Sync_Log__c(
                 Record_Id__c = entry.recordId,
                 Object_Type__c = entry.objectType,
                 Operation_Type__c = entry.operationType,
@@ -45,117 +49,34 @@ public with sharing class NotionSyncLogger {
                 Callouts_Used__c = entry.calloutsUsed
             );
             
-            logs.add(log);
+            logRecords.add(logRecord);
         }
         
-        if (!logs.isEmpty()) {
+        if (!logRecords.isEmpty()) {
             try {
-                insert logs;
+                insert logRecords;
+                // Clear logs after successful insert
+                logs.clear();
             } catch (Exception e) {
                 System.debug('Failed to insert sync logs: ' + e.getMessage());
             }
         }
     }
     
-    // Add a log entry to the pending collection
-    public static void log(String recordId, String objectType, String operationType, 
-                          String status, String errorMessage, Integer retryCount) {
-        // Only add to pending logs if logging is enabled
-        if (isLoggingEnabled()) {
-            pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, null));
-        }
+    
+    // Clear logs without saving (for error scenarios)
+    public void clear() {
+        logs.clear();
     }
     
-    // Add a log entry with Notion page ID
-    public static void log(String recordId, String objectType, String operationType, 
-                          String status, String errorMessage, Integer retryCount, String notionPageId) {
-        // Only add to pending logs if logging is enabled
-        if (isLoggingEnabled()) {
-            pendingLogs.add(new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId));
-        }
+    // Get pending log entries for deferred flushing
+    public List<LogEntry> getPendingEntries() {
+        return logs.clone();
     }
     
-    // Add a log entry with rate limit information
-    public static LogEntry logWithRateLimit(String recordId, String objectType, String operationType, 
-                                       String status, String errorMessage, Integer retryCount, String notionPageId,
-                                       Boolean rateLimited, Integer rateLimitRetryAfter) {
-        // Only create and add log if logging is enabled
-        if (!isLoggingEnabled()) {
-            return null;
-        }
-        
-        LogEntry entry = new LogEntry(recordId, objectType, operationType, status, errorMessage, retryCount, notionPageId);
-        entry.rateLimited = rateLimited;
-        entry.rateLimitRetryAfter = rateLimitRetryAfter;
-        
-        // Capture current governor limits
-        entry.apiCallsMade = 1; // Will be updated by caller if different
-        entry.cpuTimeUsed = Limits.getCpuTime();
-        entry.calloutsUsed = Limits.getCallouts();
-        
-        pendingLogs.add(entry);
-        return entry; // Return the entry so caller can update fields
-    }
-    
-    // Flush all pending logs
-    public static void flush() {
-        // Check if logging is enabled and we have pending logs
-        if (!isLoggingEnabled() || pendingLogs.isEmpty()) {
-            pendingLogs.clear();
-            return;
-        }
-        
-        if (!pendingLogs.isEmpty()) {
-            List<String> logJsonList = new List<String>();
-            for (LogEntry entry : pendingLogs) {
-                logJsonList.add(JSON.serialize(entry));
-            }
-            
-            // If we're already in a future context, we need to handle this specially
-            // We can't call another @future method, and we can't do DML if there are
-            // pending callouts. So we'll store the logs and process them separately.
-            if (System.isFuture()) {
-                // Convert back to logs and insert directly
-                // This should only be called AFTER all callouts are complete
-                List<Notion_Sync_Log__c> logs = new List<Notion_Sync_Log__c>();
-                for (String logJson : logJsonList) {
-                    LogEntry entry = (LogEntry) JSON.deserialize(logJson, LogEntry.class);
-                    logs.add(new Notion_Sync_Log__c(
-                        Record_Id__c = entry.recordId,
-                        Object_Type__c = entry.objectType,
-                        Operation_Type__c = entry.operationType,
-                        Status__c = entry.status,
-                        Error_Message__c = entry.errorMessage,
-                        Retry_Count__c = entry.retryCount,
-                        Notion_Page_Id__c = entry.notionPageId,
-                        Rate_Limited__c = entry.rateLimited,
-                        Rate_Limit_Retry_After__c = entry.rateLimitRetryAfter,
-                        API_Calls_Made__c = entry.apiCallsMade,
-                        CPU_Time_Used__c = entry.cpuTimeUsed,
-                        Callouts_Used__c = entry.calloutsUsed
-                    ));
-                }
-                
-                if (!logs.isEmpty()) {
-                    try {
-                        insert logs;
-                    } catch (Exception e) {
-                        System.debug('Failed to insert sync logs from future context: ' + e.getMessage());
-                    }
-                }
-            } else if (Test.isRunningTest()) {
-                logSync(logJsonList);
-            } else {
-                logAsync(logJsonList);
-            }
-            
-            pendingLogs.clear();
-        }
-    }
-    
-    // Clear pending logs without saving (for error scenarios)
-    public static void clear() {
-        pendingLogs.clear();
+    // Check if there are pending entries
+    public Boolean hasPendingEntries() {
+        return !logs.isEmpty();
     }
     
     public class LogEntry {
@@ -172,20 +93,66 @@ public with sharing class NotionSyncLogger {
         public Integer cpuTimeUsed;
         public Integer calloutsUsed;
         
-        public LogEntry(String recordId, String objectType, String operationType, 
-                       String status, String errorMessage, Integer retryCount, String notionPageId) {
-            this.recordId = recordId;
-            this.objectType = objectType;
+        // Constructor with only operationType - all other fields are optional
+        public LogEntry(String operationType) {
             this.operationType = operationType;
-            this.status = status;
-            this.errorMessage = errorMessage;
-            this.retryCount = retryCount;
-            this.notionPageId = notionPageId;
+            this.status = 'Success';
+            this.errorMessage = null;
+            this.retryCount = 0;
+            this.notionPageId = null;
             this.rateLimited = false;
             this.rateLimitRetryAfter = null;
             this.apiCallsMade = 0;
             this.cpuTimeUsed = 0;
             this.calloutsUsed = 0;
+        }
+        
+        // Method to set record information (objectType and recordId)
+        public LogEntry withRecord(String objectType, String recordId) {
+            this.objectType = objectType;
+            this.recordId = recordId;
+            return this;
+        }
+        
+        // Method to set Salesforce object type only
+        public LogEntry withSalesforceObject(String objectType) {
+            this.objectType = objectType;
+            return this;
+        }
+        
+        // Builder pattern methods for fluent API
+        public LogEntry withStatus(String status) {
+            this.status = status;
+            return this;
+        }
+        
+        public LogEntry withError(String errorMessage) {
+            this.errorMessage = errorMessage;
+            this.status = 'Failed';
+            return this;
+        }
+        
+        public LogEntry withNotionPageId(String notionPageId) {
+            this.notionPageId = notionPageId;
+            return this;
+        }
+        
+        public LogEntry withRetryCount(Integer retryCount) {
+            this.retryCount = retryCount;
+            return this;
+        }
+        
+        public LogEntry withRateLimit(Integer retryAfterSeconds) {
+            this.rateLimited = true;
+            this.rateLimitRetryAfter = retryAfterSeconds;
+            this.status = 'Failed';  // Use 'Failed' since 'Rate Limited' is not a valid picklist value
+            return this;
+        }
+        
+        public LogEntry withMetrics(Integer apiCallsMade, Integer cpuTimeUsed) {
+            this.apiCallsMade = apiCallsMade;
+            this.cpuTimeUsed = cpuTimeUsed;
+            return this;
         }
     }
 }

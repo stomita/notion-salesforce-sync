@@ -15,20 +15,19 @@ private class NotionSyncLoggerTest {
     static void testBasicLogging() {
         Test.startTest();
         
-        // Test basic log entry
-        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0, 'test-page-id');
+        // Create logger instance
+        NotionSyncLogger logger = new NotionSyncLogger();
         
-        // Verify pending logs
-        System.assertEquals(1, NotionSyncLogger.pendingLogs.size(), 'Should have one pending log');
-        NotionSyncLogger.LogEntry entry = NotionSyncLogger.pendingLogs[0];
-        System.assertEquals('001000000000001', entry.recordId, 'Record ID should match');
-        System.assertEquals('Account', entry.objectType, 'Object type should match');
-        System.assertEquals('CREATE', entry.operationType, 'Operation type should match');
-        System.assertEquals('Success', entry.status, 'Status should match');
-        System.assertEquals('test-page-id', entry.notionPageId, 'Notion page ID should match');
+        // Test basic log entry
+        logger.log(
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Account', '001000000000001')
+                .withStatus('Success')
+                .withNotionPageId('test-page-id')
+        );
         
         // Flush logs
-        NotionSyncLogger.flush();
+        logger.flush();
         
         Test.stopTest();
         
@@ -45,46 +44,35 @@ private class NotionSyncLoggerTest {
     static void testRateLimitLogging() {
         Test.startTest();
         
-        // Test rate limit log entry
-        NotionSyncLogger.logWithRateLimit(
-            '001000000000002', 
-            'Contact', 
-            'UPDATE', 
-            'Failed', 
-            'Rate limit exceeded. Retry after 5 seconds.',
-            1,
-            null,
-            true,
-            5
-        );
+        // Create logger instance
+        NotionSyncLogger logger = new NotionSyncLogger();
         
-        // Verify pending log has rate limit info
-        System.assertEquals(1, NotionSyncLogger.pendingLogs.size(), 'Should have one pending log');
-        NotionSyncLogger.LogEntry entry = NotionSyncLogger.pendingLogs[0];
-        System.assertEquals(true, entry.rateLimited, 'Should be marked as rate limited');
-        System.assertEquals(5, entry.rateLimitRetryAfter, 'Retry after seconds should match');
-        System.assert(entry.cpuTimeUsed >= 0, 'CPU time should be captured');
-        System.assert(entry.calloutsUsed >= 0, 'Callouts used should be captured');
+        // Test rate limit log entry with builder pattern
+        NotionSyncLogger.LogEntry entry = new NotionSyncLogger.LogEntry('UPDATE')
+        .withRecord('Contact', '001000000000002')
+        .withRateLimit(5)
+        .withMetrics(3, 100)
+        .withRetryCount(1);
         
-        // Update API calls made
-        entry.apiCallsMade = 3;
+        logger.log(entry);
         
         // Flush logs
-        NotionSyncLogger.flush();
+        logger.flush();
         
         Test.stopTest();
         
         // Verify log was created with rate limit fields
         List<Notion_Sync_Log__c> logs = [
             SELECT Rate_Limited__c, Rate_Limit_Retry_After__c, API_Calls_Made__c, 
-                   CPU_Time_Used__c, Callouts_Used__c
+                   CPU_Time_Used__c, Callouts_Used__c, Status__c
             FROM Notion_Sync_Log__c
         ];
         System.assertEquals(1, logs.size(), 'Should have created one log record');
         System.assertEquals(true, logs[0].Rate_Limited__c, 'Should be marked as rate limited');
         System.assertEquals(5, logs[0].Rate_Limit_Retry_After__c, 'Retry after should match');
         System.assertEquals(3, logs[0].API_Calls_Made__c, 'API calls made should match');
-        System.assert(logs[0].CPU_Time_Used__c >= 0, 'CPU time should be logged');
+        System.assertEquals(100, logs[0].CPU_Time_Used__c, 'CPU time should match');
+        System.assertEquals('Failed', logs[0].Status__c, 'Status should be Failed for rate limited requests');
         System.assert(logs[0].Callouts_Used__c >= 0, 'Callouts used should be logged');
     }
     
@@ -92,23 +80,21 @@ private class NotionSyncLoggerTest {
     static void testBulkLogging() {
         Test.startTest();
         
+        // Create logger instance
+        NotionSyncLogger logger = new NotionSyncLogger();
+        
         // Add multiple log entries
         for (Integer i = 0; i < 10; i++) {
-            NotionSyncLogger.log(
-                '00100000000000' + i, 
-                'Account', 
-                'CREATE', 
-                'Success', 
-                null, 
-                0,
-                'page-' + i
+            logger.log(
+                new NotionSyncLogger.LogEntry('CREATE')
+                    .withRecord('Account', '00100000000000' + i)
+                    .withStatus('Success')
+                    .withNotionPageId('page-' + i)
             );
         }
         
-        System.assertEquals(10, NotionSyncLogger.pendingLogs.size(), 'Should have 10 pending logs');
-        
         // Flush logs
-        NotionSyncLogger.flush();
+        logger.flush();
         
         Test.stopTest();
         
@@ -121,23 +107,18 @@ private class NotionSyncLoggerTest {
     static void testErrorLogging() {
         Test.startTest();
         
+        // Create logger instance
+        NotionSyncLogger logger = new NotionSyncLogger();
+        
         // Test error log entry
-        NotionSyncLogger.log(
-            '001000000000003', 
-            'Opportunity', 
-            'DELETE', 
-            'Failed', 
-            'Record not found in Notion',
-            2
+        logger.log(
+            new NotionSyncLogger.LogEntry('DELETE')
+                .withRecord('Opportunity', '001000000000003')
+                .withError('Record not found in Notion')
+                .withRetryCount(2)
         );
         
-        // Verify error details
-        NotionSyncLogger.LogEntry entry = NotionSyncLogger.pendingLogs[0];
-        System.assertEquals('Failed', entry.status, 'Status should be Failed');
-        System.assertEquals('Record not found in Notion', entry.errorMessage, 'Error message should match');
-        System.assertEquals(2, entry.retryCount, 'Retry count should match');
-        
-        NotionSyncLogger.flush();
+        logger.flush();
         
         Test.stopTest();
         
@@ -155,16 +136,25 @@ private class NotionSyncLoggerTest {
     static void testClearLogs() {
         Test.startTest();
         
-        // Add some logs
-        NotionSyncLogger.log('001000000000004', 'Lead', 'CREATE', 'Success', null, 0);
-        NotionSyncLogger.log('001000000000005', 'Lead', 'UPDATE', 'Failed', 'Error', 0);
+        // Create logger instance
+        NotionSyncLogger logger = new NotionSyncLogger();
         
-        System.assertEquals(2, NotionSyncLogger.pendingLogs.size(), 'Should have 2 pending logs');
+        // Add some logs
+        logger.log(
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Lead', '001000000000004')
+        );
+        logger.log(
+            new NotionSyncLogger.LogEntry('UPDATE')
+                .withRecord('Lead', '001000000000005')
+                .withError('Error')
+        );
         
         // Clear logs without saving
-        NotionSyncLogger.clear();
+        logger.clear();
         
-        System.assertEquals(0, NotionSyncLogger.pendingLogs.size(), 'Pending logs should be cleared');
+        // After clearing, trying to flush should create no records
+        logger.flush();
         
         Test.stopTest();
         
@@ -191,8 +181,12 @@ private class NotionSyncLoggerTest {
     
     @future
     static void simulateFutureLogging() {
-        NotionSyncLogger.log('001FUTURE000001', 'Account', 'CREATE', 'Success', null, 0);
-        NotionSyncLogger.flush();
+        NotionSyncLogger logger = new NotionSyncLogger();
+        logger.log(
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Account', '001FUTURE000001')
+        );
+        logger.flush();
     }
     
     @isTest
@@ -202,14 +196,17 @@ private class NotionSyncLoggerTest {
         
         Test.startTest();
         
-        // Try to log when logging is disabled
-        NotionSyncLogger.log('001000000000001', 'Account', 'CREATE', 'Success', null, 0);
+        // Create logger instance
+        NotionSyncLogger logger = new NotionSyncLogger();
         
-        // Verify no pending logs were created
-        System.assertEquals(0, NotionSyncLogger.pendingLogs.size(), 'Should have no pending logs when disabled');
+        // Try to log when logging is disabled
+        logger.log(
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Account', '001000000000001')
+        );
         
         // Try to flush (should do nothing)
-        NotionSyncLogger.flush();
+        logger.flush();
         
         Test.stopTest();
         
