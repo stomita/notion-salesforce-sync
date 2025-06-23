@@ -4,3 +4,6 @@
 
 # LWC Test Files
 **/__tests__/**
+
+# CI Test-only components
+force-app/test-only/**
