@@ -88,8 +88,6 @@ jobs:
       - name: Deploy Source to Scratch Org
         run: |
           sf project deploy start --source-dir force-app --target-org ci-scratch
-          # Deploy test-only components for CI (includes external credential access)
-          sf project deploy start --source-dir force-app/test-only --target-org ci-scratch || true
       
       - name: Run Apex Tests
         run: |
@@ -114,8 +112,6 @@ jobs:
           sf org assign permset --name Notion_Integration_User -o ci-scratch
           sf org assign permset --name Notion_Sync_Admin -o ci-scratch
           sf org assign permset --name Notion_Integration_Test_User -o ci-scratch
-          # Assign CI test permission set (has external credential access)
-          sf org assign permset --name Notion_CI_Test_User -o ci-scratch || true
       
       - name: Setup Notion API Credentials
         run: |
@@ -124,6 +120,20 @@ jobs:
             scripts/apex/setup-integration-credentials-template.apex > /tmp/setup-credentials.apex
           sf apex run -f /tmp/setup-credentials.apex -o ci-scratch
           rm -f /tmp/setup-credentials.apex
+      
+      - name: Add External Credential Access for CI
+        run: |
+          # For 2GP packages, we need to update the permission set with external credential access
+          # Create temporary directory for CI-specific metadata
+          mkdir -p /tmp/ci-deploy/permissionsets
+          cp scripts/ci-permission-set-patch.xml /tmp/ci-deploy/permissionsets/Notion_Integration_User.permissionset-meta.xml
+          cp scripts/ci-package.xml /tmp/ci-deploy/package.xml
+          
+          # Deploy the updated permission set
+          sf project deploy start --manifest /tmp/ci-deploy/package.xml --source-dir /tmp/ci-deploy -o ci-scratch
+          
+          # Clean up
+          rm -rf /tmp/ci-deploy
       
       - name: Run Integration Tests
         run: |
