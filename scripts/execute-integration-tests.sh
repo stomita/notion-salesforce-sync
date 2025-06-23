@@ -40,6 +40,21 @@ run_test() {
     fi
 }
 
+# First verify authentication
+echo
+echo "=== Verifying Notion API Authentication ==="
+sf apex run -f scripts/apex/verify-auth.apex ${ORG_ALIAS:+-o $ORG_ALIAS}
+if [ $? -ne 0 ]; then
+    echo
+    echo "❌ Authentication verification failed!"
+    echo "Please ensure:"
+    echo "1. Notion API key is properly configured in Named Credentials"
+    echo "2. The API key has access to the workspace"
+    echo "3. The Notion integration is not restricted"
+    exit 1
+fi
+echo "✓ Authentication verified successfully"
+
 # Run setup first (clean up test data)
 echo
 echo "=== Running Test Setup ==="

@@ -106,6 +106,13 @@ jobs:
         run: |
           sf project deploy start --source-dir force-app/integration --target-org ci-scratch
       
+      - name: Assign Permission Sets
+        run: |
+          # Assign required permission sets for integration tests
+          sf org assign permset --name Notion_Integration_User -o ci-scratch
+          sf org assign permset --name Notion_Sync_Admin -o ci-scratch
+          sf org assign permset --name Notion_Integration_Test_User -o ci-scratch
+      
       - name: Setup Notion API Credentials
         run: |
           # Create temporary script with API key

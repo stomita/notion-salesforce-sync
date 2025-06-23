@@ -454,4 +454,97 @@ public class NotionApiClient {
             return new NotionResponse(false, databaseId, 'Exception during database retrieval: ' + e.getMessage(), null, null);
         }
     }
+    
+    /**
+     * Verify Notion API authentication by making a simple API call
+     * This method is used to check if the credentials are properly configured
+     * @return NotionResponse with success status and user information if authenticated
+     */
+    public static NotionResponse verifyAuthentication() {
+        try {
+            // Use the users/me endpoint to verify authentication
+            // This is a lightweight endpoint that returns current bot user info
+            HttpRequest request = buildHttpRequest('GET', '/v1/users/me');
+            
+            HttpResponse response = new Http().send(request);
+            
+            // Process the response
+            Integer statusCode = response.getStatusCode();
+            String responseBody = response.getBody();
+            
+            System.debug('NotionApiClient.verifyAuthentication: Status Code: ' + statusCode);
+            
+            if (statusCode == 200) {
+                try {
+                    Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+                    String botId = (String) responseMap.get('id');
+                    String botName = responseMap.containsKey('name') ? (String) responseMap.get('name') : 'Notion Integration';
+                    
+                    return new NotionResponse(
+                        true, 
+                        botId, 
+                        'Authentication successful. Bot: ' + botName, 
+                        statusCode, 
+                        responseBody
+                    );
+                } catch (Exception e) {
+                    return new NotionResponse(
+                        false, 
+                        null, 
+                        'Authentication succeeded but failed to parse response: ' + e.getMessage(), 
+                        statusCode, 
+                        responseBody
+                    );
+                }
+            } else if (statusCode == 401) {
+                return new NotionResponse(
+                    false, 
+                    null, 
+                    'Authentication failed: Invalid API key or unauthorized access', 
+                    statusCode, 
+                    responseBody
+                );
+            } else {
+                String errorMessage = 'Authentication check failed with HTTP ' + statusCode;
+                try {
+                    Map<String, Object> errorResponse = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+                    if (errorResponse.containsKey('message')) {
+                        errorMessage += ': ' + (String) errorResponse.get('message');
+                    }
+                } catch (Exception e) {
+                    // Ignore parsing error
+                }
+                
+                return new NotionResponse(false, null, errorMessage, statusCode, responseBody);
+            }
+            
+        } catch (CalloutException e) {
+            // Handle specific callout exceptions
+            String errorMessage = e.getMessage();
+            if (errorMessage.contains('Unauthorized endpoint')) {
+                return new NotionResponse(
+                    false, 
+                    null, 
+                    'Authentication failed: Named Credential not configured or unauthorized', 
+                    401, 
+                    null
+                );
+            }
+            return new NotionResponse(
+                false, 
+                null, 
+                'Authentication check failed: ' + errorMessage, 
+                null, 
+                null
+            );
+        } catch (Exception e) {
+            return new NotionResponse(
+                false, 
+                null, 
+                'Unexpected error during authentication check: ' + e.getMessage(), 
+                null, 
+                null
+            );
+        }
+    }
 }
