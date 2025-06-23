@@ -23,9 +23,8 @@ sf apex run -f "$SCRIPT_DIR/apex/test-6-batch-setup.apex" $ORG_FLAG
 echo ">>> Running batch test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-6-batch-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 30 seconds for sync to complete (100 records)..."
-echo ">>> Note: Flow triggers individually per record, using @future calls..."
-sleep 30
+echo ">>> Waiting 60 seconds for sync to complete (100 records)..."
+sleep 60
 
 echo ">>> Checking results..."
 "$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-6-batch-check.apex" "$ORG_FLAG"

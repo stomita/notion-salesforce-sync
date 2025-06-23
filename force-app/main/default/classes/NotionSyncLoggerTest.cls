@@ -20,7 +20,8 @@ private class NotionSyncLoggerTest {
         
         // Test basic log entry
         logger.log(
-            logger.createLogEntry('001000000000001', 'Account', 'CREATE')
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Account', '001000000000001')
                 .withStatus('Success')
                 .withNotionPageId('test-page-id')
         );
@@ -47,15 +48,11 @@ private class NotionSyncLoggerTest {
         NotionSyncLogger logger = new NotionSyncLogger();
         
         // Test rate limit log entry with builder pattern
-        NotionSyncLogger.LogEntry entry = logger.createLogEntry(
-            '001000000000002', 
-            'Contact', 
-            'UPDATE'
-        )
+        NotionSyncLogger.LogEntry entry = new NotionSyncLogger.LogEntry('UPDATE')
+        .withRecord('Contact', '001000000000002')
         .withRateLimit(5)
         .withMetrics(3, 100)
-        .withRetryCount(1)
-        .withError('Rate limit exceeded. Retry after 5 seconds.');
+        .withRetryCount(1);
         
         logger.log(entry);
         
@@ -75,7 +72,7 @@ private class NotionSyncLoggerTest {
         System.assertEquals(5, logs[0].Rate_Limit_Retry_After__c, 'Retry after should match');
         System.assertEquals(3, logs[0].API_Calls_Made__c, 'API calls made should match');
         System.assertEquals(100, logs[0].CPU_Time_Used__c, 'CPU time should match');
-        System.assertEquals('Rate Limited', logs[0].Status__c, 'Status should be Rate Limited');
+        System.assertEquals('Failed', logs[0].Status__c, 'Status should be Failed for rate limited requests');
         System.assert(logs[0].Callouts_Used__c >= 0, 'Callouts used should be logged');
     }
     
@@ -89,7 +86,8 @@ private class NotionSyncLoggerTest {
         // Add multiple log entries
         for (Integer i = 0; i < 10; i++) {
             logger.log(
-                logger.createLogEntry('00100000000000' + i, 'Account', 'CREATE')
+                new NotionSyncLogger.LogEntry('CREATE')
+                    .withRecord('Account', '00100000000000' + i)
                     .withStatus('Success')
                     .withNotionPageId('page-' + i)
             );
@@ -114,7 +112,8 @@ private class NotionSyncLoggerTest {
         
         // Test error log entry
         logger.log(
-            logger.createLogEntry('001000000000003', 'Opportunity', 'DELETE')
+            new NotionSyncLogger.LogEntry('DELETE')
+                .withRecord('Opportunity', '001000000000003')
                 .withError('Record not found in Notion')
                 .withRetryCount(2)
         );
@@ -141,9 +140,13 @@ private class NotionSyncLoggerTest {
         NotionSyncLogger logger = new NotionSyncLogger();
         
         // Add some logs
-        logger.log('001000000000004', 'Lead', 'CREATE');
         logger.log(
-            logger.createLogEntry('001000000000005', 'Lead', 'UPDATE')
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Lead', '001000000000004')
+        );
+        logger.log(
+            new NotionSyncLogger.LogEntry('UPDATE')
+                .withRecord('Lead', '001000000000005')
                 .withError('Error')
         );
         
@@ -179,7 +182,10 @@ private class NotionSyncLoggerTest {
     @future
     static void simulateFutureLogging() {
         NotionSyncLogger logger = new NotionSyncLogger();
-        logger.log('001FUTURE000001', 'Account', 'CREATE');
+        logger.log(
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Account', '001FUTURE000001')
+        );
         logger.flush();
     }
     
@@ -194,7 +200,10 @@ private class NotionSyncLoggerTest {
         NotionSyncLogger logger = new NotionSyncLogger();
         
         // Try to log when logging is disabled
-        logger.log('001000000000001', 'Account', 'CREATE');
+        logger.log(
+            new NotionSyncLogger.LogEntry('CREATE')
+                .withRecord('Account', '001000000000001')
+        );
         
         // Try to flush (should do nothing)
         logger.flush();

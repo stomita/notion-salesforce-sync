@@ -75,8 +75,11 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
                 }
             }
             
-            // Add batch-level summary logs
-            addBatchSummaryLogs(results);
+            // Log batch metrics and results
+            logBatchMetrics(results);
+            
+            // Log overall batch summary
+            logBatchSummary(results, nextStartIndex);
             
         } catch (Exception e) {
             handleBatchError(e);
@@ -130,43 +133,133 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
     }
     
     /**
-     * Add batch-level summary logs
+     * Log batch metrics to both debug log and database
      */
-    private void addBatchSummaryLogs(List<NotionSyncBatchProcessor.BatchResult> results) {
+    private void logBatchMetrics(List<NotionSyncBatchProcessor.BatchResult> results) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+        
         for (NotionSyncBatchProcessor.BatchResult result : results) {
-            // Log batch-level metrics
+            if (result == null) {
+                continue;
+            }
+            
+            // Log batch-level metrics to debug log
             String message = String.format(
                 'Batch processed: {0} items, Status: {1}, CPU: {2}ms, Heap: {3}KB, Callouts: {4}',
                 new List<Object>{
-                    result.batchSize,
-                    result.status,
-                    result.cpuTimeUsed,
-                    result.heapSizeUsed / 1024,
-                    result.calloutsUsed
+                    result.batchSize != null ? result.batchSize : 0,
+                    result.status != null ? result.status : 'Unknown',
+                    result.cpuTimeUsed != null ? result.cpuTimeUsed : 0,
+                    result.heapSizeUsed != null ? result.heapSizeUsed / 1024 : 0,
+                    result.calloutsUsed != null ? result.calloutsUsed : 0
                 }
             );
             
-            // Log batch summary using cleaner API
-            NotionSyncLogger.LogEntry entry = logger.createLogEntry(
-                'BATCH_' + System.now().getTime(),
-                'BatchProcess',
-                'BATCH'
-            )
-            .withStatus(result.status)
-            .withMetrics(result.calloutsUsed, result.cpuTimeUsed);
+            System.debug(LoggingLevel.INFO, message);
             
-            if (result.status == 'Rate Limited') {
-                entry.withRateLimit(result.retryAfterSeconds);
+            // Create a sync log entry for the batch result
+            NotionSyncLogger.LogEntry batchLog = new NotionSyncLogger.LogEntry('BATCH')
+                .withSalesforceObject(result.objectType)
+                .withMetrics(result.calloutsUsed, result.cpuTimeUsed);
+            
+            // Build detailed message with batch statistics
+            String batchDetails = String.format(
+                'Batch Size: {0}, Processed: {1}, Failed: {2}, Deferred: {3}',
+                new List<Object>{
+                    result.batchSize != null ? result.batchSize : 0,
+                    result.processedCount != null ? result.processedCount : 0,
+                    result.failedCount != null ? result.failedCount : 0,
+                    result.deferredCount != null ? result.deferredCount : 0
+                }
+            );
+            
+            // Set status based on batch result
+            if (result.status == 'Success') {
+                batchLog.withStatus('Success');
+                // Add batch details to error message field for successful batches
+                batchLog.errorMessage = batchDetails;
+            } else if (result.status == 'Rate Limited') {
+                batchLog.withRateLimit(result.retryAfterSeconds != null ? result.retryAfterSeconds : 1);
+                String errorMsg = batchDetails;
+                if (result.errorMessage != null) {
+                    errorMsg += ' | Error: ' + result.errorMessage;
+                }
+                batchLog.withError(errorMsg);
+            } else if (result.status == 'Error' || result.errorMessage != null) {
+                String errorMsg = batchDetails;
+                if (result.errorMessage != null) {
+                    errorMsg += ' | Error: ' + result.errorMessage;
+                }
+                batchLog.withError(errorMsg);
+            }
+            
+            // Log the batch result
+            logger.log(batchLog);
+            
+            if (result.status == 'Rate Limited' && result.retryAfterSeconds != null) {
+                System.debug('Batch was rate limited, retry after: ' + result.retryAfterSeconds + ' seconds');
             }
             
             if (result.errorMessage != null) {
-                entry.withError(result.errorMessage);
+                System.debug('Batch error: ' + result.errorMessage);
             }
-            
-            logger.log(entry);
-            
-            System.debug(LoggingLevel.INFO, message);
         }
+    }
+    
+    /**
+     * Log overall batch job summary
+     */
+    private void logBatchSummary(List<NotionSyncBatchProcessor.BatchResult> results, Integer nextStartIndex) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+        
+        // Calculate totals
+        Integer totalProcessed = 0;
+        Integer totalFailed = 0;
+        Integer totalDeferred = 0;
+        Integer totalCallouts = 0;
+        Integer totalCpuTime = 0;
+        
+        for (NotionSyncBatchProcessor.BatchResult result : results) {
+            if (result != null) {
+                totalProcessed += result.processedCount != null ? result.processedCount : 0;
+                totalFailed += result.failedCount != null ? result.failedCount : 0;
+                totalDeferred += result.deferredCount != null ? result.deferredCount : 0;
+                totalCallouts += result.calloutsUsed != null ? result.calloutsUsed : 0;
+                totalCpuTime += result.cpuTimeUsed != null ? result.cpuTimeUsed : 0;
+            }
+        }
+        
+        // Create summary log
+        String summaryMessage = String.format(
+            'Batch Job Summary - Total Requests: {0}, Processed: {1}, Failed: {2}, Deferred: {3}, Remaining: {4}, Batches: {5}, Callouts: {6}, CPU: {7}ms',
+            new List<Object>{
+                allRequests.size(),
+                totalProcessed,
+                totalFailed,
+                totalDeferred,
+                allRequests.size() - nextStartIndex,
+                results.size(),
+                totalCallouts,
+                totalCpuTime
+            }
+        );
+        
+        NotionSyncLogger.LogEntry summaryLog = new NotionSyncLogger.LogEntry('BATCH_SUMMARY')
+            .withMetrics(totalCallouts, totalCpuTime);
+        
+        // Set status based on overall results
+        if (totalFailed > 0 || totalDeferred > 0) {
+            summaryLog.withError(summaryMessage);
+        } else {
+            summaryLog.withStatus('Success');
+            summaryLog.errorMessage = summaryMessage;
+        }
+        
+        logger.log(summaryLog);
     }
     
     /**
@@ -176,9 +269,9 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         System.debug(LoggingLevel.ERROR, 'Batch processing error: ' + e.getMessage());
         System.debug(LoggingLevel.ERROR, 'Stack trace: ' + e.getStackTraceString());
         
-        // Log error using instance logger
+        // Log error using instance logger - use CREATE as operation type
         logger.log(
-            logger.createLogEntry('BATCH_ERROR', 'BatchProcess', 'ERROR')
+            new NotionSyncLogger.LogEntry('BATCH')
                 .withError('Batch processing error: ' + e.getMessage())
         );
         

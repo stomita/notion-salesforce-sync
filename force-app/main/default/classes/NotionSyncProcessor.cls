@@ -64,7 +64,8 @@ public class NotionSyncProcessor {
     private void logErrorsForRequests(List<NotionSync.Request> requests, String errorMessage) {
         for (NotionSync.Request request : requests) {
             logger.log(
-                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                new NotionSyncLogger.LogEntry(request.operationType)
+                    .withRecord(request.objectType, request.recordId)
                     .withError(errorMessage)
             );
         }
@@ -164,7 +165,8 @@ public class NotionSyncProcessor {
             
             // Log success
             logger.log(
-                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                new NotionSyncLogger.LogEntry(request.operationType)
+                    .withRecord(request.objectType, request.recordId)
                     .withStatus('Success')
                     .withNotionPageId(notionPageId)
             );
@@ -172,14 +174,16 @@ public class NotionSyncProcessor {
         } catch (NotionRateLimiter.RateLimitException e) {
             // Handle rate limit specifically
             logger.log(
-                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
-                    .withStatus('Rate Limited')
+                new NotionSyncLogger.LogEntry(request.operationType)
+                    .withRecord(request.objectType, request.recordId)
                     .withError(e.getMessage())
+                    .withRateLimit(1)  // Default to 1 second retry
             );
         } catch (Exception e) {
             // Log error
             logger.log(
-                logger.createLogEntry(request.recordId, request.objectType, request.operationType)
+                new NotionSyncLogger.LogEntry(request.operationType)
+                    .withRecord(request.objectType, request.recordId)
                     .withError(e.getMessage())
             );
         }

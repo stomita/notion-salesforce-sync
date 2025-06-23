@@ -120,6 +120,7 @@ public class NotionSyncBatchProcessor {
      */
     private BatchResult processSingleBatch(List<NotionSync.Request> batch, NotionSyncLogger logger) {
         BatchResult result = new BatchResult();
+        result.objectType = batch[0].objectType;
         result.batchSize = batch.size();
         result.startTime = System.now();
         
@@ -239,6 +240,7 @@ public class NotionSyncBatchProcessor {
      * Result of processing a single batch
      */
     public class BatchResult {
+        public String objectType { get; set; }
         public Integer batchSize { get; set; }
         public Integer processedCount { get; set; }
         public Integer failedCount { get; set; }

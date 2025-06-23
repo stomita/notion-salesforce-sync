@@ -75,5 +75,5 @@ public class NotionSync {
     public static final String STATUS_SUCCESS = 'Success';
     public static final String STATUS_FAILED = 'Failed';
     public static final String STATUS_DEFERRED = 'Deferred';
-    public static final String STATUS_RATE_LIMITED = 'Rate Limited';
+    // Note: Rate limited requests use STATUS_FAILED with Rate_Limited__c = true
 }

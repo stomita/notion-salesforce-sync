@@ -12,16 +12,6 @@ public with sharing class NotionSyncLogger {
     }
     
     
-    // Factory method to create a log entry
-    public LogEntry createLogEntry(String recordId, String objectType, String operationType) {
-        return new LogEntry(recordId, objectType, operationType);
-    }
-    
-    // Simple log method - creates and logs a basic success entry
-    public void log(String recordId, String objectType, String operationType) {
-        log(createLogEntry(recordId, objectType, operationType));
-    }
-    
     // Log with a LogEntry object
     public void log(LogEntry entry) {
         if (!loggingEnabled) {
@@ -103,10 +93,8 @@ public with sharing class NotionSyncLogger {
         public Integer cpuTimeUsed;
         public Integer calloutsUsed;
         
-        // Simple constructor with only required fields
-        public LogEntry(String recordId, String objectType, String operationType) {
-            this.recordId = recordId;
-            this.objectType = objectType;
+        // Constructor with only operationType - all other fields are optional
+        public LogEntry(String operationType) {
             this.operationType = operationType;
             this.status = 'Success';
             this.errorMessage = null;
@@ -117,6 +105,19 @@ public with sharing class NotionSyncLogger {
             this.apiCallsMade = 0;
             this.cpuTimeUsed = 0;
             this.calloutsUsed = 0;
+        }
+        
+        // Method to set record information (objectType and recordId)
+        public LogEntry withRecord(String objectType, String recordId) {
+            this.objectType = objectType;
+            this.recordId = recordId;
+            return this;
+        }
+        
+        // Method to set Salesforce object type only
+        public LogEntry withSalesforceObject(String objectType) {
+            this.objectType = objectType;
+            return this;
         }
         
         // Builder pattern methods for fluent API
@@ -144,7 +145,7 @@ public with sharing class NotionSyncLogger {
         public LogEntry withRateLimit(Integer retryAfterSeconds) {
             this.rateLimited = true;
             this.rateLimitRetryAfter = retryAfterSeconds;
-            this.status = 'Rate Limited';
+            this.status = 'Failed';  // Use 'Failed' since 'Rate Limited' is not a valid picklist value
             return this;
         }
         
