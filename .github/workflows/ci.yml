@@ -121,19 +121,6 @@ jobs:
           sf apex run -f /tmp/setup-credentials.apex -o ci-scratch
           rm -f /tmp/setup-credentials.apex
       
-      - name: Add External Credential Access for CI
-        run: |
-          # For 2GP packages, we need to update the permission set with external credential access
-          # Create temporary directory for CI-specific metadata
-          mkdir -p /tmp/ci-deploy/permissionsets
-          cp scripts/ci-permission-set-patch.xml /tmp/ci-deploy/permissionsets/Notion_Integration_User.permissionset-meta.xml
-          
-          # Deploy the updated permission set
-          sf project deploy start --source-dir /tmp/ci-deploy -o ci-scratch
-          
-          # Clean up
-          rm -rf /tmp/ci-deploy
-      
       - name: Run Integration Tests
         run: |
           # Export as environment variables for the script
