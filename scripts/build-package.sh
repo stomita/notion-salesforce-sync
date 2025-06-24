@@ -146,9 +146,19 @@ if command -v jq &> /dev/null; then
     # Add package ID to the package directory
     jq ".packageDirectories[0].id = \"$PACKAGE_ID\"" sfdx-project.json > sfdx-project.json.tmp
     mv sfdx-project.json.tmp sfdx-project.json
+    
+    # Ensure packageAliases exists and add the alias
+    jq "if .packageAliases then . else . + {packageAliases: {}} end | .packageAliases[\"$PACKAGE_NAME\"] = \"$PACKAGE_ID\"" sfdx-project.json > sfdx-project.json.tmp
+    mv sfdx-project.json.tmp sfdx-project.json
 else
     # Fallback to sed
     sed -i '' "s/\"namespace\": \"\"/\"namespace\": \"$NAMESPACE\"/" sfdx-project.json
+    
+    # Add packageAliases if it doesn't exist
+    if ! grep -q "packageAliases" sfdx-project.json; then
+        # Add before the closing brace
+        sed -i '' "s/}$/,\n  \"packageAliases\": {\n    \"$PACKAGE_NAME\": \"$PACKAGE_ID\"\n  }\n}/" sfdx-project.json
+    fi
 fi
 
 # Show current configuration
@@ -158,6 +168,7 @@ if command -v jq &> /dev/null; then
     echo "  Namespace: $(jq -r .namespace sfdx-project.json)"
     echo "  Package ID: $(jq -r '.packageDirectories[0].id' sfdx-project.json)"
     echo "  Package Name: $(jq -r '.packageDirectories[0].package' sfdx-project.json)"
+    echo "  Package Alias: $(jq -r ".packageAliases[\"$PACKAGE_NAME\"]" sfdx-project.json)"
 else
     echo "  (Install jq for formatted output)"
 fi
