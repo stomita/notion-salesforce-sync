@@ -48,21 +48,27 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help)
-            echo "Usage: $0 --namespace <namespace> --devhub <alias> [options]"
+            echo "Usage: $0 [options]"
+            echo ""
             echo "Options:"
-            echo "  --namespace <namespace>    The namespace to use for the managed package (required)"
-            echo "  --devhub <alias>          The DevHub alias to use (required)"
+            echo "  --namespace <namespace>    The namespace (defaults to NOTION_SYNC_PACKAGE_NAMESPACE from .env)"
+            echo "  --devhub <alias>          The DevHub alias (defaults to current default DevHub)"
             echo "  --package-id <id>         The package ID (defaults to NOTION_SYNC_PACKAGE_ID from .env)"
             echo "  --wait <minutes>          Wait time for package creation (default: 20)"
             echo "  --skip-validation         Skip validation during package creation"
             echo "  --no-code-coverage        Skip code coverage calculation"
             echo "  --help                    Show this help message"
             echo ""
-            echo "Environment variables:"
-            echo "  NOTION_SYNC_PACKAGE_ID    Package ID (can be set in .env file)"
+            echo "Environment variables (can be set in .env file):"
+            echo "  NOTION_SYNC_PACKAGE_NAMESPACE    Package namespace"
+            echo "  NOTION_SYNC_PACKAGE_ID           Package ID"
             echo ""
-            echo "Example:"
-            echo "  $0 --namespace notionsync --devhub notion-sync-devhub"
+            echo "Examples:"
+            echo "  # Use all defaults from .env and default DevHub:"
+            echo "  $0"
+            echo ""
+            echo "  # Override specific values:"
+            echo "  $0 --namespace notionsync --devhub my-devhub"
             exit 0
             ;;
         *)
@@ -73,21 +79,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Use environment variable if package ID not provided via command line
+# Use environment variables if not provided via command line
 if [ -z "$PACKAGE_ID" ] && [ -n "$NOTION_SYNC_PACKAGE_ID" ]; then
     PACKAGE_ID="$NOTION_SYNC_PACKAGE_ID"
 fi
 
+if [ -z "$NAMESPACE" ] && [ -n "$NOTION_SYNC_PACKAGE_NAMESPACE" ]; then
+    NAMESPACE="$NOTION_SYNC_PACKAGE_NAMESPACE"
+fi
+
+# If no DevHub specified, check for default
+if [ -z "$DEVHUB" ]; then
+    # Try to get the default DevHub
+    DEFAULT_DEVHUB=$(sf config get target-dev-hub --json 2>/dev/null | jq -r '.result[0].value' 2>/dev/null || echo "")
+    if [ -n "$DEFAULT_DEVHUB" ] && [ "$DEFAULT_DEVHUB" != "null" ]; then
+        DEVHUB="$DEFAULT_DEVHUB"
+        echo "Using default DevHub: $DEVHUB"
+    fi
+fi
+
 # Validate required parameters
 if [ -z "$NAMESPACE" ]; then
-    echo "Error: --namespace is required for managed package"
-    echo "Run $0 --help for usage information"
+    echo "Error: Namespace is required. Set NOTION_SYNC_PACKAGE_NAMESPACE in .env or use --namespace"
     exit 1
 fi
 
 if [ -z "$DEVHUB" ]; then
-    echo "Error: --devhub is required"
-    echo "Run $0 --help for usage information"
+    echo "Error: No DevHub found. Set a default with 'sf config set target-dev-hub <alias>' or use --devhub"
     exit 1
 fi
 
