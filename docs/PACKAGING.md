@@ -13,41 +13,47 @@ This guide explains how to build and manage the Notion Salesforce Sync as a Seco
 
 3. **Package Already Created**: The package "Notion Salesforce Sync" is already created with ID: `0HogL0000000FVJSA2`
 
+## Configuration
+
+Create a `.env` file with your package configuration:
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit to add your package details:
+NOTION_SYNC_PACKAGE_NAMESPACE=notionsync
+NOTION_SYNC_PACKAGE_ID=0HogL0000000FVJSA2
+```
+
 ## Building a Package Version
 
 ### Quick Start
 
+With your `.env` configured and default DevHub set:
 ```bash
-# Build a new package version
-./scripts/build-package.sh --namespace notionsync --devhub notion-sync-devhub
+# Build using all defaults from .env
+./scripts/build-package.sh
 
-# Build with extended wait time
-./scripts/build-package.sh --namespace notionsync --devhub notion-sync-devhub --wait 30
+# Override specific values if needed
+./scripts/build-package.sh --namespace myothernamespace --wait 30
 ```
 
-### Manual Process
+### Build Script Options
 
-If you prefer to run commands manually:
+- `--namespace <namespace>` - Override namespace (defaults to NOTION_SYNC_PACKAGE_NAMESPACE)
+- `--devhub <alias>` - Override DevHub (defaults to your default DevHub)
+- `--package-id <id>` - Override package ID (defaults to NOTION_SYNC_PACKAGE_ID)
+- `--wait <minutes>` - Wait time for package creation (default: 20)
+- `--skip-validation` - Skip validation during package creation
+- `--no-code-coverage` - Skip code coverage calculation
 
-1. **Prepare the project** (adds namespace temporarily):
-   ```bash
-   ./scripts/prepare-package.sh --namespace notionsync --devhub notion-sync-devhub
-   ```
+### What the Build Script Does
 
-2. **Create package version**:
-   ```bash
-   sf package version create \
-     --package "Notion Salesforce Sync" \
-     --target-dev-hub notion-sync-devhub \
-     --wait 20 \
-     --installation-key-bypass \
-     --code-coverage
-   ```
-
-3. **Restore original sfdx-project.json**:
-   ```bash
-   mv sfdx-project.json.backup sfdx-project.json
-   ```
+1. Loads configuration from `.env` file
+2. Creates a backup of `sfdx-project.json`
+3. Temporarily adds namespace and package ID to the project file
+4. Runs `sf package version create` with your configuration
+5. Automatically restores the original `sfdx-project.json`
 
 ## Package Management Commands
 
