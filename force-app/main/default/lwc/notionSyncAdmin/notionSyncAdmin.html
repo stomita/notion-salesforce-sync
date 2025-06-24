@@ -113,11 +113,13 @@
                                     <div class="slds-media__body">
                                         <h2 class="slds-text-heading_medium">
                                             {configurationTitle}
-                                            <template if:true={currentConfiguration.isActive}>
-                                                <lightning-badge label="Active" variant="success" class="slds-m-left_x-small"></lightning-badge>
-                                            </template>
-                                            <template if:false={currentConfiguration.isActive}>
-                                                <lightning-badge label="Inactive" class="slds-m-left_x-small"></lightning-badge>
+                                            <template if:true={currentConfiguration}>
+                                                <template if:true={currentConfiguration.isActive}>
+                                                    <lightning-badge label="Active" variant="success" class="slds-m-left_x-small"></lightning-badge>
+                                                </template>
+                                                <template if:false={currentConfiguration.isActive}>
+                                                    <lightning-badge label="Inactive" class="slds-m-left_x-small"></lightning-badge>
+                                                </template>
                                             </template>
                                         </h2>
                                     </div>
@@ -149,7 +151,7 @@
                                 <lightning-input
                                     type="checkbox"
                                     label="Active"
-                                    checked={currentConfiguration.isActive}
+                                    checked={isActive}
                                     onchange={handleActiveToggle}
                                     class="slds-m-bottom_small"
                                 ></lightning-input>

@@ -32,6 +32,10 @@ export default class NotionSyncAdmin extends LightningElement {
         this.checkPermissionAndLoadData();
     }
 
+    get isActive() {
+        return this.currentConfiguration ? this.currentConfiguration.isActive : false;
+    }
+
     async checkPermissionAndLoadData() {
         try {
             await this.loadSalesforceObjects();
