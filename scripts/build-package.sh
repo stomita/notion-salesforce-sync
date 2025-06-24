@@ -175,18 +175,19 @@ fi
 echo ""
 
 # Build the package version create command
-# Use package ID directly
-PACKAGE_CMD="sf package version create --package \"$PACKAGE_ID\" --target-dev-hub $DEVHUB --wait $WAIT_TIME"
+# Use path to avoid ambiguity
+PACKAGE_CMD="sf package version create --path force-app/main --target-dev-hub $DEVHUB --wait $WAIT_TIME"
 
 # Add optional flags
+PACKAGE_CMD="$PACKAGE_CMD --installation-key-bypass"
+
 if [ "$SKIP_VALIDATION" = true ]; then
     PACKAGE_CMD="$PACKAGE_CMD --skip-validation"
+    # Can't use code coverage with skip validation
 else
-    PACKAGE_CMD="$PACKAGE_CMD --installation-key-bypass"
-fi
-
-if [ "$CODE_COVERAGE" = true ]; then
-    PACKAGE_CMD="$PACKAGE_CMD --code-coverage"
+    if [ "$CODE_COVERAGE" = true ]; then
+        PACKAGE_CMD="$PACKAGE_CMD --code-coverage"
+    fi
 fi
 
 # Show the command that will be executed
