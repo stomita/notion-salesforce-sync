@@ -125,18 +125,12 @@ if command -v jq &> /dev/null; then
     jq ".namespace = \"$NAMESPACE\"" sfdx-project.json > sfdx-project.json.tmp
     mv sfdx-project.json.tmp sfdx-project.json
     
-    # Ensure package ID is in packageAliases
-    jq ".packageAliases[\"$PACKAGE_NAME\"] = \"$PACKAGE_ID\"" sfdx-project.json > sfdx-project.json.tmp
+    # Add package ID to the package directory
+    jq ".packageDirectories[0].id = \"$PACKAGE_ID\"" sfdx-project.json > sfdx-project.json.tmp
     mv sfdx-project.json.tmp sfdx-project.json
 else
     # Fallback to sed
     sed -i '' "s/\"namespace\": \"\"/\"namespace\": \"$NAMESPACE\"/" sfdx-project.json
-    
-    # Check if package alias exists, if not add it
-    if ! grep -q "\"$PACKAGE_NAME\": \"$PACKAGE_ID\"" sfdx-project.json; then
-        # This is a simple approach - might need refinement for complex cases
-        sed -i '' "s/\"packageAliases\": {/\"packageAliases\": {\n    \"$PACKAGE_NAME\": \"$PACKAGE_ID\",/" sfdx-project.json
-    fi
 fi
 
 # Show current configuration
@@ -144,15 +138,16 @@ echo ""
 echo "Current sfdx-project.json configuration:"
 if command -v jq &> /dev/null; then
     echo "  Namespace: $(jq -r .namespace sfdx-project.json)"
-    echo "  Package Alias: $(jq -r ".packageAliases[\"$PACKAGE_NAME\"]" sfdx-project.json)"
+    echo "  Package ID: $(jq -r '.packageDirectories[0].id' sfdx-project.json)"
+    echo "  Package Name: $(jq -r '.packageDirectories[0].package' sfdx-project.json)"
 else
     echo "  (Install jq for formatted output)"
 fi
 echo ""
 
 # Build the package version create command
-# Use package name since it's mapped to the ID in packageAliases
-PACKAGE_CMD="sf package version create --package \"$PACKAGE_NAME\" --target-dev-hub $DEVHUB --wait $WAIT_TIME"
+# Use package ID directly
+PACKAGE_CMD="sf package version create --package \"$PACKAGE_ID\" --target-dev-hub $DEVHUB --wait $WAIT_TIME"
 
 # Add optional flags
 if [ "$SKIP_VALIDATION" = true ]; then
