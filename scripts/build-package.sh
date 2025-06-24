@@ -11,6 +11,14 @@ DEVHUB=""
 WAIT_TIME=20
 SKIP_VALIDATION=false
 CODE_COVERAGE=true
+PACKAGE_ID=""
+PACKAGE_NAME="Notion Salesforce Sync"
+
+# Load environment variables if .env file exists
+if [ -f .env ]; then
+    echo "Loading environment variables from .env file..."
+    export $(cat .env | grep -v '^#' | xargs)
+fi
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -21,6 +29,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --devhub)
             DEVHUB="$2"
+            shift 2
+            ;;
+        --package-id)
+            PACKAGE_ID="$2"
             shift 2
             ;;
         --wait)
@@ -40,10 +52,14 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --namespace <namespace>    The namespace to use for the managed package (required)"
             echo "  --devhub <alias>          The DevHub alias to use (required)"
+            echo "  --package-id <id>         The package ID (defaults to NOTION_SYNC_PACKAGE_ID from .env)"
             echo "  --wait <minutes>          Wait time for package creation (default: 20)"
             echo "  --skip-validation         Skip validation during package creation"
             echo "  --no-code-coverage        Skip code coverage calculation"
             echo "  --help                    Show this help message"
+            echo ""
+            echo "Environment variables:"
+            echo "  NOTION_SYNC_PACKAGE_ID    Package ID (can be set in .env file)"
             echo ""
             echo "Example:"
             echo "  $0 --namespace notionsync --devhub notion-sync-devhub"
@@ -56,6 +72,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Use environment variable if package ID not provided via command line
+if [ -z "$PACKAGE_ID" ] && [ -n "$NOTION_SYNC_PACKAGE_ID" ]; then
+    PACKAGE_ID="$NOTION_SYNC_PACKAGE_ID"
+fi
 
 # Validate required parameters
 if [ -z "$NAMESPACE" ]; then
@@ -70,9 +91,15 @@ if [ -z "$DEVHUB" ]; then
     exit 1
 fi
 
+if [ -z "$PACKAGE_ID" ]; then
+    echo "Error: Package ID is required. Set NOTION_SYNC_PACKAGE_ID in .env or use --package-id"
+    exit 1
+fi
+
 echo "=== Building 2GP Managed Package ==="
 echo "Namespace: $NAMESPACE"
 echo "DevHub: $DEVHUB"
+echo "Package ID: $PACKAGE_ID"
 echo "Wait Time: $WAIT_TIME minutes"
 echo ""
 
@@ -91,18 +118,41 @@ restore_backup() {
 # Set up trap to restore backup on exit
 trap restore_backup EXIT
 
-# Add namespace to project configuration
-echo "Adding namespace to sfdx-project.json..."
+# Update project configuration
+echo "Updating sfdx-project.json..."
 if command -v jq &> /dev/null; then
+    # Add namespace
     jq ".namespace = \"$NAMESPACE\"" sfdx-project.json > sfdx-project.json.tmp
+    mv sfdx-project.json.tmp sfdx-project.json
+    
+    # Ensure package ID is in packageAliases
+    jq ".packageAliases[\"$PACKAGE_NAME\"] = \"$PACKAGE_ID\"" sfdx-project.json > sfdx-project.json.tmp
     mv sfdx-project.json.tmp sfdx-project.json
 else
     # Fallback to sed
     sed -i '' "s/\"namespace\": \"\"/\"namespace\": \"$NAMESPACE\"/" sfdx-project.json
+    
+    # Check if package alias exists, if not add it
+    if ! grep -q "\"$PACKAGE_NAME\": \"$PACKAGE_ID\"" sfdx-project.json; then
+        # This is a simple approach - might need refinement for complex cases
+        sed -i '' "s/\"packageAliases\": {/\"packageAliases\": {\n    \"$PACKAGE_NAME\": \"$PACKAGE_ID\",/" sfdx-project.json
+    fi
 fi
 
+# Show current configuration
+echo ""
+echo "Current sfdx-project.json configuration:"
+if command -v jq &> /dev/null; then
+    echo "  Namespace: $(jq -r .namespace sfdx-project.json)"
+    echo "  Package Alias: $(jq -r ".packageAliases[\"$PACKAGE_NAME\"]" sfdx-project.json)"
+else
+    echo "  (Install jq for formatted output)"
+fi
+echo ""
+
 # Build the package version create command
-PACKAGE_CMD="sf package version create --package \"Notion Salesforce Sync\" --target-dev-hub $DEVHUB --wait $WAIT_TIME"
+# Use package name since it's mapped to the ID in packageAliases
+PACKAGE_CMD="sf package version create --package \"$PACKAGE_NAME\" --target-dev-hub $DEVHUB --wait $WAIT_TIME"
 
 # Add optional flags
 if [ "$SKIP_VALIDATION" = true ]; then
