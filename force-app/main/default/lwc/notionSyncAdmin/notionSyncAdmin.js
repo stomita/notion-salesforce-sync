@@ -87,6 +87,10 @@ export default class NotionSyncAdmin extends LightningElement {
         const objectApiName = event.detail.value;
         if (objectApiName && objectApiName !== 'new') {
             this.selectedObject = objectApiName;
+            // Update the configuration with the selected object
+            if (this.isNewConfiguration && this.currentConfiguration) {
+                this.currentConfiguration.objectApiName = objectApiName;
+            }
             // Don't reset isNewConfiguration here - preserve it
             await this.loadObjectConfiguration(objectApiName);
         }
@@ -301,7 +305,16 @@ export default class NotionSyncAdmin extends LightningElement {
     handleNewConfiguration() {
         this.isNewConfiguration = true;
         this.selectedObject = 'new';
-        this.currentConfiguration = null;
+        // Initialize with an empty configuration to avoid null errors
+        this.currentConfiguration = {
+            objectApiName: '',
+            notionDatabaseId: '',
+            notionDatabaseName: '',
+            isActive: true,
+            salesforceIdPropertyName: '',
+            fieldMappings: [],
+            relationshipMappings: []
+        };
         this.hasUnsavedChanges = false;
     }
 
@@ -372,6 +385,9 @@ export default class NotionSyncAdmin extends LightningElement {
 
     // Computed properties
     get objectOptions() {
+        if (!this.salesforceObjects || this.salesforceObjects.length === 0) {
+            return [];
+        }
         return this.salesforceObjects.map(obj => ({
             label: `${obj.label} (${obj.apiName})`,
             value: obj.apiName
