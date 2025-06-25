@@ -87,10 +87,12 @@ export default class NotionSyncAdmin extends LightningElement {
         const objectApiName = event.detail.value;
         if (objectApiName && objectApiName !== 'new') {
             this.selectedObject = objectApiName;
-            // Update the configuration with the selected object
-            if (this.isNewConfiguration && this.currentConfiguration) {
-                this.currentConfiguration.objectApiName = objectApiName;
+            
+            // For new configurations, create the configuration object now
+            if (this.isNewConfiguration && !this.currentConfiguration) {
+                this.currentConfiguration = this.createNewConfiguration(objectApiName);
             }
+            
             // Don't reset isNewConfiguration here - preserve it
             await this.loadObjectConfiguration(objectApiName);
         }
@@ -305,16 +307,8 @@ export default class NotionSyncAdmin extends LightningElement {
     handleNewConfiguration() {
         this.isNewConfiguration = true;
         this.selectedObject = 'new';
-        // Initialize with an empty configuration to avoid null errors
-        this.currentConfiguration = {
-            objectApiName: '',
-            notionDatabaseId: '',
-            notionDatabaseName: '',
-            isActive: true,
-            salesforceIdPropertyName: '',
-            fieldMappings: [],
-            relationshipMappings: []
-        };
+        // Don't initialize configuration yet - wait for object selection
+        this.currentConfiguration = null;
         this.hasUnsavedChanges = false;
     }
 
@@ -396,6 +390,14 @@ export default class NotionSyncAdmin extends LightningElement {
 
     get isConfigurationLoaded() {
         return this.currentConfiguration !== null;
+    }
+
+    get showObjectSelection() {
+        return this.isNewConfiguration && (!this.currentConfiguration || !this.currentConfiguration.objectApiName);
+    }
+
+    get showConfigurationForm() {
+        return this.currentConfiguration && this.currentConfiguration.objectApiName;
     }
 
     get saveDisabled() {

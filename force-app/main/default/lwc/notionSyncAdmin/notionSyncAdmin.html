@@ -128,7 +128,7 @@
                         </div>
 
                         <!-- Object Selection (for new configs) -->
-                        <template if:false={isConfigurationLoaded}>
+                        <template if:true={showObjectSelection}>
                             <lightning-combobox
                                 name="object"
                                 label="Select Salesforce Object"
@@ -142,7 +142,7 @@
                         </template>
 
                         <!-- Configuration Form -->
-                        <template if:true={isConfigurationLoaded}>
+                        <template if:true={showConfigurationForm}>
                             <!-- Basic Configuration -->
                             <div class="slds-box slds-m-bottom_medium">
                                 <h3 class="slds-text-heading_small slds-m-bottom_small">Basic Configuration</h3>
