@@ -7,11 +7,6 @@
     </customPermissions>
     <hasActivationRequired>false</hasActivationRequired>
     <label>Notion Sync Administrator</label>
-    <!-- Access to External Credentials for Notion API -->
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>Notion_Credential-NotionIntegration</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
     <!-- Custom Metadata Type Access -->
     <customMetadataTypeAccesses>
         <enabled>true</enabled>
