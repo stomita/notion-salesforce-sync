@@ -4,8 +4,8 @@ import getDatabaseSchema from '@salesforce/apex/NotionAdminController.getDatabas
 import getConfiguredSyncObjects from '@salesforce/apex/NotionAdminController.getConfiguredSyncObjects';
 
 export default class NotionRelationshipConfig extends LightningElement {
-    @api objectApiName;
-    @api notionDatabaseId;
+    _objectApiName;
+    _notionDatabaseId;
     @api existingMappings = [];
 
     @track relationshipMappings = [];
@@ -28,6 +28,30 @@ export default class NotionRelationshipConfig extends LightningElement {
         if (this.objectApiName && this.notionDatabaseId) {
             this.loadRelationshipData();
         }
+    }
+
+    @api
+    set objectApiName(value) {
+        this._objectApiName = value;
+        if (this._objectApiName && this._notionDatabaseId) {
+            this.loadRelationshipData();
+        }
+    }
+
+    get objectApiName() {
+        return this._objectApiName;
+    }
+
+    @api
+    set notionDatabaseId(value) {
+        this._notionDatabaseId = value;
+        if (this._objectApiName && this._notionDatabaseId) {
+            this.loadRelationshipData();
+        }
+    }
+
+    get notionDatabaseId() {
+        return this._notionDatabaseId;
     }
 
     initializeMappings() {
@@ -53,12 +77,17 @@ export default class NotionRelationshipConfig extends LightningElement {
     }
 
     async loadRelationshipData() {
+        // Prevent duplicate loading
+        if (this.isLoading) {
+            return;
+        }
+        
         this.isLoading = true;
         try {
             // Load fields, database schema, and configured sync objects
             const [fields, schema, syncObjects] = await Promise.all([
-                getObjectFields({ objectApiName: this.objectApiName }),
-                getDatabaseSchema({ databaseId: this.notionDatabaseId }),
+                getObjectFields({ objectApiName: this._objectApiName }),
+                getDatabaseSchema({ databaseId: this._notionDatabaseId }),
                 getConfiguredSyncObjects()
             ]);
 
