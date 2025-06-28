@@ -220,14 +220,16 @@ public with sharing class NotionAdminController {
         }
     }
     
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled(cacheable=false)
     public static List<SalesforceField> getObjectFields(String objectApiName) {
         checkAdminPermission();
+        System.debug('[getObjectFields] Called with objectApiName: ' + objectApiName);
         try {
             List<SalesforceField> fields = new List<SalesforceField>();
             
             Schema.SObjectType objType = Schema.getGlobalDescribe().get(objectApiName);
             if (objType == null) {
+                System.debug('[getObjectFields] Object not found: ' + objectApiName);
                 throw new AuraHandledException('Object not found: ' + objectApiName);
             }
             
@@ -262,8 +264,10 @@ public with sharing class NotionAdminController {
             // Sort by label
             fields.sort();
             
+            System.debug('[getObjectFields] Returning ' + fields.size() + ' fields for ' + objectApiName);
             return fields;
         } catch (Exception e) {
+            System.debug('[getObjectFields] Error: ' + e.getMessage());
             throw new AuraHandledException('Error fetching object fields: ' + e.getMessage());
         }
     }
