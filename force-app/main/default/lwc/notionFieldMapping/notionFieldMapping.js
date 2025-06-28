@@ -15,11 +15,36 @@ export default class NotionFieldMapping extends LightningElement {
 
     // For new mapping - Initialize with null to ensure proper initial state
     @track newMapping = null;
+    
+    // Track if data has been loaded successfully
+    _dataLoaded = false;
 
     connectedCallback() {
+        console.log('[FieldMapping] connectedCallback - objectApiName:', this.objectApiName, 'notionDatabaseId:', this.notionDatabaseId);
         this.initializeMappings();
         if (this.objectApiName && this.notionDatabaseId) {
             this.loadData();
+        } else {
+            console.log('[FieldMapping] Skipping loadData - missing required props');
+        }
+    }
+
+    renderedCallback() {
+        console.log('[FieldMapping] renderedCallback - objectApiName:', this.objectApiName, 'notionDatabaseId:', this.notionDatabaseId);
+        // Check if we need to reload data when props change or when they become available for the first time
+        if (this.objectApiName && this.notionDatabaseId) {
+            const needsReload = !this._dataLoaded || 
+                               this._lastObjectApiName !== this.objectApiName || 
+                               this._lastNotionDatabaseId !== this.notionDatabaseId;
+            
+            if (needsReload) {
+                console.log('[FieldMapping] Props changed or first load, reloading data');
+                console.log('[FieldMapping] _dataLoaded:', this._dataLoaded, '_lastObjectApiName:', this._lastObjectApiName, '_lastNotionDatabaseId:', this._lastNotionDatabaseId);
+                this._lastObjectApiName = this.objectApiName;
+                this._lastNotionDatabaseId = this.notionDatabaseId;
+                this._dataLoaded = true;
+                this.loadData();
+            }
         }
     }
 
@@ -35,21 +60,33 @@ export default class NotionFieldMapping extends LightningElement {
     }
 
     async loadData() {
+        console.log('[FieldMapping] Loading data for:', this.objectApiName, this.notionDatabaseId);
         this.isLoading = true;
         try {
             // Load Salesforce fields and Notion properties in parallel
+            console.log('[FieldMapping] Calling getObjectFields with:', this.objectApiName);
             const [fields, schema] = await Promise.all([
                 getObjectFields({ objectApiName: this.objectApiName }),
                 getDatabaseSchema({ databaseId: this.notionDatabaseId })
             ]);
 
-            this.salesforceFields = fields;
-            this.notionProperties = schema.properties;
+            console.log('[FieldMapping] Loaded fields:', fields);
+            console.log('[FieldMapping] Fields length:', fields ? fields.length : 'null');
+            console.log('[FieldMapping] Loaded schema:', schema);
+            
+            this.salesforceFields = fields || [];
+            this.notionProperties = schema?.properties || [];
             
             // Auto-detect types for existing mappings
             this.updateMappingTypes();
         } catch (error) {
-            console.error('Error loading data:', error);
+            console.error('[FieldMapping] Error loading data:', error);
+            console.error('[FieldMapping] Error details:', JSON.stringify(error));
+            console.error('[FieldMapping] Error message:', error.message);
+            console.error('[FieldMapping] Error stack:', error.stack);
+            // Set empty arrays to prevent undefined errors
+            this.salesforceFields = [];
+            this.notionProperties = [];
         } finally {
             this.isLoading = false;
         }
@@ -181,12 +218,14 @@ export default class NotionFieldMapping extends LightningElement {
     // Computed properties
     get availableFields() {
         const mappedFields = new Set(this.fieldMappings.map(m => m.salesforceFieldApiName));
-        return this.salesforceFields
+        const available = this.salesforceFields
             .filter(field => !mappedFields.has(field.apiName))
             .map(field => ({
                 label: `${field.label} - ${field.apiName} (${field.type})`,
                 value: field.apiName
             }));
+        console.log('[FieldMapping] Available fields:', available.length, 'Total fields:', this.salesforceFields.length, 'Mapped:', mappedFields.size);
+        return available;
     }
 
     get availableProperties() {

@@ -45,7 +45,7 @@
 
             <div class="slds-p-horizontal_medium">
                 <!-- Current Configurations View (Default) -->
-                <template if:false={selectedObject}>
+                <template if:false={isConfigurationView}>
                     <!-- Tab Set -->
                     <lightning-tabset variant="standard" active-tab-value={activeTab}>
                         <!-- Configurations Tab -->
@@ -97,7 +97,7 @@
                 </template>
 
                 <!-- Object Configuration View -->
-                <template if:true={selectedObject}>
+                <template if:true={isConfigurationView}>
                     <div class="slds-p-around_medium">
                         <!-- Back Button and Title -->
                         <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
@@ -127,22 +127,7 @@
                             </div>
                         </div>
 
-                        <!-- Object Selection (for new configs) -->
-                        <template if:false={isConfigurationLoaded}>
-                            <lightning-combobox
-                                name="object"
-                                label="Select Salesforce Object"
-                                value={selectedObject}
-                                placeholder="Choose an object to configure"
-                                options={objectOptions}
-                                onchange={handleObjectSelection}
-                                required
-                                class="slds-m-bottom_large"
-                            ></lightning-combobox>
-                        </template>
-
                         <!-- Configuration Form -->
-                        <template if:true={isConfigurationLoaded}>
                             <!-- Basic Configuration -->
                             <div class="slds-box slds-m-bottom_medium">
                                 <h3 class="slds-text-heading_small slds-m-bottom_small">Basic Configuration</h3>
@@ -156,13 +141,29 @@
                                     class="slds-m-bottom_small"
                                 ></lightning-input>
                                 
-                                <!-- Salesforce Object Info -->
-                                <div class="slds-m-bottom_small">
-                                    <div class="slds-text-title slds-text-color_weak">Salesforce Object</div>
-                                    <div class="slds-text-body_regular">
-                                        <strong>{selectedObjectLabel}</strong> ({selectedObject})
+                                <!-- Salesforce Object Selection (for new configs) -->
+                                <template if:true={showObjectSelection}>
+                                    <lightning-combobox
+                                        name="object"
+                                        label="Select Salesforce Object"
+                                        value={selectedObject}
+                                        placeholder="Choose an object to configure"
+                                        options={objectOptions}
+                                        onchange={handleObjectSelection}
+                                        required
+                                        class="slds-m-bottom_small"
+                                    ></lightning-combobox>
+                                </template>
+                                
+                                <!-- Salesforce Object Info (for existing configs) -->
+                                <template if:false={showObjectSelection}>
+                                    <div class="slds-m-bottom_small">
+                                        <div class="slds-text-title slds-text-color_weak">Salesforce Object</div>
+                                        <div class="slds-text-body_regular">
+                                            <strong>{selectedObjectLabel}</strong> ({selectedObject})
+                                        </div>
                                     </div>
-                                </div>
+                                </template>
 
                                 <!-- Database Selection -->
                                 <div class="slds-grid slds-gutters slds-m-bottom_small">
@@ -187,7 +188,7 @@
                                 <!-- Salesforce ID Property -->
                                 <lightning-combobox
                                     label="Salesforce ID Property Name"
-                                    value={currentConfiguration.salesforceIdPropertyName}
+                                    value={currentSalesforceIdPropertyName}
                                     placeholder="Select a property"
                                     options={salesforceIdPropertyOptions}
                                     onchange={handleSalesforceIdPropertyChange}
@@ -200,12 +201,19 @@
                             <!-- Field Mappings -->
                             <div class="slds-box slds-m-bottom_medium">
                                 <h3 class="slds-text-heading_small slds-m-bottom_small">Field Mappings</h3>
-                                <c-notion-field-mapping
-                                    object-api-name={selectedObject}
-                                    notion-database-id={currentConfiguration.notionDatabaseId}
-                                    existing-mappings={currentConfiguration.fieldMappings}
-                                    onmappingchange={handleFieldMappingChange}
-                                ></c-notion-field-mapping>
+                                <template if:true={showFieldMappingComponent}>
+                                    <c-notion-field-mapping
+                                        object-api-name={selectedObject}
+                                        notion-database-id={currentNotionDatabaseId}
+                                        existing-mappings={currentFieldMappings}
+                                        onmappingchange={handleFieldMappingChange}
+                                    ></c-notion-field-mapping>
+                                </template>
+                                <template if:false={showFieldMappingComponent}>
+                                    <div class="slds-text-color_weak">
+                                        Loading field configuration...
+                                    </div>
+                                </template>
                             </div>
 
                             <!-- Relationship Mappings -->
@@ -213,8 +221,8 @@
                                 <h3 class="slds-text-heading_small slds-m-bottom_small">Relationship Mappings</h3>
                                 <c-notion-relationship-config
                                     object-api-name={selectedObject}
-                                    notion-database-id={currentConfiguration.notionDatabaseId}
-                                    existing-mappings={currentConfiguration.relationshipMappings}
+                                    notion-database-id={currentNotionDatabaseId}
+                                    existing-mappings={currentRelationshipMappings}
                                     onmappingchange={handleRelationshipChange}
                                 ></c-notion-relationship-config>
                             </div>
@@ -240,7 +248,6 @@
                                     </lightning-button-group>
                                 </div>
                             </div>
-                        </template>
                     </div>
                 </template>
             </div>

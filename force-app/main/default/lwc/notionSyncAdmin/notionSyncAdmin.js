@@ -85,35 +85,43 @@ export default class NotionSyncAdmin extends LightningElement {
 
     async handleObjectSelection(event) {
         const objectApiName = event.detail.value;
-        if (objectApiName && objectApiName !== 'new') {
+        if (objectApiName) {
             this.selectedObject = objectApiName;
-            // Update the configuration with the selected object
-            if (this.isNewConfiguration && this.currentConfiguration) {
-                this.currentConfiguration.objectApiName = objectApiName;
+            
+            // For new configurations, create the configuration object now
+            if (this.isNewConfiguration && !this.currentConfiguration) {
+                this.currentConfiguration = this.createNewConfiguration(objectApiName);
             }
+            
             // Don't reset isNewConfiguration here - preserve it
             await this.loadObjectConfiguration(objectApiName);
         }
     }
 
     async loadObjectConfiguration(objectApiName) {
+        console.log('[LoadConfig] Starting load for:', objectApiName);
         try {
             this.isLoading = true;
             this.selectedObject = objectApiName;
             
             // If this is a new configuration, don't try to load existing config
             if (this.isNewConfiguration) {
+                console.log('[LoadConfig] Creating new configuration');
                 this.currentConfiguration = this.createNewConfiguration(objectApiName);
             } else {
+                console.log('[LoadConfig] Loading existing configuration');
                 const config = await getSyncConfiguration({ objectApiName });
+                console.log('[LoadConfig] Loaded config:', config);
                 this.currentConfiguration = config || this.createNewConfiguration(objectApiName);
             }
             
             // If we have a database ID, load its properties
             if (this.currentConfiguration.notionDatabaseId) {
+                console.log('[LoadConfig] Loading database properties for:', this.currentConfiguration.notionDatabaseId);
                 await this.loadDatabaseProperties(this.currentConfiguration.notionDatabaseId);
             }
             
+            console.log('[LoadConfig] Setting showFieldMapping to true');
             this.showFieldMapping = true;
         } catch (error) {
             console.error('Error in loadObjectConfiguration:', error);
@@ -162,6 +170,7 @@ export default class NotionSyncAdmin extends LightningElement {
     }
 
     handleFieldMappingChange(event) {
+        console.log('[SyncAdmin] Field mapping change:', event.detail.mappings);
         // Update only the field mappings, don't recreate the entire object
         this.updateConfiguration({
             fieldMappings: event.detail.mappings
@@ -304,17 +313,9 @@ export default class NotionSyncAdmin extends LightningElement {
 
     handleNewConfiguration() {
         this.isNewConfiguration = true;
-        this.selectedObject = 'new';
-        // Initialize with an empty configuration to avoid null errors
-        this.currentConfiguration = {
-            objectApiName: '',
-            notionDatabaseId: '',
-            notionDatabaseName: '',
-            isActive: true,
-            salesforceIdPropertyName: '',
-            fieldMappings: [],
-            relationshipMappings: []
-        };
+        this.selectedObject = null;  // Set to null instead of 'new' to properly show object selection
+        // Don't initialize configuration yet - wait for object selection
+        this.currentConfiguration = null;
         this.hasUnsavedChanges = false;
     }
 
@@ -393,9 +394,24 @@ export default class NotionSyncAdmin extends LightningElement {
             value: obj.apiName
         }));
     }
+    
+    get isConfigurationView() {
+        // Show configuration view when:
+        // 1. We have a selected object (edit mode)
+        // 2. OR we're in new configuration mode
+        return this.selectedObject || this.isNewConfiguration;
+    }
 
     get isConfigurationLoaded() {
         return this.currentConfiguration !== null;
+    }
+
+    get showObjectSelection() {
+        return this.isNewConfiguration && (!this.currentConfiguration || !this.currentConfiguration.objectApiName);
+    }
+
+    get showConfigurationForm() {
+        return this.currentConfiguration && this.currentConfiguration.objectApiName;
     }
 
     get saveDisabled() {
@@ -452,11 +468,37 @@ export default class NotionSyncAdmin extends LightningElement {
     get isSalesforceIdPropertyDisabled() {
         return !this.currentConfiguration || !this.currentConfiguration.notionDatabaseId;
     }
+    
+    get currentSalesforceIdPropertyName() {
+        return this.currentConfiguration ? this.currentConfiguration.salesforceIdPropertyName : '';
+    }
+    
+    get currentNotionDatabaseId() {
+        const dbId = this.currentConfiguration ? this.currentConfiguration.notionDatabaseId : '';
+        console.log('[SyncAdmin] currentNotionDatabaseId:', dbId);
+        return dbId;
+    }
+    
+    get currentFieldMappings() {
+        const mappings = this.currentConfiguration ? this.currentConfiguration.fieldMappings : [];
+        console.log('[SyncAdmin] currentFieldMappings:', mappings);
+        return mappings;
+    }
+    
+    get currentRelationshipMappings() {
+        return this.currentConfiguration ? this.currentConfiguration.relationshipMappings : [];
+    }
+    
+    get showFieldMappingComponent() {
+        // Only show the field mapping component when we have both required props
+        return this.selectedObject && this.currentNotionDatabaseId && this.currentNotionDatabaseId.length > 0;
+    }
 
     handleEditConfiguration(event) {
         const { objectApiName } = event.detail;
         
         console.log('[EDIT] Starting edit for object:', objectApiName);
+        console.log('[EDIT] Setting selectedObject to:', objectApiName);
         
         this.selectedObject = objectApiName;
         this.isNewConfiguration = false;
@@ -471,6 +513,7 @@ export default class NotionSyncAdmin extends LightningElement {
         this.activeTab = 'configurations';
         
         // Load the configuration
+        console.log('[EDIT] About to load configuration for:', objectApiName);
         this.loadObjectConfiguration(objectApiName);
     }
     

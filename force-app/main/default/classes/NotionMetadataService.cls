@@ -81,6 +81,46 @@ public with sharing class NotionMetadataService {
         
         // Handle relationship mappings
         if (config.relationshipMappings != null) {
+            // First, mark existing relationship mappings for deletion if not in the new config
+            Set<String> newRelationshipKeys = new Set<String>();
+            for (NotionAdminController.RelationshipMapping mapping : config.relationshipMappings) {
+                String fieldName = sanitizeDeveloperName(mapping.salesforceRelationshipField);
+                String relationDeveloperName = objectDeveloperName + '_' + fieldName;
+                
+                // Handle long developer names
+                if (relationDeveloperName.length() > 40) {
+                    Integer maxObjectLength = 40 - fieldName.length() - 1;
+                    if (maxObjectLength > 0) {
+                        String truncatedObjectName = objectDeveloperName.substring(0, Math.min(objectDeveloperName.length(), maxObjectLength));
+                        relationDeveloperName = truncatedObjectName + '_' + fieldName;
+                    } else {
+                        relationDeveloperName = fieldName.substring(0, 40);
+                    }
+                }
+                
+                newRelationshipKeys.add(relationDeveloperName);
+            }
+            
+            // Query existing relationship mappings
+            List<NotionRelation__mdt> existingRelations = [
+                SELECT Id, DeveloperName
+                FROM NotionRelation__mdt
+                WHERE ChildObject__r.DeveloperName = :objectDeveloperName
+            ];
+            
+            // Delete removed relationship mappings
+            List<String> relationshipsToDelete = new List<String>();
+            for (NotionRelation__mdt existingRelation : existingRelations) {
+                if (!newRelationshipKeys.contains(existingRelation.DeveloperName)) {
+                    relationshipsToDelete.add('NotionRelation__mdt.' + existingRelation.DeveloperName);
+                }
+            }
+            
+            if (!relationshipsToDelete.isEmpty()) {
+                service.deleteMetadata('CustomMetadata', relationshipsToDelete);
+            }
+            
+            // Create or update relationship mappings
             for (NotionAdminController.RelationshipMapping mapping : config.relationshipMappings) {
                 // Generate a shorter developer name to fit within 40 character limit
                 String fieldName = sanitizeDeveloperName(mapping.salesforceRelationshipField);
