@@ -1,7 +1,25 @@
 public class NotionApiClient {
     
-    private static final String NAMED_CREDENTIAL = 'callout:Notion_API';
+    private static final String NAMED_CREDENTIAL = 'callout:' + getNamespacedName('Notion_API');
     private static final String API_VERSION = '2022-06-28';
+    
+    /**
+     * Get the properly namespaced name for a Named Credential
+     * This handles both namespaced (managed package) and non-namespaced scenarios
+     */
+    private static String getNamespacedName(String baseName) {
+        // Get the namespace by examining the class name
+        String className = NotionApiClient.class.getName();
+        
+        // If the class name contains a dot, it has a namespace
+        if (className.contains('.')) {
+            String namespace = className.substringBefore('.');
+            return namespace + '__' + baseName;
+        }
+        
+        // No namespace, return the base name as-is
+        return baseName;
+    }
     
     public class NotionApiException extends Exception {}
     

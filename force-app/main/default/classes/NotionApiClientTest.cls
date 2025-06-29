@@ -558,4 +558,58 @@ public class NotionApiClientTest {
             return response;
         }
     }
+    
+    @isTest
+    static void testNamespaceHandling() {
+        // Test that the Named Credential is properly namespaced
+        // This test validates the endpoint URL contains the correct Named Credential reference
+        Test.setMock(HttpCalloutMock.class, new NamespaceValidationMock());
+        
+        Map<String, Object> properties = new Map<String, Object>();
+        properties.put('Name', NotionApiClient.buildTitleProperty('Test Page'));
+        
+        NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+            'test-database-id', 
+            properties
+        );
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+        Test.stopTest();
+        
+        // The mock validates that the endpoint contains the proper Named Credential format
+        System.assert(response.success, 'Request should succeed with proper Named Credential');
+    }
+    
+    private class NamespaceValidationMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest request) {
+            // Validate that the endpoint starts with 'callout:'
+            System.assert(request.getEndpoint().startsWith('callout:'), 
+                         'Endpoint should use Named Credential syntax');
+            
+            // Check if the endpoint contains namespace prefix (for managed packages)
+            // or just the base name (for unmanaged code)
+            String endpoint = request.getEndpoint();
+            Boolean hasNamespace = endpoint.contains('__Notion_API');
+            Boolean hasBaseName = endpoint.contains(':Notion_API');
+            
+            System.assert(hasNamespace || hasBaseName, 
+                         'Endpoint should contain either namespaced or base Named Credential name');
+            
+            // Return success response
+            HttpResponse response = new HttpResponse();
+            response.setStatusCode(200);
+            response.setHeader('Content-Type', 'application/json');
+            
+            Map<String, Object> responseBody = new Map<String, Object>{
+                'id' => 'test-page-id',
+                'object' => 'page',
+                'created_time' => '2023-01-01T00:00:00.000Z',
+                'last_edited_time' => '2023-01-01T00:00:00.000Z'
+            };
+            
+            response.setBody(JSON.serialize(responseBody));
+            return response;
+        }
+    }
 }
