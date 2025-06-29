@@ -4,9 +4,9 @@
       "path": "force-app/main",
       "default": true,
       "package": "Notion Salesforce Sync",
-      "versionName": "Version 1.0",
-      "versionNumber": "1.0.0.NEXT",
-      "versionDescription": "Salesforce to Notion synchronization tool"
+      "versionName": "Version 1.2",
+      "versionNumber": "1.2.0.NEXT",
+      "versionDescription": "Added namespace support for Named Credentials"
     },
     {
       "path": "force-app/integration",
