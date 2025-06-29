@@ -42,12 +42,16 @@ private class NotionCoverageEnhancementTest {
         
         Test.startTest();
         
-        // Test with no metadata - should throw exception
+        // Test with a non-existent object type to ensure no metadata exists
         try {
-            NotionDataTransformer.NotionPage page = NotionDataTransformer.transformRecord(acc, 'Account');
+            // Use a fake object name that definitely won't have metadata
+            NotionDataTransformer.NotionPage page = NotionDataTransformer.transformRecord(acc, 'NonExistentObject__c');
             System.assert(false, 'Should have thrown exception');
         } catch (NotionDataTransformer.TransformationException e) {
             System.assert(e.getMessage().contains('No field mappings'), 'Should indicate no mappings');
+        } catch (Exception e) {
+            // In case a different exception is thrown
+            System.assert(false, 'Unexpected exception type: ' + e.getTypeName() + ' - ' + e.getMessage());
         }
         
         // Test createNotionPageJson
