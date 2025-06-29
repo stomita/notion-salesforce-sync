@@ -73,6 +73,7 @@ Example for Account object:
         <triggerType>RecordAfterSave</triggerType>
     </start>
     <status>Draft</status>
+    <isTemplate>true</isTemplate>
     <formulas>
         <name>OperationType</name>
         <dataType>String</dataType>

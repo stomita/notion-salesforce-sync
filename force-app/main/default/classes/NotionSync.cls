@@ -1,37 +1,37 @@
 /**
  * Central class containing shared data structures and types for Notion sync operations
  */
-public class NotionSync {
+global class NotionSync {
     
     /**
      * Request object for sync operations
      * Used across multiple components to pass sync request details
      */
-    public class Request {
+    global class Request {
         @InvocableVariable(
             required=true 
             label='Record ID' 
             description='ID of the record to sync'
         )
-        public String recordId;
+        global String recordId;
         
         @InvocableVariable(
             required=true 
             label='Object Type' 
             description='API name of the object (e.g., Account)'
         )
-        public String objectType;
+        global String objectType;
         
         @InvocableVariable(
             required=true 
             label='Operation Type' 
             description='CREATE, UPDATE, or DELETE'
         )
-        public String operationType;
+        global String operationType;
         
-        public Request() {}
+        global Request() {}
         
-        public Request(String recordId, String objectType, String operationType) {
+        global Request(String recordId, String objectType, String operationType) {
             this.recordId = recordId;
             this.objectType = objectType;
             this.operationType = operationType;
@@ -42,16 +42,16 @@ public class NotionSync {
      * Result object for sync operations
      * Used to return sync results
      */
-    public class Result {
+    global class Result {
         @InvocableVariable(label='Success')
-        public Boolean success;
+        global Boolean success;
         
         @InvocableVariable(label='Message')
-        public String message;
+        global String message;
         
-        public Result() {}
+        global Result() {}
         
-        public Result(Boolean success, String message) {
+        global Result(Boolean success, String message) {
             this.success = success;
             this.message = message;
         }

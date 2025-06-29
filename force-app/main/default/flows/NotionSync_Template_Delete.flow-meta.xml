@@ -73,4 +73,5 @@ Example for Account object:
         <triggerType>RecordBeforeDelete</triggerType>
     </start>
     <status>Draft</status>
+    <isTemplate>true</isTemplate>
 </Flow>
