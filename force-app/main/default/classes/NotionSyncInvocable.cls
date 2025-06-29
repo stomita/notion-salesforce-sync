@@ -2,7 +2,7 @@
  * Invocable class for Notion synchronization
  * Called directly from Flows to maintain user context for Named Credential access
  */
-public with sharing class NotionSyncInvocable {
+global with sharing class NotionSyncInvocable {
     
     // Test flag to disable processing during unit tests
     @TestVisible
@@ -17,7 +17,7 @@ public with sharing class NotionSyncInvocable {
         description='Synchronizes a Salesforce record to Notion database'
         category='Notion Integration'
     )
-    public static List<NotionSync.Result> syncToNotion(List<NotionSync.Request> requests) {
+    global static List<NotionSync.Result> syncToNotion(List<NotionSync.Request> requests) {
         List<NotionSync.Result> results = new List<NotionSync.Result>();
         
         // Skip processing in test context to avoid interference with unit tests
