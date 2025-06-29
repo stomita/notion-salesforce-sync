@@ -19,7 +19,7 @@ public with sharing class NotionMetadataService {
         // Create or update NotionSyncObject__mdt
         String objectDeveloperName = sanitizeDeveloperName(config.objectApiName);
         MetadataService.CustomMetadata objectMetadata = new MetadataService.CustomMetadata();
-        objectMetadata.fullName = 'NotionSyncObject__mdt.' + objectDeveloperName;
+        objectMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionSyncObject') + '.' + objectDeveloperName;
         objectMetadata.label = config.objectApiName + ' Sync Configuration';
         
         // Set field values
@@ -51,7 +51,7 @@ public with sharing class NotionMetadataService {
             List<String> metadataToDelete = new List<String>();
             for (NotionSyncField__mdt existingField : existingFields) {
                 if (!newFieldKeys.contains(existingField.DeveloperName)) {
-                    metadataToDelete.add('NotionSyncField__mdt.' + existingField.DeveloperName);
+                    metadataToDelete.add(NamespaceUtil.getMetadataTypeName('NotionSyncField') + '.' + existingField.DeveloperName);
                 }
             }
             
@@ -64,7 +64,7 @@ public with sharing class NotionMetadataService {
                 String fieldDeveloperName = objectDeveloperName + '_' + sanitizeDeveloperName(mapping.salesforceFieldApiName);
                 
                 MetadataService.CustomMetadata fieldMetadata = new MetadataService.CustomMetadata();
-                fieldMetadata.fullName = 'NotionSyncField__mdt.' + fieldDeveloperName;
+                fieldMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionSyncField') + '.' + fieldDeveloperName;
                 fieldMetadata.label = mapping.salesforceFieldApiName + ' → ' + mapping.notionPropertyName;
                 
                 // Set field values
@@ -112,7 +112,7 @@ public with sharing class NotionMetadataService {
             List<String> relationshipsToDelete = new List<String>();
             for (NotionRelation__mdt existingRelation : existingRelations) {
                 if (!newRelationshipKeys.contains(existingRelation.DeveloperName)) {
-                    relationshipsToDelete.add('NotionRelation__mdt.' + existingRelation.DeveloperName);
+                    relationshipsToDelete.add(NamespaceUtil.getMetadataTypeName('NotionRelation') + '.' + existingRelation.DeveloperName);
                 }
             }
             
@@ -139,7 +139,7 @@ public with sharing class NotionMetadataService {
                 }
                 
                 MetadataService.CustomMetadata relationMetadata = new MetadataService.CustomMetadata();
-                relationMetadata.fullName = 'NotionRelation__mdt.' + relationDeveloperName;
+                relationMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionRelation') + '.' + relationDeveloperName;
                 relationMetadata.label = mapping.salesforceRelationshipField + ' Relation';
                 
                 // Set field values
@@ -207,7 +207,8 @@ public with sharing class NotionMetadataService {
     
     private static void addMetadataServiceValue(MetadataService.CustomMetadata metadata, String field, String value) {
         MetadataService.CustomMetadataValue customField = new MetadataService.CustomMetadataValue();
-        customField.field = field;
+        // Apply namespace to the field name if needed
+        customField.field = NamespaceUtil.getFieldName(field);
         customField.value = value;
         metadata.values.add(customField);
     }
@@ -243,7 +244,7 @@ public with sharing class NotionMetadataService {
         
         // Soft delete: Update the object metadata to set IsDeleted__c = true
         MetadataService.CustomMetadata objectMetadata = new MetadataService.CustomMetadata();
-        objectMetadata.fullName = 'NotionSyncObject__mdt.' + objectDeveloperName;
+        objectMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionSyncObject') + '.' + objectDeveloperName;
         // Truncate label to ensure it fits within 40 character limit
         String label = objectApiName + ' (Deleted)';
         if (label.length() > 40) {
