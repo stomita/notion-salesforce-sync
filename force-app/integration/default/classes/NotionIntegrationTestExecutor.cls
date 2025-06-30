@@ -946,7 +946,292 @@ public class NotionIntegrationTestExecutor {
     }
     
     // ============================================
-    // TEST 6: BATCH PROCESSING
+    // TEST 6: BODY CONTENT UPDATE HANDLING
+    // ============================================
+    
+    /**
+     * Setup for body content test - create test records for each scenario
+     */
+    public void setupBodyContentTest() {
+        System.debug('\n--- Setting up body content test ---');
+        
+        // Clean up any existing body content test data
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Body Content Test%'];
+        
+        // Create multiple accounts for different test scenarios
+        List<Account> testAccounts = new List<Account>();
+        
+        // Test 1: Normal content update
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 01 - Normal Update',
+            Description = 'Initial content for normal update test'
+        ));
+        
+        // Test 2: Longer content update
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 02 - Longer Content',
+            Description = 'Short initial content'
+        ));
+        
+        // Test 3: Shorter content update
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 03 - Shorter Content',
+            Description = 'This is a longer initial content that will be shortened during the test'
+        ));
+        
+        // Test 4: Clear to null
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 04 - Clear to Null',
+            Description = 'This content will be cleared to null'
+        ));
+        
+        // Test 5: Add after null
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 05 - Add After Null',
+            Description = null  // Start with null
+        ));
+        
+        // Test 6: Clear to empty string
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 06 - Empty String',
+            Description = 'This content will be cleared to empty string'
+        ));
+        
+        // Test 7: Clear to whitespace
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 07 - Whitespace',
+            Description = 'This content will be cleared to whitespace'
+        ));
+        
+        // Test 8: No change to body content
+        testAccounts.add(new Account(
+            Name = 'Body Content Test 08 - No Body Change',
+            Description = 'This content will remain unchanged'
+        ));
+        
+        insert testAccounts;
+        
+        System.debug('Created ' + testAccounts.size() + ' test accounts for body content scenarios');
+    }
+    
+    /**
+     * Run body content update tests
+     */
+    public void runBodyContentUpdateTest() {
+        System.debug('\n--- Running body content update tests ---');
+        
+        // Get all test accounts
+        List<Account> testAccounts = [
+            SELECT Id, Name, Description
+            FROM Account
+            WHERE Name LIKE 'Body Content Test%'
+            ORDER BY Name
+        ];
+        
+        System.debug('Found ' + testAccounts.size() + ' test accounts');
+        
+        // Test 1: Normal content update
+        Account test1 = testAccounts[0];
+        test1.Description = 'Updated description with new content at ' + DateTime.now();
+        update test1;
+        System.debug('Test 1: Updated to new content');
+        
+        // Test 2: Update to longer content
+        Account test2 = testAccounts[1];
+        test2.Description = 'This is a much longer description with multiple lines.\n' +
+                           'It contains special characters like & < > " \' and numbers 123.\n' +
+                           'This tests that longer content is properly synced.';
+        update test2;
+        System.debug('Test 2: Updated to longer content');
+        
+        // Test 3: Update to shorter content
+        Account test3 = testAccounts[2];
+        test3.Description = 'Short';
+        update test3;
+        System.debug('Test 3: Updated to shorter content');
+        
+        // Test 4: Clear content (set to null)
+        Account test4 = testAccounts[3];
+        test4.Description = null;
+        update test4;
+        System.debug('Test 4: Cleared content (set to null)');
+        
+        // Test 5: Add content after null
+        Account test5 = testAccounts[4];
+        test5.Description = 'Content added after null';
+        update test5;
+        System.debug('Test 5: Added content after null');
+        
+        // Test 6: Set to empty string
+        Account test6 = testAccounts[5];
+        test6.Description = '';
+        update test6;
+        System.debug('Test 6: Set to empty string');
+        
+        // Test 7: Set to whitespace only
+        Account test7 = testAccounts[6];
+        test7.Description = '   ';
+        update test7;
+        System.debug('Test 7: Set to whitespace only');
+        
+        // Test 8: No change update (should not make unnecessary API calls)
+        Account test8 = testAccounts[7];
+        test8.Name = test8.Name + ' - Updated';  // Update name only, not description
+        update test8;
+        System.debug('Test 8: Updated name only, description unchanged');
+        
+        System.debug('All body content update tests executed');
+    }
+    
+    /**
+     * Check body content sync results
+     */
+    public void checkBodyContentSyncResults() {
+        System.debug('\n--- Checking body content sync results ---');
+        
+        // Get all test accounts
+        List<Account> testAccounts = [
+            SELECT Id, Name, Description
+            FROM Account
+            WHERE Name LIKE 'Body Content Test%'
+            ORDER BY Name
+        ];
+        
+        System.debug('Checking results for ' + testAccounts.size() + ' test accounts');
+        
+        // Verify each test scenario
+        for (Account testAccount : testAccounts) {
+            System.debug('\nChecking: ' + testAccount.Name);
+            
+            // Get sync logs for this account
+            List<Notion_Sync_Log__c> syncLogs = [
+                SELECT Operation_Type__c, Status__c, Error_Message__c, Notion_Page_Id__c
+                FROM Notion_Sync_Log__c
+                WHERE Record_Id__c = :testAccount.Id
+                ORDER BY CreatedDate DESC
+            ];
+            
+            // Should have CREATE and UPDATE logs
+            Boolean hasCreate = false;
+            Boolean hasUpdate = false;
+            String notionPageId = null;
+            
+            for (Notion_Sync_Log__c log : syncLogs) {
+                assert(log.Status__c == 'Success', 
+                    'Sync should succeed for ' + testAccount.Name + ': ' + log.Error_Message__c);
+                
+                if (log.Operation_Type__c == 'CREATE') {
+                    hasCreate = true;
+                    notionPageId = log.Notion_Page_Id__c;
+                } else if (log.Operation_Type__c == 'UPDATE') {
+                    hasUpdate = true;
+                }
+            }
+            
+            assert(hasCreate, 'Should have CREATE sync for ' + testAccount.Name);
+            assert(String.isNotBlank(notionPageId), 'Should have Notion page ID for ' + testAccount.Name);
+            
+            // For Test 5 (Add After Null) - started with null so no update needed
+            if (!testAccount.Name.contains('05 - Add After Null')) {
+                assert(hasUpdate, 'Should have UPDATE sync for ' + testAccount.Name);
+            }
+            
+            // Get current page content from Notion
+            NotionApiClient.NotionResponse blocksResponse = NotionApiClient.getPageBlocks(notionPageId);
+            assert(blocksResponse.success, 'Should be able to get page blocks for ' + testAccount.Name);
+            
+            Map<String, Object> blockData = (Map<String, Object>) JSON.deserializeUntyped(blocksResponse.responseBody);
+            List<Object> blocks = (List<Object>) blockData.get('results');
+            
+            // Extract content
+            String currentContent = extractPageContent(blocks);
+            
+            // Verify content based on test scenario
+            if (testAccount.Name.contains('01 - Normal Update')) {
+                assert(currentContent.startsWith('Updated description with new content at'), 
+                    'Test 1 should have updated content');
+                assert(!blocks.isEmpty(), 'Test 1 should have content blocks');
+                
+            } else if (testAccount.Name.contains('02 - Longer Content')) {
+                assert(currentContent.contains('multiple lines'), 
+                    'Test 2 should have longer content');
+                assert(currentContent.contains('special characters'), 
+                    'Test 2 should have special characters');
+                
+            } else if (testAccount.Name.contains('03 - Shorter Content')) {
+                assert(currentContent == 'Short', 
+                    'Test 3 should have short content: got "' + currentContent + '"');
+                
+            } else if (testAccount.Name.contains('04 - Clear to Null')) {
+                assert(blocks.isEmpty(), 
+                    'Test 4 should have no blocks after clearing to null');
+                assert(String.isBlank(currentContent), 
+                    'Test 4 should have empty content');
+                
+            } else if (testAccount.Name.contains('05 - Add After Null')) {
+                assert(currentContent == 'Content added after null', 
+                    'Test 5 should have content added after null');
+                
+            } else if (testAccount.Name.contains('06 - Empty String')) {
+                assert(blocks.isEmpty(), 
+                    'Test 6 should have no blocks after clearing to empty string');
+                assert(String.isBlank(currentContent), 
+                    'Test 6 should have empty content');
+                
+            } else if (testAccount.Name.contains('07 - Whitespace')) {
+                assert(blocks.isEmpty(), 
+                    'Test 7 should have no blocks after clearing to whitespace');
+                assert(String.isBlank(currentContent), 
+                    'Test 7 should have empty content');
+                
+            } else if (testAccount.Name.contains('08 - No Body Change')) {
+                assert(currentContent == 'This content will remain unchanged', 
+                    'Test 8 should have unchanged content');
+            }
+            
+            System.debug('✓ ' + testAccount.Name + ' verified successfully');
+        }
+        
+        passCount++;
+        System.debug('✓ Body content update test passed - all scenarios verified');
+    }
+    
+    /**
+     * Helper method to extract content from Notion blocks
+     */
+    private String extractPageContent(List<Object> blocks) {
+        String content = '';
+        
+        if (blocks == null || blocks.isEmpty()) {
+            return content;
+        }
+        
+        for (Object blockObj : blocks) {
+            Map<String, Object> block = (Map<String, Object>) blockObj;
+            String blockType = (String) block.get('type');
+            
+            if (blockType == 'paragraph') {
+                Map<String, Object> paragraph = (Map<String, Object>) block.get('paragraph');
+                if (paragraph != null) {
+                    List<Object> richTextArray = (List<Object>) paragraph.get('rich_text');
+                    if (richTextArray != null && !richTextArray.isEmpty()) {
+                        for (Object richTextObj : richTextArray) {
+                            Map<String, Object> richText = (Map<String, Object>) richTextObj;
+                            String plainText = (String) richText.get('plain_text');
+                            if (plainText != null) {
+                                content += plainText;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return content;
+    }
+    
+    // ============================================
+    // TEST 7: BATCH PROCESSING
     // ============================================
     
     /**

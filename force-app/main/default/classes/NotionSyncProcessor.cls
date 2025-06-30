@@ -235,10 +235,9 @@ public class NotionSyncProcessor {
             Object fieldValue = record.get(mapping.SalesforceFieldApiName__c);
             
             if (mapping.IsBodyContent__c) {
-                // If this field is marked as body content, add it to body content only
-                if (fieldValue != null) {
-                    bodyContent = String.valueOf(fieldValue);
-                }
+                // If this field is marked as body content, add it to body content
+                // Important: Include null values to support clearing content
+                bodyContent = fieldValue != null ? String.valueOf(fieldValue) : '';
                 // Skip adding it to properties - continue to next field
                 continue;
             }
@@ -259,7 +258,9 @@ public class NotionSyncProcessor {
             }
         }
         
-        if (String.isNotBlank(bodyContent)) {
+        // Always include body content in properties, even if empty
+        // This ensures the update method knows when to clear content
+        if (bodyContent != null) {
             properties.put('body', bodyContent);
         }
         
@@ -395,58 +396,63 @@ public class NotionSyncProcessor {
             }
         }
         
-        // Handle body content update if present
-        if (String.isNotBlank(bodyContent)) {
-            // Get existing blocks to check if content has changed
-            NotionApiClient.NotionResponse blocksResponse = NotionApiClient.getPageBlocks(pageId);
+        // Handle body content update - including clearing content when null/empty
+        // Get existing blocks to check if content has changed
+        NotionApiClient.NotionResponse blocksResponse = NotionApiClient.getPageBlocks(pageId);
+        
+        Boolean bodyContentChanged = false;
+        List<Object> existingBlocks = null;
+        
+        if (blocksResponse.success && blocksResponse.responseBody != null) {
+            Map<String, Object> blockData = (Map<String, Object>) JSON.deserializeUntyped(blocksResponse.responseBody);
+            existingBlocks = (List<Object>) blockData.get('results');
             
-            Boolean bodyContentChanged = true; // Default to true if we can't determine
+            // Extract current content from blocks
+            String currentContent = extractContentFromBlocks(existingBlocks);
             
-            if (blocksResponse.success && blocksResponse.responseBody != null) {
-                Map<String, Object> blockData = (Map<String, Object>) JSON.deserializeUntyped(blocksResponse.responseBody);
-                List<Object> existingBlocks = (List<Object>) blockData.get('results');
-                
-                // Extract current content from blocks
-                String currentContent = extractContentFromBlocks(existingBlocks);
-                
-                // Compare with new content
-                bodyContentChanged = !bodyContent.equals(currentContent);
-                
-                if (bodyContentChanged) {
-                    System.debug('Body content has changed, updating blocks for page: ' + pageId);
-                    
-                    // Delete existing blocks
-                    if (existingBlocks != null && !existingBlocks.isEmpty()) {
-                        for (Object blockObj : existingBlocks) {
-                            Map<String, Object> block = (Map<String, Object>) blockObj;
-                            String blockId = (String) block.get('id');
-                            if (blockId != null) {
-                                NotionApiClient.deleteBlock(blockId);
-                            }
-                        }
-                    }
-                    
-                    // Append new body content
-                    List<Object> children = buildNotionChildren(bodyContent);
-                    NotionApiClient.NotionResponse appendResponse = NotionApiClient.appendPageBlocks(pageId, children);
-                    
-                    if (!appendResponse.success) {
-                        // Log the error but don't fail the entire update
-                        System.debug('Warning: Failed to update body content for page ' + pageId + ': ' + appendResponse.errorMessage);
-                    }
-                } else {
-                    System.debug('Body content unchanged, skipping block update for page: ' + pageId);
-                }
+            // Normalize content for comparison (treat null and empty string as equivalent)
+            String normalizedNewContent = String.isBlank(bodyContent) ? '' : bodyContent;
+            String normalizedCurrentContent = String.isBlank(currentContent) ? '' : currentContent;
+            
+            // Compare normalized content
+            bodyContentChanged = !normalizedNewContent.equals(normalizedCurrentContent);
+            
+            if (bodyContentChanged) {
+                System.debug('Body content has changed from "' + currentContent + '" to "' + bodyContent + '"');
             } else {
-                // If we can't get existing blocks, proceed with update anyway
-                System.debug('Could not retrieve existing blocks, proceeding with content update');
-                
+                System.debug('Body content unchanged, skipping block update for page: ' + pageId);
+            }
+        } else {
+            // If we can't get existing blocks, assume content changed
+            System.debug('Could not retrieve existing blocks, assuming content changed');
+            bodyContentChanged = true;
+        }
+        
+        // Only update if content has actually changed
+        if (bodyContentChanged) {
+            // Delete existing blocks if any
+            if (existingBlocks != null && !existingBlocks.isEmpty()) {
+                System.debug('Deleting ' + existingBlocks.size() + ' existing blocks');
+                for (Object blockObj : existingBlocks) {
+                    Map<String, Object> block = (Map<String, Object>) blockObj;
+                    String blockId = (String) block.get('id');
+                    if (blockId != null) {
+                        NotionApiClient.deleteBlock(blockId);
+                    }
+                }
+            }
+            
+            // Only append new content if it's not blank
+            if (String.isNotBlank(bodyContent)) {
+                System.debug('Appending new body content');
                 List<Object> children = buildNotionChildren(bodyContent);
                 NotionApiClient.NotionResponse appendResponse = NotionApiClient.appendPageBlocks(pageId, children);
                 
                 if (!appendResponse.success) {
                     System.debug('Warning: Failed to update body content for page ' + pageId + ': ' + appendResponse.errorMessage);
                 }
+            } else {
+                System.debug('Body content is empty, page will have no blocks');
             }
         }
         
