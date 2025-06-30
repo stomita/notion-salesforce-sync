@@ -198,6 +198,74 @@ public class NotionApiClient {
         }
     }
     
+    // Method to get all blocks (children) of a page
+    public static NotionResponse getPageBlocks(String pageId) {
+        try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
+            HttpRequest request = buildHttpRequest('GET', '/v1/blocks/' + pageId + '/children');
+            
+            HttpResponse response = new Http().send(request);
+            return processResponse(response);
+            
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, pageId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (Exception e) {
+            return new NotionResponse(false, pageId, 'Exception during blocks retrieval: ' + e.getMessage(), null, null);
+        }
+    }
+    
+    // Method to append blocks to a page (for updating body content)
+    public static NotionResponse appendPageBlocks(String pageId, List<Object> children) {
+        try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
+            HttpRequest request = buildHttpRequest('PATCH', '/v1/blocks/' + pageId + '/children');
+            
+            Map<String, Object> requestBody = new Map<String, Object>{
+                'children' => children
+            };
+            
+            String jsonBody = JSON.serialize(requestBody);
+            request.setBody(jsonBody);
+            
+            // Debug logging
+            System.debug('NotionApiClient.appendPageBlocks: Appending blocks to page ' + pageId);
+            System.debug('Request Body: ' + jsonBody);
+            
+            HttpResponse response = new Http().send(request);
+            return processResponse(response);
+            
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, pageId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (Exception e) {
+            return new NotionResponse(false, pageId, 'Exception during blocks append: ' + e.getMessage(), null, null);
+        }
+    }
+    
+    // Method to delete a block
+    public static NotionResponse deleteBlock(String blockId) {
+        try {
+            // Apply rate limiting before making the request
+            NotionRateLimiter.throttleRequest();
+            
+            HttpRequest request = buildHttpRequest('DELETE', '/v1/blocks/' + blockId);
+            
+            HttpResponse response = new Http().send(request);
+            return processResponse(response);
+            
+        } catch (NotionRateLimiter.RateLimitException e) {
+            // Return rate limit error
+            return new NotionResponse(false, blockId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (Exception e) {
+            return new NotionResponse(false, blockId, 'Exception during block deletion: ' + e.getMessage(), null, null);
+        }
+    }
+    
     private static HttpRequest buildHttpRequest(String method, String endpoint) {
         HttpRequest request = new HttpRequest();
         request.setMethod(method);
