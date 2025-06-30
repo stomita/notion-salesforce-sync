@@ -299,6 +299,59 @@ public class NotionApiClientTest {
     }
     
     @isTest
+    static void testGetPageBlocks() {
+        // Setup mock
+        Test.setMock(HttpCalloutMock.class, new NotionApiBlocksMock());
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.getPageBlocks('page-123');
+        Test.stopTest();
+        
+        System.assert(response.success, 'Should successfully get page blocks');
+        System.assert(response.responseBody.contains('block-123'), 'Should contain block data');
+    }
+    
+    @isTest
+    static void testAppendPageBlocks() {
+        // Setup mock
+        Test.setMock(HttpCalloutMock.class, new NotionApiSuccessMock());
+        
+        List<Object> children = new List<Object>{
+            new Map<String, Object>{
+                'type' => 'paragraph',
+                'paragraph' => new Map<String, Object>{
+                    'rich_text' => new List<Object>{
+                        new Map<String, Object>{
+                            'type' => 'text',
+                            'text' => new Map<String, Object>{
+                                'content' => 'Test content'
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.appendPageBlocks('page-123', children);
+        Test.stopTest();
+        
+        System.assert(response.success, 'Should successfully append blocks');
+    }
+    
+    @isTest
+    static void testDeleteBlock() {
+        // Setup mock
+        Test.setMock(HttpCalloutMock.class, new NotionApiDeleteBlockMock());
+        
+        Test.startTest();
+        NotionApiClient.NotionResponse response = NotionApiClient.deleteBlock('block-123');
+        Test.stopTest();
+        
+        System.assert(response.success, 'Should successfully delete block');
+    }
+    
+    @isTest
     static void testBuildDateTimeProperty() {
         DateTime testDateTime = DateTime.newInstance(2023, 12, 25, 14, 30, 45);
         Map<String, Object> property = NotionApiClient.buildDateTimeProperty(testDateTime);
@@ -433,6 +486,42 @@ public class NotionApiClientTest {
     private class NotionApiExceptionMock implements HttpCalloutMock {
         public HttpResponse respond(HttpRequest request) {
             throw new CalloutException('Mock callout exception');
+        }
+    }
+    
+    private class NotionApiBlocksMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest request) {
+            HttpResponse response = new HttpResponse();
+            response.setStatusCode(200);
+            response.setHeader('Content-Type', 'application/json');
+            
+            Map<String, Object> responseBody = new Map<String, Object>{
+                'results' => new List<Object>{
+                    new Map<String, Object>{
+                        'id' => 'block-123',
+                        'type' => 'paragraph'
+                    }
+                }
+            };
+            
+            response.setBody(JSON.serialize(responseBody));
+            return response;
+        }
+    }
+    
+    private class NotionApiDeleteBlockMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest request) {
+            HttpResponse response = new HttpResponse();
+            response.setStatusCode(200);
+            response.setHeader('Content-Type', 'application/json');
+            
+            Map<String, Object> responseBody = new Map<String, Object>{
+                'object' => 'block',
+                'archived' => true
+            };
+            
+            response.setBody(JSON.serialize(responseBody));
+            return response;
         }
     }
     

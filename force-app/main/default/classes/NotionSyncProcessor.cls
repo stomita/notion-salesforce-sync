@@ -376,20 +376,81 @@ public class NotionSyncProcessor {
     }
     
     private String updateNotionPage(String pageId, Map<String, Object> properties) {
+        // Extract body content before building properties
+        String bodyContent = (String) properties.get('body');
+        
         // Build properties (excluding body)
         Map<String, Object> notionProps = buildNotionProperties(properties);
         
+        // Update page properties first
         NotionApiClient.NotionResponse response = NotionApiClient.updatePage(pageId, notionProps);
         
-        if (response.success) {
-            return response.pageId;
-        } else if (response.isRateLimited) {
-            throw new NotionRateLimiter.RateLimitException(
-                'Rate limited while updating page. Retry after: ' + response.retryAfterSeconds
-            );
-        } else {
-            throw new NotionSync.SyncException('Failed to update Notion page: ' + response.errorMessage);
+        if (!response.success) {
+            if (response.isRateLimited) {
+                throw new NotionRateLimiter.RateLimitException(
+                    'Rate limited while updating page. Retry after: ' + response.retryAfterSeconds
+                );
+            } else {
+                throw new NotionSync.SyncException('Failed to update Notion page: ' + response.errorMessage);
+            }
         }
+        
+        // Handle body content update if present
+        if (String.isNotBlank(bodyContent)) {
+            // Get existing blocks to check if content has changed
+            NotionApiClient.NotionResponse blocksResponse = NotionApiClient.getPageBlocks(pageId);
+            
+            Boolean bodyContentChanged = true; // Default to true if we can't determine
+            
+            if (blocksResponse.success && blocksResponse.responseBody != null) {
+                Map<String, Object> blockData = (Map<String, Object>) JSON.deserializeUntyped(blocksResponse.responseBody);
+                List<Object> existingBlocks = (List<Object>) blockData.get('results');
+                
+                // Extract current content from blocks
+                String currentContent = extractContentFromBlocks(existingBlocks);
+                
+                // Compare with new content
+                bodyContentChanged = !bodyContent.equals(currentContent);
+                
+                if (bodyContentChanged) {
+                    System.debug('Body content has changed, updating blocks for page: ' + pageId);
+                    
+                    // Delete existing blocks
+                    if (existingBlocks != null && !existingBlocks.isEmpty()) {
+                        for (Object blockObj : existingBlocks) {
+                            Map<String, Object> block = (Map<String, Object>) blockObj;
+                            String blockId = (String) block.get('id');
+                            if (blockId != null) {
+                                NotionApiClient.deleteBlock(blockId);
+                            }
+                        }
+                    }
+                    
+                    // Append new body content
+                    List<Object> children = buildNotionChildren(bodyContent);
+                    NotionApiClient.NotionResponse appendResponse = NotionApiClient.appendPageBlocks(pageId, children);
+                    
+                    if (!appendResponse.success) {
+                        // Log the error but don't fail the entire update
+                        System.debug('Warning: Failed to update body content for page ' + pageId + ': ' + appendResponse.errorMessage);
+                    }
+                } else {
+                    System.debug('Body content unchanged, skipping block update for page: ' + pageId);
+                }
+            } else {
+                // If we can't get existing blocks, proceed with update anyway
+                System.debug('Could not retrieve existing blocks, proceeding with content update');
+                
+                List<Object> children = buildNotionChildren(bodyContent);
+                NotionApiClient.NotionResponse appendResponse = NotionApiClient.appendPageBlocks(pageId, children);
+                
+                if (!appendResponse.success) {
+                    System.debug('Warning: Failed to update body content for page ' + pageId + ': ' + appendResponse.errorMessage);
+                }
+            }
+        }
+        
+        return response.pageId;
     }
     
     private void deleteNotionPage(String pageId) {
@@ -434,5 +495,37 @@ public class NotionSyncProcessor {
             }
         });
         return children;
+    }
+    
+    private String extractContentFromBlocks(List<Object> blocks) {
+        if (blocks == null || blocks.isEmpty()) {
+            return '';
+        }
+        
+        String extractedContent = '';
+        
+        for (Object blockObj : blocks) {
+            Map<String, Object> block = (Map<String, Object>) blockObj;
+            String blockType = (String) block.get('type');
+            
+            // Currently we only create paragraph blocks, so we'll only extract from those
+            if (blockType == 'paragraph') {
+                Map<String, Object> paragraph = (Map<String, Object>) block.get('paragraph');
+                if (paragraph != null) {
+                    List<Object> richTextArray = (List<Object>) paragraph.get('rich_text');
+                    if (richTextArray != null && !richTextArray.isEmpty()) {
+                        for (Object richTextObj : richTextArray) {
+                            Map<String, Object> richText = (Map<String, Object>) richTextObj;
+                            String plainText = (String) richText.get('plain_text');
+                            if (plainText != null) {
+                                extractedContent += plainText;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return extractedContent;
     }
 }
