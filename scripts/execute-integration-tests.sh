@@ -77,7 +77,10 @@ echo
 run_test "test-5-delete.sh"
 
 echo
-run_test "test-6-batch.sh"
+run_test "test-6-body-content.sh"
+
+echo
+run_test "test-7-batch.sh"
 
 # Overall summary
 echo

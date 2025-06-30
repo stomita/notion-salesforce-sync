@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Test 6: Batch Processing
-echo "=== Test 6: Batch Processing ==="
+# Test 7: Batch Processing
+echo "=== Test 7: Batch Processing ==="
 
 # Get the scratch org alias (default to current default org)
 ORG_ALIAS="${1:-}"
@@ -18,15 +18,15 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo ">>> Setting up batch test..."
-sf apex run -f "$SCRIPT_DIR/apex/test-6-batch-setup.apex" $ORG_FLAG
+sf apex run -f "$SCRIPT_DIR/apex/test-7-batch-setup.apex" $ORG_FLAG
 
 echo ">>> Running batch test..."
-sf apex run -f "$SCRIPT_DIR/apex/test-6-batch-run.apex" $ORG_FLAG
+sf apex run -f "$SCRIPT_DIR/apex/test-7-batch-run.apex" $ORG_FLAG
 
 echo ">>> Waiting 60 seconds for sync to complete (100 records)..."
 sleep 60
 
 echo ">>> Checking results..."
-"$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-6-batch-check.apex" "$ORG_FLAG"
+"$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-7-batch-check.apex" "$ORG_FLAG"
 
-echo "Test 6 complete!"
+echo "Test 7 complete!"
