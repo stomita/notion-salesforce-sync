@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Notion Navigation</masterLabel>
+    <description>Navigate to Notion page for a Salesforce record with sync options</description>
+    <targets>
+        <target>lightning__FlowScreen</target>
+        <target>lightning__RecordPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__FlowScreen">
+            <property name="recordId" type="String" label="Record ID" description="The ID of the Salesforce record" required="true"/>
+            <property name="objectApiName" type="String" label="Object API Name" description="The API name of the Salesforce object" required="true"/>
+            <property name="autoRedirect" type="Boolean" label="Auto Redirect" description="Automatically redirect to Notion if page exists" default="true"/>
+            <property name="showSyncOption" type="Boolean" label="Show Sync Option" description="Show checkbox to sync before navigating" default="true"/>
+        </targetConfig>
+        <targetConfig targets="lightning__RecordPage">
+            <property name="showSyncOption" type="Boolean" label="Show Sync Option" description="Show checkbox to sync before navigating" default="true"/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

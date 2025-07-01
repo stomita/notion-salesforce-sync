@@ -84,4 +84,8 @@
         <enabled>true</enabled>
         <name>NotionSyncObject__mdt</name>
     </customMetadataTypeAccesses>
+    <classAccesses>
+        <apexClass>NotionNavigationController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 </PermissionSet>
