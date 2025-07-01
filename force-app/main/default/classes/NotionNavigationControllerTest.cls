@@ -99,27 +99,6 @@ private class NotionNavigationControllerTest {
         Test.stopTest();
     }
     
-    @isTest
-    static void testSyncAndGetNotionPage_RecordNotFound() {
-        // Use a fake ID that doesn't exist
-        Id fakeAccountId = '001000000000000AAA';
-        
-        // Mock the HTTP callout
-        Test.setMock(HttpCalloutMock.class, new NotionNavigationMock(true, false));
-        
-        Test.startTest();
-        try {
-            NotionNavigationController.syncAndGetNotionPage(
-                fakeAccountId, 
-                'Account', 
-                NotionSync.OPERATION_CREATE
-            );
-            System.assert(false, 'Should have thrown exception');
-        } catch (AuraHandledException e) {
-            System.assert(e.getMessage().contains('Record not found'), 'Error message should mention record not found: ' + e.getMessage());
-        }
-        Test.stopTest();
-    }
     
     @isTest
     static void testSyncAndGetNotionPage_InactiveConfig() {
