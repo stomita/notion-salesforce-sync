@@ -46,7 +46,10 @@ public with sharing class NotionSyncLogger {
                 Rate_Limit_Retry_After__c = entry.rateLimitRetryAfter,
                 API_Calls_Made__c = entry.apiCallsMade,
                 CPU_Time_Used__c = entry.cpuTimeUsed,
-                Callouts_Used__c = entry.calloutsUsed
+                Callouts_Used__c = entry.calloutsUsed,
+                Duplicates_Found__c = entry.duplicatesFound,
+                Duplicates_Deleted__c = entry.duplicatesDeleted,
+                Deduplication_Deferred__c = entry.deduplicationDeferred
             );
             
             logRecords.add(logRecord);
@@ -92,6 +95,10 @@ public with sharing class NotionSyncLogger {
         public Integer apiCallsMade;
         public Integer cpuTimeUsed;
         public Integer calloutsUsed;
+        // Deduplication fields
+        public Integer duplicatesFound;
+        public Integer duplicatesDeleted;
+        public Boolean deduplicationDeferred;
         
         // Constructor with only operationType - all other fields are optional
         public LogEntry(String operationType) {
@@ -105,6 +112,10 @@ public with sharing class NotionSyncLogger {
             this.apiCallsMade = 0;
             this.cpuTimeUsed = 0;
             this.calloutsUsed = 0;
+            // Initialize deduplication fields
+            this.duplicatesFound = 0;
+            this.duplicatesDeleted = 0;
+            this.deduplicationDeferred = false;
         }
         
         // Method to set record information (objectType and recordId)
@@ -152,6 +163,13 @@ public with sharing class NotionSyncLogger {
         public LogEntry withMetrics(Integer apiCallsMade, Integer cpuTimeUsed) {
             this.apiCallsMade = apiCallsMade;
             this.cpuTimeUsed = cpuTimeUsed;
+            return this;
+        }
+        
+        public LogEntry withDeduplication(Integer duplicatesFound, Integer duplicatesDeleted, Boolean deduplicationDeferred) {
+            this.duplicatesFound = duplicatesFound;
+            this.duplicatesDeleted = duplicatesDeleted;
+            this.deduplicationDeferred = deduplicationDeferred;
             return this;
         }
     }

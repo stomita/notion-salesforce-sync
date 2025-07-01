@@ -534,4 +534,254 @@ public class NotionSyncProcessor {
         
         return extractedContent;
     }
+    
+    /**
+     * Result class for deduplication operations
+     */
+    public class DeduplicationResult {
+        public Integer duplicatesFound = 0;
+        public Integer duplicatesDeleted = 0;
+        public Boolean deferred = false;
+        
+        public DeduplicationResult() {}
+    }
+    
+    /**
+     * Deduplicate Notion pages for given Salesforce records
+     * @param recordIds Set of Salesforce record IDs to check for duplicates
+     * @param syncConfig Sync configuration containing database and property mappings
+     * @param maxDeletions Maximum number of deletions to perform (for governor limit management)
+     * @return DeduplicationResult containing statistics and deferral status
+     */
+    public DeduplicationResult deduplicateNotionPages(Set<Id> recordIds, NotionSyncObject__mdt syncConfig, Integer maxDeletions) {
+        DeduplicationResult result = new DeduplicationResult();
+        
+        if (recordIds == null || recordIds.isEmpty() || syncConfig == null) {
+            return result;
+        }
+        
+        try {
+            // Query all pages with these Salesforce IDs
+            List<Map<String, Object>> allPages = queryPagesForDeduplication(syncConfig, recordIds);
+            
+            if (allPages.isEmpty()) {
+                return result;
+            }
+            
+            // Group pages by Salesforce ID
+            Map<String, List<Map<String, Object>>> pagesBySalesforceId = groupPagesBySalesforceId(
+                allPages, 
+                syncConfig.SalesforceIdPropertyName__c
+            );
+            
+            // Process duplicates with rate limiting
+            Integer deletionCount = 0;
+            
+            for (String salesforceId : pagesBySalesforceId.keySet()) {
+                List<Map<String, Object>> pages = pagesBySalesforceId.get(salesforceId);
+                
+                if (pages.size() > 1) {
+                    result.duplicatesFound += pages.size() - 1;
+                    
+                    // Sort by created_time (oldest first)
+                    pages.sort(new NotionPageCreatedTimeComparator());
+                    
+                    // Delete all except the oldest
+                    for (Integer i = 1; i < pages.size(); i++) {
+                        // Check limits before each deletion
+                        if (NotionRateLimiter.shouldDeferProcessing() || 
+                            (maxDeletions != null && deletionCount >= maxDeletions)) {
+                            result.deferred = true;
+                            return result;
+                        }
+                        
+                        try {
+                            // Apply rate limiting
+                            NotionRateLimiter.throttleRequest();
+                            
+                            String pageId = (String)pages[i].get('id');
+                            deleteNotionPage(pageId);
+                            
+                            result.duplicatesDeleted++;
+                            deletionCount++;
+                            
+                            // Log individual deletion
+                            logger.log(
+                                new NotionSyncLogger.LogEntry('DEDUP')
+                                    .withRecord(syncConfig.ObjectApiName__c, salesforceId)
+                                    .withNotionPageId(pageId)
+                                    .withStatus('Success')
+                                    .withError('Duplicate Notion page deleted')
+                            );
+                            
+                        } catch (NotionRateLimiter.RateLimitException e) {
+                            result.deferred = true;
+                            String pageId = (String)pages[i].get('id');
+                            logger.log(
+                                new NotionSyncLogger.LogEntry('DEDUP')
+                                    .withRecord(syncConfig.ObjectApiName__c, salesforceId)
+                                    .withNotionPageId(pageId)
+                                    .withError('Rate limit during deduplication: ' + e.getMessage())
+                                    .withRateLimit(1)
+                            );
+                            return result;
+                        } catch (Exception e) {
+                            // Log error but continue with other duplicates
+                            String pageId = (String)pages[i].get('id');
+                            logger.log(
+                                new NotionSyncLogger.LogEntry('DEDUP')
+                                    .withRecord(syncConfig.ObjectApiName__c, salesforceId)
+                                    .withNotionPageId(pageId)
+                                    .withError('Failed to delete duplicate: ' + e.getMessage())
+                            );
+                        }
+                    }
+                }
+            }
+            
+        } catch (Exception e) {
+            logger.log(
+                new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
+                    .withSalesforceObject(syncConfig.ObjectApiName__c)
+                    .withError('Deduplication error: ' + e.getMessage())
+            );
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Query Notion pages for deduplication
+     * Uses OR filter to query multiple Salesforce IDs efficiently
+     */
+    private List<Map<String, Object>> queryPagesForDeduplication(NotionSyncObject__mdt syncConfig, Set<Id> recordIds) {
+        List<Map<String, Object>> allPages = new List<Map<String, Object>>();
+        
+        // Build OR filter for all record IDs
+        List<Object> orConditions = new List<Object>();
+        for (Id recordId : recordIds) {
+            orConditions.add(new Map<String, Object>{
+                'property' => syncConfig.SalesforceIdPropertyName__c,
+                'rich_text' => new Map<String, Object>{
+                    'equals' => String.valueOf(recordId)
+                }
+            });
+        }
+        
+        Map<String, Object> filter = new Map<String, Object>{
+            'or' => orConditions
+        };
+        
+        // Query with pagination support
+        String startCursor = null;
+        Boolean hasMore = true;
+        
+        while (hasMore) {
+            // Check limits before each API call
+            if (NotionRateLimiter.shouldDeferProcessing()) {
+                break;
+            }
+            
+            NotionApiClient.NotionResponse response = NotionApiClient.queryDatabase(
+                syncConfig.NotionDatabaseId__c, 
+                filter,
+                startCursor,
+                100 // page size
+            );
+            
+            if (response.success && String.isNotBlank(response.responseBody)) {
+                Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
+                List<Object> results = (List<Object>) responseBody.get('results');
+                
+                if (results != null) {
+                    for (Object result : results) {
+                        allPages.add((Map<String, Object>) result);
+                    }
+                }
+                
+                // Check for more pages
+                hasMore = (Boolean) responseBody.get('has_more');
+                if (hasMore) {
+                    startCursor = (String) responseBody.get('next_cursor');
+                }
+            } else {
+                hasMore = false;
+                
+                if (response.isRateLimited) {
+                    throw new NotionRateLimiter.RateLimitException(
+                        'Rate limited during deduplication query. Retry after: ' + response.retryAfterSeconds
+                    );
+                } else if (!response.success) {
+                    throw new NotionSync.SyncException('Failed to query pages for deduplication: ' + response.errorMessage);
+                }
+            }
+        }
+        
+        return allPages;
+    }
+    
+    /**
+     * Group Notion pages by their Salesforce ID property
+     */
+    private Map<String, List<Map<String, Object>>> groupPagesBySalesforceId(
+        List<Map<String, Object>> pages, 
+        String salesforceIdPropertyName
+    ) {
+        Map<String, List<Map<String, Object>>> grouped = new Map<String, List<Map<String, Object>>>();
+        
+        for (Map<String, Object> page : pages) {
+            Map<String, Object> properties = (Map<String, Object>) page.get('properties');
+            if (properties != null) {
+                Map<String, Object> idProperty = (Map<String, Object>) properties.get(salesforceIdPropertyName);
+                if (idProperty != null) {
+                    String salesforceId = extractTextFromProperty(idProperty);
+                    if (String.isNotBlank(salesforceId)) {
+                        if (!grouped.containsKey(salesforceId)) {
+                            grouped.put(salesforceId, new List<Map<String, Object>>());
+                        }
+                        grouped.get(salesforceId).add(page);
+                    }
+                }
+            }
+        }
+        
+        return grouped;
+    }
+    
+    /**
+     * Extract text value from a Notion property
+     */
+    private String extractTextFromProperty(Map<String, Object> property) {
+        // Handle rich_text property type
+        List<Object> richTextArray = (List<Object>) property.get('rich_text');
+        if (richTextArray != null && !richTextArray.isEmpty()) {
+            Map<String, Object> firstText = (Map<String, Object>) richTextArray[0];
+            return (String) firstText.get('plain_text');
+        }
+        
+        // Handle title property type
+        List<Object> titleArray = (List<Object>) property.get('title');
+        if (titleArray != null && !titleArray.isEmpty()) {
+            Map<String, Object> firstTitle = (Map<String, Object>) titleArray[0];
+            return (String) firstTitle.get('plain_text');
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Comparator for sorting Notion pages by created time
+     */
+    public class NotionPageCreatedTimeComparator implements Comparator<Map<String, Object>> {
+        public Integer compare(Map<String, Object> page1, Map<String, Object> page2) {
+            String time1 = (String) page1.get('created_time');
+            String time2 = (String) page2.get('created_time');
+            
+            if (time1 == null && time2 == null) return 0;
+            if (time1 == null) return 1;
+            if (time2 == null) return -1;
+            
+            return time1.compareTo(time2);
+        }
+    }
 }

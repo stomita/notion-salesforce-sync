@@ -251,6 +251,11 @@ public class NotionSyncBatchProcessor {
         public String deferReason { get; set; }
         public Integer retryAfterSeconds { get; set; }
         
+        // Deduplication metrics
+        public Integer duplicatesFound { get; set; }
+        public Integer duplicatesDeleted { get; set; }
+        public Boolean deduplicationDeferred { get; set; }
+        
         // Performance metrics
         public DateTime startTime { get; set; }
         public DateTime endTime { get; set; }
@@ -265,7 +270,10 @@ public class NotionSyncBatchProcessor {
             processedCount = 0;
             failedCount = 0;
             deferredCount = 0;
+            duplicatesFound = 0;
+            duplicatesDeleted = 0;
             shouldDefer = false;
+            deduplicationDeferred = false;
         }
         
         /**

@@ -82,6 +82,9 @@ run_test "test-6-body-content.sh"
 echo
 run_test "test-7-batch.sh"
 
+echo
+run_test "test-8-deduplication.sh"
+
 # Overall summary
 echo
 echo "=================================="

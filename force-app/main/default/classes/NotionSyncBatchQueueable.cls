@@ -78,6 +78,9 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             // Log batch metrics and results
             logBatchMetrics(results);
             
+            // Perform deduplication after successful batches
+            performDeduplication(results, remainingRequests);
+            
             // Log overall batch summary
             logBatchSummary(results, nextStartIndex);
             
@@ -276,5 +279,135 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         );
         
         // Don't rethrow - let the job complete
+    }
+    
+    /**
+     * Perform deduplication after successful batch processing
+     */
+    private void performDeduplication(List<NotionSyncBatchProcessor.BatchResult> results, 
+                                     List<NotionSync.Request> processedRequests) {
+        // Only deduplicate for CREATE/UPDATE operations, not DELETE
+        if (processedRequests.isEmpty() || processedRequests[0].operationType == 'DELETE') {
+            return;
+        }
+        
+        // Check if we have successful results and capacity for deduplication
+        Boolean hasSuccessfulBatches = false;
+        for (NotionSyncBatchProcessor.BatchResult result : results) {
+            if (result.status == 'Success' && result.processedCount > 0) {
+                hasSuccessfulBatches = true;
+                break;
+            }
+        }
+        
+        if (!hasSuccessfulBatches) {
+            return;
+        }
+        
+        // Check governor limits before attempting deduplication
+        NotionRateLimiter.GovernorLimitStatus limits = NotionRateLimiter.getGovernorLimitStatus();
+        
+        // Calculate usage percentages
+        Decimal calloutPercentage = NotionRateLimiter.calculatePercentage(limits.calloutsUsed, limits.calloutLimit);
+        Decimal cpuPercentage = NotionRateLimiter.calculatePercentage(limits.cpuTimeUsed, limits.cpuTimeLimit);
+        
+        // Only deduplicate if we have at least 20% capacity remaining
+        if (calloutPercentage < 80 && cpuPercentage < 80) {
+            try {
+                // Extract unique record IDs from processed requests
+                Set<Id> processedRecordIds = extractRecordIds(processedRequests);
+                String objectType = processedRequests[0].objectType;
+                
+                // Get sync configuration
+                NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
+                if (syncConfig == null || !syncConfig.IsActive__c) {
+                    return;
+                }
+                
+                // Calculate safe deletion count based on remaining limits
+                Integer remainingCallouts = limits.calloutLimit - limits.calloutsUsed;
+                Integer maxDeletions = Math.max(1, (remainingCallouts - 5) / 2); // Reserve 5 callouts, 2 per deletion (query + delete)
+                
+                // Create processor with logger and perform deduplication
+                NotionSyncProcessor processor = new NotionSyncProcessor(logger);
+                NotionSyncProcessor.DeduplicationResult dedupResult = processor.deduplicateNotionPages(
+                    processedRecordIds, 
+                    syncConfig,
+                    maxDeletions
+                );
+                
+                // Log deduplication results
+                if (dedupResult.duplicatesFound > 0 || dedupResult.duplicatesDeleted > 0) {
+                    logger.log(
+                        new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
+                            .withSalesforceObject(objectType)
+                            .withStatus(dedupResult.deferred ? 'Deferred' : 'Success')
+                            .withDeduplication(dedupResult.duplicatesFound, dedupResult.duplicatesDeleted, dedupResult.deferred)
+                    );
+                }
+                
+                // If deduplication was deferred and we have remaining duplicates, queue separate job
+                if (dedupResult.deferred && dedupResult.duplicatesFound > dedupResult.duplicatesDeleted) {
+                    queueDeferredDeduplication(processedRecordIds, objectType);
+                }
+                
+            } catch (Exception e) {
+                System.debug('Deduplication error: ' + e.getMessage());
+                logger.log(
+                    new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
+                        .withError('Deduplication error: ' + e.getMessage())
+                );
+            }
+        } else {
+            // Queue deduplication for later if limits are tight
+            try {
+                Set<Id> processedRecordIds = extractRecordIds(processedRequests);
+                String objectType = processedRequests[0].objectType;
+                queueDeferredDeduplication(processedRecordIds, objectType);
+            } catch (Exception e) {
+                System.debug('Failed to queue deferred deduplication: ' + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Queue deduplication for deferred processing
+     */
+    private void queueDeferredDeduplication(Set<Id> recordIds, String objectType) {
+        if (!Test.isRunningTest() && recordIds != null && !recordIds.isEmpty()) {
+            try {
+                System.enqueueJob(new NotionDeduplicationQueueable(recordIds, objectType));
+                System.debug('Queued deduplication for ' + recordIds.size() + ' records of type ' + objectType);
+            } catch (Exception e) {
+                System.debug('Failed to queue deduplication: ' + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Extract unique record IDs from sync requests
+     */
+    private Set<Id> extractRecordIds(List<NotionSync.Request> requests) {
+        Set<Id> recordIds = new Set<Id>();
+        for (NotionSync.Request request : requests) {
+            if (String.isNotBlank(request.recordId)) {
+                recordIds.add(request.recordId);
+            }
+        }
+        return recordIds;
+    }
+    
+    /**
+     * Get sync configuration for object type
+     */
+    private NotionSyncObject__mdt getSyncConfiguration(String objectType) {
+        List<NotionSyncObject__mdt> configs = [
+            SELECT Id, ObjectApiName__c, NotionDatabaseId__c, IsActive__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = :objectType
+            LIMIT 1
+        ];
+        
+        return configs.isEmpty() ? null : configs[0];
     }
 }
