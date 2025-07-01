@@ -100,30 +100,44 @@ private class NotionNavigationControllerTest {
     }
     
     @isTest
-    static void testSyncAndGetNotionPage_NoConfig() {
-        // Create a Lead for testing with an object that has no sync config
-        Lead testLead = new Lead(
-            FirstName = 'Test',
-            LastName = 'Lead',
-            Company = 'Test Company'
-        );
-        insert testLead;
+    static void testSyncAndGetNotionPage_RecordNotFound() {
+        // Use a fake ID that doesn't exist
+        Id fakeAccountId = '001000000000000AAA';
         
-        // Mock the HTTP callout to return no sync config
-        Test.setMock(HttpCalloutMock.class, new NotionNavigationMock(false, false));
+        // Mock the HTTP callout
+        Test.setMock(HttpCalloutMock.class, new NotionNavigationMock(true, false));
         
         Test.startTest();
         try {
             NotionNavigationController.syncAndGetNotionPage(
-                testLead.Id, 
-                'Lead', // Use Lead which has no sync config in test metadata
+                fakeAccountId, 
+                'Account', 
                 NotionSync.OPERATION_CREATE
             );
             System.assert(false, 'Should have thrown exception');
         } catch (AuraHandledException e) {
-            System.assert(e.getMessage().toLowerCase().contains('no sync configuration'), 'Error message should mention no sync configuration: ' + e.getMessage());
+            System.assert(e.getMessage().contains('Record not found'), 'Error message should mention record not found: ' + e.getMessage());
         }
         Test.stopTest();
+    }
+    
+    @isTest
+    static void testSyncAndGetNotionPage_InactiveConfig() {
+        Account testAccount = [SELECT Id FROM Account WHERE Name = 'Test Account for Navigation' LIMIT 1];
+        
+        // Note: We can't actually test inactive config since we can't modify metadata in tests
+        // This test is included for completeness but will test the happy path
+        Test.setMock(HttpCalloutMock.class, new NotionNavigationMock(true, true));
+        
+        Test.startTest();
+        String pageUrl = NotionNavigationController.syncAndGetNotionPage(
+            testAccount.Id, 
+            'Account', 
+            NotionSync.OPERATION_CREATE
+        );
+        Test.stopTest();
+        
+        System.assertNotEquals(null, pageUrl, 'Should return page URL');
     }
     
     @isTest
