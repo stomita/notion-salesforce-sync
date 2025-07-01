@@ -1,0 +1,63 @@
+<template>
+    <lightning-card title="Notion Navigation" icon-name="custom:custom19">
+        <div class="slds-p-horizontal_medium">
+            <!-- Loading State -->
+            <template if:true={isLoading}>
+                <div class="slds-align_absolute-center slds-p-vertical_medium">
+                    <lightning-spinner alternative-text={loadingMessage} size="small"></lightning-spinner>
+                    <span class="slds-m-left_small">{loadingMessage}</span>
+                </div>
+            </template>
+            
+            <!-- Error State -->
+            <template if:true={error}>
+                <div class="slds-text-color_error slds-p-vertical_small">
+                    <lightning-icon icon-name="utility:error" variant="error" size="small"></lightning-icon>
+                    <span class="slds-m-left_small">{error}</span>
+                </div>
+            </template>
+            
+            <!-- Page Exists State -->
+            <template if:true={showNavigateButton}>
+                <div class="slds-p-vertical_small">
+                    <!-- Sync Checkbox -->
+                    <template if:true={showSyncCheckbox}>
+                        <div class="slds-p-bottom_small">
+                            <lightning-input 
+                                type="checkbox" 
+                                label="Sync record before navigating" 
+                                checked={syncBeforeNav}
+                                onchange={handleSyncCheckbox}
+                                disabled={syncing}>
+                            </lightning-input>
+                        </div>
+                    </template>
+                    
+                    <!-- Navigate Button -->
+                    <lightning-button
+                        variant="brand"
+                        label="Open in Notion"
+                        icon-name="utility:new_window"
+                        onclick={navigateToNotion}
+                        disabled={syncing}>
+                    </lightning-button>
+                </div>
+            </template>
+            
+            <!-- No Page State -->
+            <template if:true={showCreateButton}>
+                <div class="slds-p-vertical_small">
+                    <p class="slds-text-body_regular slds-p-bottom_small">
+                        No Notion page found for this record.
+                    </p>
+                    <lightning-button
+                        variant="brand"
+                        label="Create Page in Notion"
+                        icon-name="utility:add"
+                        onclick={createAndNavigate}>
+                    </lightning-button>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>
