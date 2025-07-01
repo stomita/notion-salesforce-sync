@@ -85,7 +85,7 @@
                         <h3 class="slds-text-heading_small slds-m-bottom_small">New Relationship Mapping</h3>
                         
                         <div class="slds-grid slds-gutters slds-m-bottom_small">
-                            <div class="slds-col slds-size_1-of-3">
+                            <div class={fieldColumnClass}>
                                 <lightning-combobox
                                     name="field"
                                     label="Salesforce Relationship Field"
@@ -97,7 +97,22 @@
                                 ></lightning-combobox>
                             </div>
                             
-                            <div class="slds-col slds-size_1-of-3">
+                            <template if:true={showTargetObjectSelector}>
+                                <div class={targetObjectColumnClass}>
+                                    <lightning-combobox
+                                        name="targetObject"
+                                        label="Target Sync Object"
+                                        value={newMapping.parentObject}
+                                        placeholder="Select target object"
+                                        options={availableTargetObjects}
+                                        onchange={handleTargetObjectSelection}
+                                        required
+                                        disabled={isTargetObjectDisabled}
+                                    ></lightning-combobox>
+                                </div>
+                            </template>
+                            
+                            <div class={propertyColumnClass}>
                                 <lightning-combobox
                                     name="property"
                                     label="Notion Relation Property"
@@ -110,6 +125,14 @@
                                 ></lightning-combobox>
                             </div>
                         </div>
+
+                        <!-- Help text for polymorphic fields -->
+                        <template if:true={showTargetObjectSelector}>
+                            <div class="slds-text-body_small slds-text-color_weak slds-m-bottom_small">
+                                <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                                This is a polymorphic field that can reference multiple objects. Please select which sync configuration to use.
+                            </div>
+                        </template>
 
                         <div class="slds-m-top_medium">
                             <lightning-button-group>

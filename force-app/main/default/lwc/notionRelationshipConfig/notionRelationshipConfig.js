@@ -14,6 +14,7 @@ export default class NotionRelationshipConfig extends LightningElement {
     @track configuredSyncObjects = [];
     @track isLoading = false;
     @track showAddMapping = false;
+    @track availableTargetObjects = []; // For polymorphic fields
     @track newMapping = {
         salesforceRelationshipField: '',
         notionRelationPropertyName: '',
@@ -130,24 +131,50 @@ export default class NotionRelationshipConfig extends LightningElement {
         const fieldApiName = event.detail.value;
         const field = this.relationshipFields.find(f => f.apiName === fieldApiName);
         
-        if (field) {
-            // Get the referenced Salesforce object
-            const referencedObject = field.referenceTo && field.referenceTo.length > 0 ? field.referenceTo[0] : '';
+        if (field && field.referenceTo && field.referenceTo.length > 0) {
+            // Find all configured sync objects for the referenced objects
+            const configuredTargets = [];
             
-            // Find the configured sync object that matches this Salesforce object
-            const syncObject = this.configuredSyncObjects.find(obj => obj.objectApiName === referencedObject);
+            for (const refObject of field.referenceTo) {
+                const syncObject = this.configuredSyncObjects.find(obj => obj.objectApiName === refObject);
+                if (syncObject) {
+                    configuredTargets.push({
+                        label: refObject,
+                        value: syncObject.developerName,
+                        objectApiName: syncObject.objectApiName
+                    });
+                }
+            }
             
-            if (syncObject) {
-                this.newMapping = {
-                    ...this.newMapping,
-                    salesforceRelationshipField: fieldApiName,
-                    salesforceFieldLabel: field.label,
-                    parentObject: syncObject.developerName,
-                    parentObjectLabel: referencedObject,
-                    parentSyncObjectName: syncObject.objectApiName
-                };
+            // Store available targets for polymorphic fields
+            this.availableTargetObjects = configuredTargets;
+            
+            if (configuredTargets.length > 0) {
+                // If only one target is configured, auto-select it
+                if (configuredTargets.length === 1) {
+                    const target = configuredTargets[0];
+                    this.newMapping = {
+                        ...this.newMapping,
+                        salesforceRelationshipField: fieldApiName,
+                        salesforceFieldLabel: field.label,
+                        parentObject: target.value,
+                        parentObjectLabel: target.label,
+                        parentSyncObjectName: target.objectApiName
+                    };
+                } else {
+                    // Multiple targets available - user needs to select one
+                    this.newMapping = {
+                        ...this.newMapping,
+                        salesforceRelationshipField: fieldApiName,
+                        salesforceFieldLabel: field.label,
+                        parentObject: '', // Clear until user selects
+                        parentObjectLabel: '',
+                        parentSyncObjectName: ''
+                    };
+                }
             } else {
-                // If no sync object is configured for this relationship, clear the mapping
+                // No sync objects configured for this relationship
+                this.availableTargetObjects = [];
                 this.newMapping = {
                     ...this.newMapping,
                     salesforceRelationshipField: fieldApiName,
@@ -165,6 +192,20 @@ export default class NotionRelationshipConfig extends LightningElement {
             ...this.newMapping,
             notionRelationPropertyName: event.detail.value
         };
+    }
+
+    handleTargetObjectSelection(event) {
+        const selectedTarget = event.detail.value;
+        const target = this.availableTargetObjects.find(t => t.value === selectedTarget);
+        
+        if (target) {
+            this.newMapping = {
+                ...this.newMapping,
+                parentObject: target.value,
+                parentObjectLabel: target.label,
+                parentSyncObjectName: target.objectApiName
+            };
+        }
     }
 
     handleSaveNewMapping() {
@@ -185,6 +226,7 @@ export default class NotionRelationshipConfig extends LightningElement {
             parentObjectLabel: '',
             parentSyncObjectName: ''
         };
+        this.availableTargetObjects = [];
     }
 
     handleRemoveRelationship(event) {
@@ -221,14 +263,22 @@ export default class NotionRelationshipConfig extends LightningElement {
                 if (mappedFields.includes(field.apiName)) {
                     return false;
                 }
-                // Check if the referenced object has a sync configuration
-                const referencedObject = field.referenceTo && field.referenceTo.length > 0 ? field.referenceTo[0] : '';
-                return this.configuredSyncObjects.some(obj => obj.objectApiName === referencedObject);
+                // Check if any of the referenced objects have a sync configuration
+                // This supports polymorphic fields like WhoId, WhatId, OwnerId
+                if (field.referenceTo && field.referenceTo.length > 0) {
+                    return field.referenceTo.some(refObject => 
+                        this.configuredSyncObjects.some(obj => obj.objectApiName === refObject)
+                    );
+                }
+                return false;
             })
             .map(field => {
-                const parentObject = field.referenceTo && field.referenceTo.length > 0 ? field.referenceTo[0] : '';
+                // Show all target objects for polymorphic fields
+                const targetObjects = field.referenceTo && field.referenceTo.length > 0 
+                    ? field.referenceTo.join(', ') 
+                    : '';
                 return {
-                    label: `${field.label} (${field.apiName}) → ${parentObject}`,
+                    label: `${field.label} (${field.apiName}) → ${targetObjects}`,
                     value: field.apiName
                 };
             });
@@ -243,7 +293,16 @@ export default class NotionRelationshipConfig extends LightningElement {
 
     get isNewMappingValid() {
         return this.newMapping.salesforceRelationshipField && 
-               this.newMapping.notionRelationPropertyName;
+               this.newMapping.notionRelationPropertyName &&
+               this.newMapping.parentObject; // Must have a target object selected
+    }
+
+    get showTargetObjectSelector() {
+        return this.availableTargetObjects.length > 1;
+    }
+
+    get isTargetObjectDisabled() {
+        return !this.newMapping.salesforceRelationshipField || this.availableTargetObjects.length <= 1;
     }
 
     get canAddMoreRelationships() {
@@ -274,5 +333,18 @@ export default class NotionRelationshipConfig extends LightningElement {
             const referencedObject = field.referenceTo && field.referenceTo.length > 0 ? field.referenceTo[0] : '';
             return !this.configuredSyncObjects.some(obj => obj.objectApiName === referencedObject);
         });
+    }
+
+    // Dynamic column classes for responsive layout
+    get fieldColumnClass() {
+        return this.showTargetObjectSelector ? 'slds-col slds-size_1-of-3' : 'slds-col slds-size_1-of-2';
+    }
+
+    get targetObjectColumnClass() {
+        return 'slds-col slds-size_1-of-3';
+    }
+
+    get propertyColumnClass() {
+        return this.showTargetObjectSelector ? 'slds-col slds-size_1-of-3' : 'slds-col slds-size_1-of-2';
     }
 }
