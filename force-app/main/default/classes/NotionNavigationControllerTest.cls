@@ -101,15 +101,13 @@ private class NotionNavigationControllerTest {
     
     @isTest
     static void testSyncAndGetNotionPage_NoConfig() {
-        Account testAccount = [SELECT Id FROM Account WHERE Name = 'Test Account for Navigation' LIMIT 1];
-        
-        // Create a contact for testing with an object that has no sync config
-        Contact testContact = new Contact(
+        // Create a Lead for testing with an object that has no sync config
+        Lead testLead = new Lead(
             FirstName = 'Test',
-            LastName = 'Contact',
-            AccountId = testAccount.Id
+            LastName = 'Lead',
+            Company = 'Test Company'
         );
-        insert testContact;
+        insert testLead;
         
         // Mock the HTTP callout to return no sync config
         Test.setMock(HttpCalloutMock.class, new NotionNavigationMock(false, false));
@@ -117,8 +115,8 @@ private class NotionNavigationControllerTest {
         Test.startTest();
         try {
             NotionNavigationController.syncAndGetNotionPage(
-                testContact.Id, 
-                'Contact', // Use Contact which has no sync config in test metadata
+                testLead.Id, 
+                'Lead', // Use Lead which has no sync config in test metadata
                 NotionSync.OPERATION_CREATE
             );
             System.assert(false, 'Should have thrown exception');
