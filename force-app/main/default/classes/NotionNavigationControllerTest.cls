@@ -24,7 +24,8 @@ private class NotionNavigationControllerTest {
         // Verify URL format
         System.assertNotEquals(null, pageUrl, 'Page URL should not be null');
         System.assert(pageUrl.startsWith('https://www.notion.so/'), 'URL should start with www.notion.so');
-        System.assert(pageUrl.contains('-'), 'URL should contain hyphens');
+        // URL format is now without hyphens - just the page ID
+        System.assert(!pageUrl.contains('-'), 'URL should not contain hyphens');
     }
     
     @isTest
@@ -111,7 +112,7 @@ private class NotionNavigationControllerTest {
             );
             System.assert(false, 'Should have thrown exception');
         } catch (AuraHandledException e) {
-            System.assert(e.getMessage().contains('No sync configuration'), 'Error message should mention no sync configuration');
+            System.assert(e.getMessage().toLowerCase().contains('no sync configuration'), 'Error message should mention no sync configuration: ' + e.getMessage());
         }
         Test.stopTest();
     }
@@ -120,7 +121,7 @@ private class NotionNavigationControllerTest {
     static void testFormatNotionUrl() {
         // Test URL formatting with reflection (since method is private)
         String pageId = '1429989fe8ac4effbc8f57f56486db54';
-        String expectedUrl = 'https://notion.so/1429989f-e8ac-4eff-bc8f-57f56486db54';
+        String expectedUrl = 'https://www.notion.so/1429989fe8ac4effbc8f57f56486db54';
         
         // We can't directly test private methods, but we can test through public method
         // The formatting is tested indirectly through testGetNotionPageInfo_PageExists
