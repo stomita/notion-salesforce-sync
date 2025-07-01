@@ -156,6 +156,10 @@ public class NotionApiClient {
     }
     
     public static NotionResponse queryDatabase(String databaseId, Map<String, Object> filter) {
+        return queryDatabase(databaseId, filter, null, null);
+    }
+    
+    public static NotionResponse queryDatabase(String databaseId, Map<String, Object> filter, String startCursor, Integer pageSize) {
         try {
             // Apply rate limiting before making the request
             NotionRateLimiter.throttleRequest();
@@ -165,6 +169,14 @@ public class NotionApiClient {
             Map<String, Object> requestBody = new Map<String, Object>();
             if (filter != null && !filter.isEmpty()) {
                 requestBody.put('filter', filter);
+            }
+            
+            if (String.isNotBlank(startCursor)) {
+                requestBody.put('start_cursor', startCursor);
+            }
+            
+            if (pageSize != null && pageSize > 0) {
+                requestBody.put('page_size', Math.min(pageSize, 100)); // Notion max is 100
             }
             
             request.setBody(JSON.serialize(requestBody));

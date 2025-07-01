@@ -14,17 +14,37 @@
             <value>
                 <fullName>CREATE</fullName>
                 <default>false</default>
-                <label>Create</label>
+                <label>CREATE</label>
             </value>
             <value>
                 <fullName>UPDATE</fullName>
                 <default>false</default>
-                <label>Update</label>
+                <label>UPDATE</label>
             </value>
             <value>
                 <fullName>DELETE</fullName>
                 <default>false</default>
-                <label>Delete</label>
+                <label>DELETE</label>
+            </value>
+            <value>
+                <fullName>DEDUP</fullName>
+                <default>false</default>
+                <label>DEDUP</label>
+            </value>
+            <value>
+                <fullName>BATCH</fullName>
+                <default>false</default>
+                <label>BATCH</label>
+            </value>
+            <value>
+                <fullName>BATCH_SUMMARY</fullName>
+                <default>false</default>
+                <label>BATCH_SUMMARY</label>
+            </value>
+            <value>
+                <fullName>DEDUP_SUMMARY</fullName>
+                <default>false</default>
+                <label>DEDUP_SUMMARY</label>
             </value>
         </valueSetDefinition>
     </valueSet>

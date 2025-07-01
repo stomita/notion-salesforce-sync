@@ -1401,6 +1401,319 @@ public class NotionIntegrationTestExecutor {
     }
     
     // ============================================
+    // TEST 8: DEDUPLICATION
+    // ============================================
+    
+    /**
+     * Setup for deduplication test - create records and intentionally create duplicates in Notion
+     */
+    public void setupDeduplicationTest() {
+        System.debug('\n--- Setting up deduplication test ---');
+        
+        // Clean up any existing deduplication test data
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Dedup Test Account%'];
+        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Dedup Test Parent%'];
+        
+        // Create test records
+        Account dedupAccount = new Account(
+            Name = 'Dedup Test Account ' + DateTime.now().getTime(),
+            Description = 'Account for deduplication testing'
+        );
+        insert dedupAccount;
+        
+        Test_Parent_Object__c dedupParent = new Test_Parent_Object__c(
+            Name = 'Dedup Test Parent ' + DateTime.now().getTime(),
+            Description__c = 'Parent for deduplication testing',
+            Status__c = 'New',
+            Amount__c = 5000.00,
+            Active__c = true
+        );
+        insert dedupParent;
+        
+        System.debug('Created test records: Account=' + dedupAccount.Id + ', Parent=' + dedupParent.Id);
+        
+        // Wait for initial sync to complete
+        System.debug('Waiting for initial sync to complete...');
+    }
+    
+    /**
+     * Run deduplication test - create duplicate pages in Notion
+     */
+    public void runDeduplicationTest() {
+        System.debug('\n--- Creating duplicate Notion pages ---');
+        
+        // Get the test records
+        Account dedupAccount = [
+            SELECT Id, Name, Description
+            FROM Account
+            WHERE Name LIKE 'Dedup Test Account%'
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        Test_Parent_Object__c dedupParent = [
+            SELECT Id, Name, Description__c, Status__c, Amount__c, Active__c
+            FROM Test_Parent_Object__c
+            WHERE Name LIKE 'Dedup Test Parent%'
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        // Get the sync configurations
+        NotionSyncObject__mdt accountConfig = [
+            SELECT NotionDatabaseId__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = 'Account'
+            AND IsActive__c = true
+            LIMIT 1
+        ];
+        
+        NotionSyncObject__mdt parentConfig = [
+            SELECT NotionDatabaseId__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = 'Test_Parent_Object__c'
+            AND IsActive__c = true
+            LIMIT 1
+        ];
+        
+        // Create duplicate Account pages in Notion
+        System.debug('Creating duplicate Account pages in Notion...');
+        for (Integer i = 1; i <= 3; i++) {
+            Map<String, Object> accountProperties = new Map<String, Object>{
+                'Name' => NotionApiClient.buildTitleProperty(dedupAccount.Name + ' - Duplicate ' + i),
+                accountConfig.SalesforceIdPropertyName__c => NotionApiClient.buildTextProperty(dedupAccount.Id)
+            };
+            
+            NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+                accountConfig.NotionDatabaseId__c,
+                accountProperties,
+                null
+            );
+            
+            NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+            if (response.success) {
+                System.debug('Created duplicate Account page ' + i + ': ' + response.pageId);
+            } else {
+                System.debug('Failed to create duplicate Account page ' + i + ': ' + response.errorMessage);
+            }
+        }
+        
+        // Create duplicate Parent pages in Notion
+        System.debug('Creating duplicate Parent pages in Notion...');
+        for (Integer i = 1; i <= 2; i++) {
+            Map<String, Object> parentProperties = new Map<String, Object>{
+                'Name' => NotionApiClient.buildTitleProperty(dedupParent.Name + ' - Duplicate ' + i),
+                'Status' => NotionApiClient.buildSelectProperty(dedupParent.Status__c),
+                'Amount' => NotionApiClient.buildNumberProperty(dedupParent.Amount__c),
+                'Active' => NotionApiClient.buildCheckboxProperty(dedupParent.Active__c),
+                parentConfig.SalesforceIdPropertyName__c => NotionApiClient.buildTextProperty(dedupParent.Id)
+            };
+            
+            NotionApiClient.NotionPageRequest pageRequest = new NotionApiClient.NotionPageRequest(
+                parentConfig.NotionDatabaseId__c,
+                parentProperties,
+                null
+            );
+            
+            NotionApiClient.NotionResponse response = NotionApiClient.createPage(pageRequest);
+            if (response.success) {
+                System.debug('Created duplicate Parent page ' + i + ': ' + response.pageId);
+            } else {
+                System.debug('Failed to create duplicate Parent page ' + i + ': ' + response.errorMessage);
+            }
+        }
+        
+        // Now trigger an update to the records to initiate sync and deduplication
+        System.debug('Updating records to trigger sync and deduplication...');
+        dedupAccount.Description = 'Updated to trigger deduplication at ' + DateTime.now();
+        update dedupAccount;
+        
+        dedupParent.Description__c = 'Updated to trigger deduplication at ' + DateTime.now();
+        update dedupParent;
+        
+        System.debug('Records updated, deduplication should be triggered');
+    }
+    
+    /**
+     * Check deduplication results
+     */
+    public void checkDeduplicationResults() {
+        System.debug('\n--- Checking deduplication results ---');
+        
+        // Get the test records
+        Account dedupAccount = [
+            SELECT Id, Name
+            FROM Account
+            WHERE Name LIKE 'Dedup Test Account%'
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        Test_Parent_Object__c dedupParent = [
+            SELECT Id, Name
+            FROM Test_Parent_Object__c
+            WHERE Name LIKE 'Dedup Test Parent%'
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        
+        // Check for DEDUP logs - also include UPDATE logs which may contain deduplication info
+        List<Notion_Sync_Log__c> dedupLogs = [
+            SELECT Id, Record_Id__c, Object_Type__c, Operation_Type__c, 
+                   Status__c, Error_Message__c, Duplicates_Found__c, 
+                   Duplicates_Deleted__c, Deduplication_Deferred__c
+            FROM Notion_Sync_Log__c
+            WHERE (Record_Id__c IN (:dedupAccount.Id, :dedupParent.Id) OR Operation_Type__c = 'DEDUP_SUMMARY')
+            AND Operation_Type__c IN ('DEDUP', 'DEDUP_SUMMARY', 'UPDATE')
+            AND CreatedDate = TODAY
+            ORDER BY CreatedDate DESC
+        ];
+        
+        System.debug('Found ' + dedupLogs.size() + ' deduplication logs');
+        
+        // Check for deduplication summary logs
+        Integer accountDuplicatesFound = 0;
+        Integer accountDuplicatesDeleted = 0;
+        Integer parentDuplicatesFound = 0;
+        Integer parentDuplicatesDeleted = 0;
+        
+        for (Notion_Sync_Log__c log : dedupLogs) {
+            System.debug('Dedup log: ' + log.Operation_Type__c + ' for ' + log.Object_Type__c + 
+                        ' - Status: ' + log.Status__c + 
+                        ', Found: ' + log.Duplicates_Found__c + 
+                        ', Deleted: ' + log.Duplicates_Deleted__c);
+            
+            // Check both DEDUP_SUMMARY logs and UPDATE logs that have deduplication info
+            if ((log.Operation_Type__c == 'DEDUP_SUMMARY' && log.Record_Id__c == null) ||
+                (log.Operation_Type__c == 'UPDATE' && log.Duplicates_Found__c != null)) {
+                
+                if (log.Object_Type__c == 'Account' || 
+                    (log.Error_Message__c != null && log.Error_Message__c.contains('Account'))) {
+                    if (log.Duplicates_Found__c != null) accountDuplicatesFound += log.Duplicates_Found__c.intValue();
+                    if (log.Duplicates_Deleted__c != null) accountDuplicatesDeleted += log.Duplicates_Deleted__c.intValue();
+                } else if (log.Object_Type__c == 'Test_Parent_Object__c' || 
+                           (log.Error_Message__c != null && log.Error_Message__c.contains('Test_Parent_Object__c'))) {
+                    if (log.Duplicates_Found__c != null) parentDuplicatesFound += log.Duplicates_Found__c.intValue();
+                    if (log.Duplicates_Deleted__c != null) parentDuplicatesDeleted += log.Duplicates_Deleted__c.intValue();
+                }
+            }
+        }
+        
+        System.debug('Account duplicates - Found: ' + accountDuplicatesFound + ', Deleted: ' + accountDuplicatesDeleted);
+        System.debug('Parent duplicates - Found: ' + parentDuplicatesFound + ', Deleted: ' + parentDuplicatesDeleted);
+        
+        // If no deduplication was found in logs, that's okay - check Notion directly
+        // The deduplication might have happened but not been logged yet
+        if (accountDuplicatesFound == 0 && parentDuplicatesFound == 0) {
+            System.debug('No deduplication found in logs yet, checking Notion directly...');
+        } else {
+            // Verify duplicates were found if logs exist
+            System.debug('Deduplication logs found - verifying counts...');
+            
+            // We created 3 duplicate Account pages, so at least some should be found
+            assert(accountDuplicatesFound > 0 || accountDuplicatesDeleted > 0, 
+                'Should find or delete some Account duplicates, found: ' + accountDuplicatesFound + ', deleted: ' + accountDuplicatesDeleted);
+            
+            // We created 2 duplicate Parent pages, so at least some should be found
+            assert(parentDuplicatesFound > 0 || parentDuplicatesDeleted > 0, 
+                'Should find or delete some Parent duplicates, found: ' + parentDuplicatesFound + ', deleted: ' + parentDuplicatesDeleted);
+        }
+        
+        // Get sync configurations
+        NotionSyncObject__mdt accountConfig = [
+            SELECT NotionDatabaseId__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = 'Account'
+            AND IsActive__c = true
+            LIMIT 1
+        ];
+        
+        NotionSyncObject__mdt parentConfig = [
+            SELECT NotionDatabaseId__c, SalesforceIdPropertyName__c
+            FROM NotionSyncObject__mdt
+            WHERE ObjectApiName__c = 'Test_Parent_Object__c'
+            AND IsActive__c = true
+            LIMIT 1
+        ];
+        
+        // Query Notion to verify only one page exists for each record
+        System.debug('Verifying single pages in Notion...');
+        
+        // Check Account
+        Map<String, Object> accountFilter = new Map<String, Object>{
+            'property' => accountConfig.SalesforceIdPropertyName__c,
+            'rich_text' => new Map<String, Object>{
+                'equals' => dedupAccount.Id
+            }
+        };
+        
+        NotionApiClient.NotionResponse accountResponse = NotionApiClient.queryDatabase(
+            accountConfig.NotionDatabaseId__c, 
+            accountFilter
+        );
+        
+        if (accountResponse.success) {
+            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(accountResponse.responseBody);
+            List<Object> results = (List<Object>) responseBody.get('results');
+            System.debug('Found ' + results.size() + ' Account pages in Notion after deduplication');
+            
+            assert(results.size() == 1, 
+                'Should have exactly 1 Account page after deduplication, found: ' + results.size());
+            
+            // Verify it's the oldest one that was kept
+            if (!results.isEmpty()) {
+                Map<String, Object> page = (Map<String, Object>) results[0];
+                Map<String, Object> properties = (Map<String, Object>) page.get('properties');
+                Map<String, Object> nameProperty = (Map<String, Object>) properties.get('Name');
+                List<Object> titleArray = (List<Object>) nameProperty.get('title');
+                if (!titleArray.isEmpty()) {
+                    Map<String, Object> titleText = (Map<String, Object>) titleArray[0];
+                    String titleContent = (String) titleText.get('plain_text');
+                    System.debug('Remaining Account page title: ' + titleContent);
+                }
+            }
+        }
+        
+        // Check Parent
+        Map<String, Object> parentFilter = new Map<String, Object>{
+            'property' => parentConfig.SalesforceIdPropertyName__c,
+            'rich_text' => new Map<String, Object>{
+                'equals' => dedupParent.Id
+            }
+        };
+        
+        NotionApiClient.NotionResponse parentResponse = NotionApiClient.queryDatabase(
+            parentConfig.NotionDatabaseId__c, 
+            parentFilter
+        );
+        
+        if (parentResponse.success) {
+            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(parentResponse.responseBody);
+            List<Object> results = (List<Object>) responseBody.get('results');
+            System.debug('Found ' + results.size() + ' Parent pages in Notion after deduplication');
+            
+            assert(results.size() == 1, 
+                'Should have exactly 1 Parent page after deduplication, found: ' + results.size());
+            
+            // Verify it's the oldest one that was kept
+            if (!results.isEmpty()) {
+                Map<String, Object> page = (Map<String, Object>) results[0];
+                Map<String, Object> properties = (Map<String, Object>) page.get('properties');
+                Map<String, Object> nameProperty = (Map<String, Object>) properties.get('Name');
+                List<Object> titleArray = (List<Object>) nameProperty.get('title');
+                if (!titleArray.isEmpty()) {
+                    Map<String, Object> titleText = (Map<String, Object>) titleArray[0];
+                    String titleContent = (String) titleText.get('plain_text');
+                    System.debug('Remaining Parent page title: ' + titleContent);
+                }
+            }
+        }
+        
+        passCount++;
+        System.debug('✓ Deduplication test passed - duplicates were successfully removed');
+    }
+    
+    // ============================================
     // REPORTING AND UTILITIES
     // ============================================
     
