@@ -13,6 +13,7 @@ SKIP_VALIDATION=false
 CODE_COVERAGE=true
 PACKAGE_ID=""
 PACKAGE_NAME="Notion Salesforce Sync"
+VERSION_DESCRIPTION=""
 
 # Load environment variables if .env file exists
 if [ -f .env ]; then
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
             WAIT_TIME="$2"
             shift 2
             ;;
+        --version-description)
+            VERSION_DESCRIPTION="$2"
+            shift 2
+            ;;
         --skip-validation)
             SKIP_VALIDATION=true
             shift
@@ -51,13 +56,14 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
-            echo "  --namespace <namespace>    The namespace (defaults to NOTION_SYNC_PACKAGE_NAMESPACE from .env)"
-            echo "  --devhub <alias>          The DevHub alias (defaults to current default DevHub)"
-            echo "  --package-id <id>         The package ID (defaults to NOTION_SYNC_PACKAGE_ID from .env)"
-            echo "  --wait <minutes>          Wait time for package creation (default: 20)"
-            echo "  --skip-validation         Skip validation during package creation"
-            echo "  --no-code-coverage        Skip code coverage calculation"
-            echo "  --help                    Show this help message"
+            echo "  --namespace <namespace>       The namespace (defaults to NOTION_SYNC_PACKAGE_NAMESPACE from .env)"
+            echo "  --devhub <alias>             The DevHub alias (defaults to current default DevHub)"
+            echo "  --package-id <id>            The package ID (defaults to NOTION_SYNC_PACKAGE_ID from .env)"
+            echo "  --wait <minutes>             Wait time for package creation (default: 20)"
+            echo "  --version-description <desc> Version description for the package"
+            echo "  --skip-validation            Skip validation during package creation"
+            echo "  --no-code-coverage           Skip code coverage calculation"
+            echo "  --help                       Show this help message"
             echo ""
             echo "Environment variables (can be set in .env file):"
             echo "  NOTION_SYNC_PACKAGE_NAMESPACE    Package namespace"
@@ -150,6 +156,44 @@ if command -v jq &> /dev/null; then
     # Ensure packageAliases exists and add the alias
     jq "if .packageAliases then . else . + {packageAliases: {}} end | .packageAliases[\"$PACKAGE_NAME\"] = \"$PACKAGE_ID\"" sfdx-project.json > sfdx-project.json.tmp
     mv sfdx-project.json.tmp sfdx-project.json
+    
+    # Always add ancestorVersion: "HIGHEST" to use the latest released version
+    jq '.packageDirectories[0].ancestorVersion = "HIGHEST"' sfdx-project.json > sfdx-project.json.tmp
+    mv sfdx-project.json.tmp sfdx-project.json
+    
+    # Dynamically determine the next version number
+    echo "Determining next version number..."
+    LATEST_VERSION=$(sf package version list --packages "$PACKAGE_ID" --target-dev-hub "$DEVHUB" --json 2>/dev/null | \
+        jq -r '.result | map(select(.MajorVersion != null)) | max_by(.MajorVersion, .MinorVersion, .PatchVersion) | "\(.MajorVersion).\(.MinorVersion)"' 2>/dev/null || echo "")
+    
+    if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "null" ]; then
+        # Extract major and minor versions
+        MAJOR=$(echo "$LATEST_VERSION" | cut -d. -f1)
+        MINOR=$(echo "$LATEST_VERSION" | cut -d. -f2)
+        # Increment minor version
+        NEXT_MINOR=$((MINOR + 1))
+        VERSION_NUMBER="${MAJOR}.${NEXT_MINOR}.0.NEXT"
+        VERSION_NAME="Version ${MAJOR}.${NEXT_MINOR}"
+    else
+        # Default to 1.0 if no versions exist
+        VERSION_NUMBER="1.0.0.NEXT"
+        VERSION_NAME="Version 1.0"
+    fi
+    
+    echo "  Next version: $VERSION_NUMBER"
+    
+    # Update version information in sfdx-project.json
+    jq ".packageDirectories[0].versionNumber = \"$VERSION_NUMBER\"" sfdx-project.json > sfdx-project.json.tmp
+    mv sfdx-project.json.tmp sfdx-project.json
+    
+    jq ".packageDirectories[0].versionName = \"$VERSION_NAME\"" sfdx-project.json > sfdx-project.json.tmp
+    mv sfdx-project.json.tmp sfdx-project.json
+    
+    # Update version description if provided
+    if [ -n "$VERSION_DESCRIPTION" ]; then
+        jq ".packageDirectories[0].versionDescription = \"$VERSION_DESCRIPTION\"" sfdx-project.json > sfdx-project.json.tmp
+        mv sfdx-project.json.tmp sfdx-project.json
+    fi
 else
     # Fallback to sed
     sed -i '' "s/\"namespace\": \"\"/\"namespace\": \"$NAMESPACE\"/" sfdx-project.json
