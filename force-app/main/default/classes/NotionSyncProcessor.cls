@@ -66,7 +66,8 @@ public class NotionSyncProcessor {
             logger.log(
                 new NotionSyncLogger.LogEntry(request.operationType)
                     .withRecord(request.objectType, request.recordId)
-                    .withError(errorMessage)
+                    .withStatus('Failed')
+                    .withMessage(errorMessage)
             );
         }
     }
@@ -176,7 +177,8 @@ public class NotionSyncProcessor {
             logger.log(
                 new NotionSyncLogger.LogEntry(request.operationType)
                     .withRecord(request.objectType, request.recordId)
-                    .withError(e.getMessage())
+                    .withStatus('Failed')
+                    .withMessage(e.getMessage())
                     .withRateLimit(1)  // Default to 1 second retry
             );
         } catch (Exception e) {
@@ -184,7 +186,8 @@ public class NotionSyncProcessor {
             logger.log(
                 new NotionSyncLogger.LogEntry(request.operationType)
                     .withRecord(request.objectType, request.recordId)
-                    .withError(e.getMessage())
+                    .withStatus('Failed')
+                    .withMessage(e.getMessage())
             );
         }
     }
@@ -605,13 +608,13 @@ public class NotionSyncProcessor {
                             result.duplicatesDeleted++;
                             deletionCount++;
                             
-                            // Log individual deletion
+                            // Log individual deletion as success
                             logger.log(
                                 new NotionSyncLogger.LogEntry('DEDUP')
                                     .withRecord(syncConfig.ObjectApiName__c, salesforceId)
                                     .withNotionPageId(pageId)
                                     .withStatus('Success')
-                                    .withError('Duplicate Notion page deleted')
+                                    .withMessage('Duplicate Notion page deleted')
                             );
                             
                         } catch (NotionRateLimiter.RateLimitException e) {
@@ -621,7 +624,8 @@ public class NotionSyncProcessor {
                                 new NotionSyncLogger.LogEntry('DEDUP')
                                     .withRecord(syncConfig.ObjectApiName__c, salesforceId)
                                     .withNotionPageId(pageId)
-                                    .withError('Rate limit during deduplication: ' + e.getMessage())
+                                    .withStatus('Failed')
+                                    .withMessage('Rate limit during deduplication: ' + e.getMessage())
                                     .withRateLimit(1)
                             );
                             return result;
@@ -632,7 +636,8 @@ public class NotionSyncProcessor {
                                 new NotionSyncLogger.LogEntry('DEDUP')
                                     .withRecord(syncConfig.ObjectApiName__c, salesforceId)
                                     .withNotionPageId(pageId)
-                                    .withError('Failed to delete duplicate: ' + e.getMessage())
+                                    .withStatus('Failed')
+                                    .withMessage('Failed to delete duplicate: ' + e.getMessage())
                             );
                         }
                     }
@@ -643,7 +648,8 @@ public class NotionSyncProcessor {
             logger.log(
                 new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
                     .withSalesforceObject(syncConfig.ObjectApiName__c)
-                    .withError('Deduplication error: ' + e.getMessage())
+                    .withStatus('Failed')
+                    .withMessage('Deduplication error: ' + e.getMessage())
             );
         }
         

@@ -182,20 +182,20 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             if (result.status == 'Success') {
                 batchLog.withStatus('Success');
                 // Add batch details to error message field for successful batches
-                batchLog.errorMessage = batchDetails;
+                batchLog.message = batchDetails;
             } else if (result.status == 'Rate Limited') {
                 batchLog.withRateLimit(result.retryAfterSeconds != null ? result.retryAfterSeconds : 1);
                 String errorMsg = batchDetails;
                 if (result.errorMessage != null) {
                     errorMsg += ' | Error: ' + result.errorMessage;
                 }
-                batchLog.withError(errorMsg);
+                batchLog.withStatus('Failed').withMessage(errorMsg);
             } else if (result.status == 'Error' || result.errorMessage != null) {
                 String errorMsg = batchDetails;
                 if (result.errorMessage != null) {
                     errorMsg += ' | Error: ' + result.errorMessage;
                 }
-                batchLog.withError(errorMsg);
+                batchLog.withStatus('Failed').withMessage(errorMsg);
             }
             
             // Log the batch result
@@ -256,10 +256,10 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         
         // Set status based on overall results
         if (totalFailed > 0 || totalDeferred > 0) {
-            summaryLog.withError(summaryMessage);
+            summaryLog.withStatus('Failed').withMessage(summaryMessage);
         } else {
             summaryLog.withStatus('Success');
-            summaryLog.errorMessage = summaryMessage;
+            summaryLog.message = summaryMessage;
         }
         
         logger.log(summaryLog);
@@ -275,7 +275,8 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         // Log error using instance logger - use CREATE as operation type
         logger.log(
             new NotionSyncLogger.LogEntry('BATCH')
-                .withError('Batch processing error: ' + e.getMessage())
+                .withStatus('Failed')
+                .withMessage('Batch processing error: ' + e.getMessage())
         );
         
         // Don't rethrow - let the job complete
@@ -355,7 +356,8 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
                 System.debug('Deduplication error: ' + e.getMessage());
                 logger.log(
                     new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
-                        .withError('Deduplication error: ' + e.getMessage())
+                        .withStatus('Failed')
+                        .withMessage('Deduplication error: ' + e.getMessage())
                 );
             }
         } else {

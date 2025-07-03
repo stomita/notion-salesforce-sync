@@ -44,7 +44,8 @@ public class NotionDeduplicationQueueable implements Queueable, Database.AllowsC
                 logger.log(
                     new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
                         .withSalesforceObject(objectType)
-                        .withError('No sync configuration found for object type: ' + objectType)
+                        .withStatus('Failed')
+                        .withMessage('No sync configuration found for object type: ' + objectType)
                 );
                 return;
             }
@@ -74,7 +75,8 @@ public class NotionDeduplicationQueueable implements Queueable, Database.AllowsC
             logger.log(
                 new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
                     .withSalesforceObject(objectType)
-                    .withError('Deduplication error: ' + e.getMessage())
+                    .withStatus('Failed')
+                    .withMessage('Deduplication error: ' + e.getMessage())
             );
             
             // Re-queue if under retry limit
@@ -99,7 +101,7 @@ public class NotionDeduplicationQueueable implements Queueable, Database.AllowsC
             new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
                 .withSalesforceObject(objectType)
                 .withStatus('Deferred')
-                .withError(reason)
+                .withMessage(reason)
         );
         
         // Re-queue if not in test and under retry limit

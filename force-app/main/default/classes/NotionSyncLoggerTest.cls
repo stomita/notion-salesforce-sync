@@ -114,7 +114,8 @@ private class NotionSyncLoggerTest {
         logger.log(
             new NotionSyncLogger.LogEntry('DELETE')
                 .withRecord('Opportunity', '001000000000003')
-                .withError('Record not found in Notion')
+                .withStatus('Failed')
+                .withMessage('Record not found in Notion')
                 .withRetryCount(2)
         );
         
@@ -147,7 +148,8 @@ private class NotionSyncLoggerTest {
         logger.log(
             new NotionSyncLogger.LogEntry('UPDATE')
                 .withRecord('Lead', '001000000000005')
-                .withError('Error')
+                .withStatus('Failed')
+                .withMessage('Error')
         );
         
         // Clear logs without saving

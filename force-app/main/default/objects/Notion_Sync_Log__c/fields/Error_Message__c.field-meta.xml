@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Error_Message__c</fullName>
-    <description>Error details if the sync failed</description>
+    <description>Message details about the sync operation</description>
     <externalId>false</externalId>
-    <label>Error Message</label>
+    <label>Message</label>
     <length>32768</length>
     <trackTrending>false</trackTrending>
     <type>LongTextArea</type>
