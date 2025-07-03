@@ -96,4 +96,9 @@
         <field>Notion_Sync_Log__c.Retry_Count__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Event_Timestamp__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 </PermissionSet>

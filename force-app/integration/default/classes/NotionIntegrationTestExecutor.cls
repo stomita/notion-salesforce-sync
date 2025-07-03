@@ -1561,12 +1561,12 @@ public class NotionIntegrationTestExecutor {
         List<Notion_Sync_Log__c> dedupLogs = [
             SELECT Id, Record_Id__c, Object_Type__c, Operation_Type__c, 
                    Status__c, Error_Message__c, Duplicates_Found__c, 
-                   Duplicates_Deleted__c, Deduplication_Deferred__c
+                   Duplicates_Deleted__c, Deduplication_Deferred__c, Event_Timestamp__c
             FROM Notion_Sync_Log__c
             WHERE (Record_Id__c IN (:dedupAccount.Id, :dedupParent.Id) OR Operation_Type__c = 'DEDUP_SUMMARY')
             AND Operation_Type__c IN ('DEDUP', 'DEDUP_SUMMARY', 'UPDATE')
             AND CreatedDate = TODAY
-            ORDER BY CreatedDate DESC
+            ORDER BY Event_Timestamp__c DESC
         ];
         
         System.debug('Found ' + dedupLogs.size() + ' deduplication logs');
