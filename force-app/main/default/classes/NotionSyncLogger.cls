@@ -21,6 +21,9 @@ public with sharing class NotionSyncLogger {
         // Set callouts used at the time of logging
         entry.calloutsUsed = Limits.getCallouts();
         
+        // Capture the actual event timestamp
+        entry.eventTimestamp = DateTime.now();
+        
         logs.add(entry);
     }
     
@@ -49,7 +52,8 @@ public with sharing class NotionSyncLogger {
                 Callouts_Used__c = entry.calloutsUsed,
                 Duplicates_Found__c = entry.duplicatesFound,
                 Duplicates_Deleted__c = entry.duplicatesDeleted,
-                Deduplication_Deferred__c = entry.deduplicationDeferred
+                Deduplication_Deferred__c = entry.deduplicationDeferred,
+                Event_Timestamp__c = entry.eventTimestamp
             );
             
             logRecords.add(logRecord);
@@ -99,6 +103,7 @@ public with sharing class NotionSyncLogger {
         public Integer duplicatesFound;
         public Integer duplicatesDeleted;
         public Boolean deduplicationDeferred;
+        public DateTime eventTimestamp;
         
         // Constructor with only operationType - all other fields are optional
         public LogEntry(String operationType) {

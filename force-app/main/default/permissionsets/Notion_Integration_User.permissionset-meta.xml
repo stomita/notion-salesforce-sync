@@ -61,6 +61,11 @@
         <field>Notion_Sync_Log__c.Rate_Limit_Retry_After__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Notion_Sync_Log__c.Event_Timestamp__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
     <hasActivationRequired>false</hasActivationRequired>
     <label>Notion Integration User</label>
     <objectPermissions>
