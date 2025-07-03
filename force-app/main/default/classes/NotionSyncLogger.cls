@@ -39,7 +39,7 @@ public with sharing class NotionSyncLogger {
                 Object_Type__c = entry.objectType,
                 Operation_Type__c = entry.operationType,
                 Status__c = entry.status,
-                Error_Message__c = entry.errorMessage,
+                Error_Message__c = entry.message,
                 Retry_Count__c = entry.retryCount,
                 Notion_Page_Id__c = entry.notionPageId,
                 Rate_Limited__c = entry.rateLimited,
@@ -87,7 +87,7 @@ public with sharing class NotionSyncLogger {
         public String objectType;
         public String operationType;
         public String status;
-        public String errorMessage;
+        public String message;
         public Integer retryCount;
         public String notionPageId;
         public Boolean rateLimited;
@@ -104,7 +104,7 @@ public with sharing class NotionSyncLogger {
         public LogEntry(String operationType) {
             this.operationType = operationType;
             this.status = 'Success';
-            this.errorMessage = null;
+            this.message = null;
             this.retryCount = 0;
             this.notionPageId = null;
             this.rateLimited = false;
@@ -137,9 +137,9 @@ public with sharing class NotionSyncLogger {
             return this;
         }
         
-        public LogEntry withError(String errorMessage) {
-            this.errorMessage = errorMessage;
-            this.status = 'Failed';
+        public LogEntry withMessage(String message) {
+            this.message = message;
+            // Does NOT change status - leaves it as is
             return this;
         }
         

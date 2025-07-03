@@ -90,7 +90,8 @@ public with sharing class NotionNavigationController {
                 logger.log(
                     new NotionSyncLogger.LogEntry(operationType)
                         .withRecord(objectType, recordId)
-                        .withError('Sync failed: ' + syncEx.getMessage())
+                        .withStatus('Failed')
+                        .withMessage('Sync failed: ' + syncEx.getMessage())
                 );
                 
                 // Now we can flush the logs (DML after callout is complete)
