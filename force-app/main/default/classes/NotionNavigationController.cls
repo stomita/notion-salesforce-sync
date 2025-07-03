@@ -136,6 +136,7 @@ public with sharing class NotionNavigationController {
      * Get sync configuration for an object type
      */
     private static NotionSyncObject__mdt getSyncConfiguration(String objectType) {
+        // Use static SOQL with field references that work in both namespaced and non-namespaced contexts
         List<NotionSyncObject__mdt> configs = [
             SELECT Id, ObjectApiName__c, NotionDatabaseId__c, IsActive__c, SalesforceIdPropertyName__c
             FROM NotionSyncObject__mdt
