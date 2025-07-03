@@ -783,11 +783,33 @@ public class NotionSyncProcessor {
             String time1 = (String) page1.get('created_time');
             String time2 = (String) page2.get('created_time');
             
-            if (time1 == null && time2 == null) return 0;
+            if (time1 == null && time2 == null) {
+                // If both times are null, use ID as secondary sort
+                return compareByPageId(page1, page2);
+            }
             if (time1 == null) return 1;
             if (time2 == null) return -1;
             
-            return time1.compareTo(time2);
+            // Compare times
+            Integer timeComparison = time1.compareTo(time2);
+            
+            // If times are equal, use page ID as secondary sort for stable ordering
+            if (timeComparison == 0) {
+                return compareByPageId(page1, page2);
+            }
+            
+            return timeComparison;
+        }
+        
+        private Integer compareByPageId(Map<String, Object> page1, Map<String, Object> page2) {
+            String id1 = (String) page1.get('id');
+            String id2 = (String) page2.get('id');
+            
+            if (id1 == null && id2 == null) return 0;
+            if (id1 == null) return 1;
+            if (id2 == null) return -1;
+            
+            return id1.compareTo(id2);
         }
     }
 }
