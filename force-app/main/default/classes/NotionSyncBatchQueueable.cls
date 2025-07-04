@@ -180,9 +180,7 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             
             // Set status based on batch result
             if (result.status == 'Success') {
-                batchLog.withStatus('Success');
-                // Add batch details to error message field for successful batches
-                batchLog.message = batchDetails;
+                batchLog.withStatus('Success').withMessage(batchDetails);
             } else if (result.status == 'Rate Limited') {
                 batchLog.withRateLimit(result.retryAfterSeconds != null ? result.retryAfterSeconds : 1);
                 String errorMsg = batchDetails;
@@ -196,6 +194,15 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
                     errorMsg += ' | Error: ' + result.errorMessage;
                 }
                 batchLog.withStatus('Failed').withMessage(errorMsg);
+            } else if (result.status == 'Deferred') {
+                batchLog.withStatus('Deferred').withMessage(batchDetails);
+            } else {
+                // Default case for any other status
+                String statusMsg = batchDetails;
+                if (result.status != null) {
+                    statusMsg += ' | Status: ' + result.status;
+                }
+                batchLog.withStatus(result.status != null ? result.status : 'Unknown').withMessage(statusMsg);
             }
             
             // Log the batch result
@@ -255,11 +262,12 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             .withMetrics(totalCallouts, totalCpuTime);
         
         // Set status based on overall results
-        if (totalFailed > 0 || totalDeferred > 0) {
+        if (totalFailed > 0) {
             summaryLog.withStatus('Failed').withMessage(summaryMessage);
+        } else if (totalDeferred > 0) {
+            summaryLog.withStatus('Deferred').withMessage(summaryMessage);
         } else {
-            summaryLog.withStatus('Success');
-            summaryLog.message = summaryMessage;
+            summaryLog.withStatus('Success').withMessage(summaryMessage);
         }
         
         logger.log(summaryLog);
@@ -292,7 +300,7 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             return;
         }
         
-        // Check if we have successful results and capacity for deduplication
+        // Check if we have successful results
         Boolean hasSuccessfulBatches = false;
         for (NotionSyncBatchProcessor.BatchResult result : results) {
             if (result.status == 'Success' && result.processedCount > 0) {
@@ -305,70 +313,36 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             return;
         }
         
-        // Check governor limits before attempting deduplication
-        NotionRateLimiter.GovernorLimitStatus limits = NotionRateLimiter.getGovernorLimitStatus();
-        
-        // Calculate usage percentages
-        Decimal calloutPercentage = NotionRateLimiter.calculatePercentage(limits.calloutsUsed, limits.calloutLimit);
-        Decimal cpuPercentage = NotionRateLimiter.calculatePercentage(limits.cpuTimeUsed, limits.cpuTimeLimit);
-        
-        // Only deduplicate if we have at least 20% capacity remaining
-        if (calloutPercentage < 80 && cpuPercentage < 80) {
-            try {
-                // Extract unique record IDs from processed requests
-                Set<Id> processedRecordIds = extractRecordIds(processedRequests);
-                String objectType = processedRequests[0].objectType;
-                
-                // Get sync configuration
-                NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
-                if (syncConfig == null || !syncConfig.IsActive__c) {
-                    return;
-                }
-                
-                // Calculate safe deletion count based on remaining limits
-                Integer remainingCallouts = limits.calloutLimit - limits.calloutsUsed;
-                Integer maxDeletions = Math.max(1, (remainingCallouts - 5) / 2); // Reserve 5 callouts, 2 per deletion (query + delete)
-                
-                // Create processor with logger and perform deduplication
-                NotionSyncProcessor processor = new NotionSyncProcessor(logger);
-                NotionSyncProcessor.DeduplicationResult dedupResult = processor.deduplicateNotionPages(
-                    processedRecordIds, 
-                    syncConfig,
-                    maxDeletions
-                );
-                
-                // Log deduplication results
-                if (dedupResult.duplicatesFound > 0 || dedupResult.duplicatesDeleted > 0) {
-                    logger.log(
-                        new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
-                            .withSalesforceObject(objectType)
-                            .withStatus(dedupResult.deferred ? 'Deferred' : 'Success')
-                            .withDeduplication(dedupResult.duplicatesFound, dedupResult.duplicatesDeleted, dedupResult.deferred)
-                    );
-                }
-                
-                // If deduplication was deferred and we have remaining duplicates, queue separate job
-                if (dedupResult.deferred && dedupResult.duplicatesFound > dedupResult.duplicatesDeleted) {
-                    queueDeferredDeduplication(processedRecordIds, objectType);
-                }
-                
-            } catch (Exception e) {
-                System.debug('Deduplication error: ' + e.getMessage());
-                logger.log(
-                    new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
-                        .withStatus('Failed')
-                        .withMessage('Deduplication error: ' + e.getMessage())
-                );
+        // Always queue deduplication to avoid callout after DML issues
+        // The batch processor may have performed DML operations via NotionSyncQueueable
+        try {
+            Set<Id> processedRecordIds = extractRecordIds(processedRequests);
+            String objectType = processedRequests[0].objectType;
+            
+            // Get sync configuration to verify it's active
+            NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
+            if (syncConfig == null || !syncConfig.IsActive__c) {
+                return;
             }
-        } else {
-            // Queue deduplication for later if limits are tight
-            try {
-                Set<Id> processedRecordIds = extractRecordIds(processedRequests);
-                String objectType = processedRequests[0].objectType;
-                queueDeferredDeduplication(processedRecordIds, objectType);
-            } catch (Exception e) {
-                System.debug('Failed to queue deferred deduplication: ' + e.getMessage());
-            }
+            
+            // Queue deduplication for asynchronous processing
+            queueDeferredDeduplication(processedRecordIds, objectType);
+            
+            // Log that deduplication was queued
+            logger.log(
+                new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
+                    .withSalesforceObject(objectType)
+                    .withStatus('Queued')
+                    .withMessage('Deduplication queued for ' + processedRecordIds.size() + ' records')
+            );
+            
+        } catch (Exception e) {
+            System.debug('Failed to queue deduplication: ' + e.getMessage());
+            logger.log(
+                new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
+                    .withStatus('Failed')
+                    .withMessage('Failed to queue deduplication: ' + e.getMessage())
+            );
         }
     }
     
