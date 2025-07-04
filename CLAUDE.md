@@ -171,6 +171,12 @@ See `docs/CI_SETUP.md` for detailed setup instructions.
 - **Naming**: Use descriptive English names for classes, methods, variables, and metadata
 - **Comments**: All inline comments and method documentation in English
 
+## CRITICAL Git Rules - MUST FOLLOW
+
+1. **NEVER use `git add -A` or `git add -a`** - These commands are PROHIBITED because they can accidentally include files modified by scripts or containing sensitive data
+2. **ALWAYS explicitly add files** - Use specific file paths like `git add force-app/main/default/classes/ClassName.cls`
+3. **ALWAYS review changes before committing** - Scripts may alter file values (e.g., database IDs in metadata) that should not be committed
+
 ## Implementation Details
 
 ### Invocable Apex Method
