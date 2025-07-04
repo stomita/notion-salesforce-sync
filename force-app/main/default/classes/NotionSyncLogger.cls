@@ -7,7 +7,9 @@ public with sharing class NotionSyncLogger {
     public NotionSyncLogger() {
         this.logs = new List<LogEntry>();
         // Check settings once during construction
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        // Use getOrgDefaults() instead of getInstance() to ensure we get org-wide settings
+        // getInstance() might return null in certain contexts (e.g., async processing)
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         this.loggingEnabled = (settings != null && settings.Enable_Sync_Logging__c == true);
     }
     
