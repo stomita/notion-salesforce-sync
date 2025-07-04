@@ -1031,7 +1031,7 @@ public class NotionIntegrationTestExecutor {
         System.debug('Found ' + testAccounts.size() + ' test accounts');
         
         // Prepare all updates in a list
-        Account[] tests = new Account[];
+        List<Account> tests = new List<Account>();
 
         // Test 1: Normal content update
         Account test1 = testAccounts[0];
