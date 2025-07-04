@@ -170,6 +170,7 @@ See `docs/CI_SETUP.md` for detailed setup instructions.
 - **Language**: All code, comments, and documentation must be written in English
 - **Naming**: Use descriptive English names for classes, methods, variables, and metadata
 - **Comments**: All inline comments and method documentation in English
+- **CRITICAL: Database IDs**: NEVER commit actual Notion database IDs to source code. Always use placeholder values like `REPLACE_WITH_NOTION_DATABASE_ID_FOR_ACCOUNT` in the integration test metadata files. These should only be replaced with actual IDs in local environments or CI via environment variables/secrets.
 
 ## Implementation Details
 
