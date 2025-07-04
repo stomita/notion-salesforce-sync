@@ -17,6 +17,9 @@ fi
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+echo ">>> Debug: Checking sync settings..."
+sf apex run -f "$SCRIPT_DIR/apex/debug-sync-settings.apex" $ORG_FLAG
+
 echo ">>> Debug: Checking flow execution before test..."
 sf apex run -f "$SCRIPT_DIR/apex/debug-flow-execution.apex" $ORG_FLAG
 
@@ -28,6 +31,9 @@ sleep 10
 
 echo ">>> Debug: Checking sync logs..."
 sf apex run -f "$SCRIPT_DIR/apex/debug-sync-logs.apex" $ORG_FLAG
+
+echo ">>> Debug: Testing direct sync invocation..."
+sf apex run -f "$SCRIPT_DIR/apex/debug-direct-sync.apex" $ORG_FLAG
 
 echo ">>> Debug: Checking flow execution after test..."
 sf apex run -f "$SCRIPT_DIR/apex/debug-flow-execution.apex" $ORG_FLAG
