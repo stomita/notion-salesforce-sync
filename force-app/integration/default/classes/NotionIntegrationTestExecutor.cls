@@ -1047,10 +1047,13 @@ public class NotionIntegrationTestExecutor {
         
         System.debug('Found ' + testAccounts.size() + ' test accounts');
         
+        // Prepare all updates in a list
+        List<Account> tests = new List<Account>();
+
         // Test 1: Normal content update
         Account test1 = testAccounts[0];
         test1.Description = 'Updated description with new content at ' + DateTime.now();
-        update test1;
+        tests.add(test1);
         System.debug('Test 1: Updated to new content');
         
         // Test 2: Update to longer content
@@ -1058,45 +1061,46 @@ public class NotionIntegrationTestExecutor {
         test2.Description = 'This is a much longer description with multiple lines.\n' +
                            'It contains special characters like & < > " \' and numbers 123.\n' +
                            'This tests that longer content is properly synced.';
-        update test2;
+        tests.add(test2);
         System.debug('Test 2: Updated to longer content');
         
         // Test 3: Update to shorter content
         Account test3 = testAccounts[2];
         test3.Description = 'Short';
-        update test3;
+        tests.add(test3);
         System.debug('Test 3: Updated to shorter content');
         
         // Test 4: Clear content (set to null)
         Account test4 = testAccounts[3];
         test4.Description = null;
-        update test4;
+        tests.add(test4);
         System.debug('Test 4: Cleared content (set to null)');
         
         // Test 5: Add content after null
         Account test5 = testAccounts[4];
         test5.Description = 'Content added after null';
-        update test5;
+        tests.add(test5);
         System.debug('Test 5: Added content after null');
         
         // Test 6: Set to empty string
         Account test6 = testAccounts[5];
         test6.Description = '';
-        update test6;
+        tests.add(test6);
         System.debug('Test 6: Set to empty string');
         
         // Test 7: Set to whitespace only
         Account test7 = testAccounts[6];
         test7.Description = '   ';
-        update test7;
+        tests.add(test7);
         System.debug('Test 7: Set to whitespace only');
         
         // Test 8: No change update (should not make unnecessary API calls)
         Account test8 = testAccounts[7];
         test8.Name = test8.Name + ' - Updated';  // Update name only, not description
-        update test8;
+        tests.add(test8);
         System.debug('Test 8: Updated name only, description unchanged');
         
+        update tests;
         System.debug('All body content update tests executed');
     }
     
