@@ -308,23 +308,32 @@ public class NotionIntegrationTestExecutor {
                 LIMIT 1
             ];
             
-            // Get the Notion page IDs from previous CREATE sync
-            List<Notion_Sync_Log__c> createLogs = [
-                SELECT Id, Record_Id__c, Notion_Page_Id__c
+            // Get the current Notion page IDs from the most recent successful sync (CREATE or UPDATE)
+            List<Notion_Sync_Log__c> syncLogs = [
+                SELECT Id, Record_Id__c, Notion_Page_Id__c, Operation_Type__c
                 FROM Notion_Sync_Log__c
                 WHERE Record_Id__c IN (:testAccount.Id, :testParent.Id)
-                AND Operation_Type__c = 'CREATE'
+                AND Operation_Type__c IN ('CREATE', 'UPDATE')
                 AND Status__c = 'Success'
+                AND Notion_Page_Id__c != null
                 ORDER BY CreatedDate DESC
             ];
             
             String accountNotionPageId = null;
             String parentNotionPageId = null;
             
-            for (Notion_Sync_Log__c log : createLogs) {
-                if (log.Record_Id__c == testAccount.Id) accountNotionPageId = log.Notion_Page_Id__c;
-                if (log.Record_Id__c == testParent.Id) parentNotionPageId = log.Notion_Page_Id__c;
+            // Get the most recent page ID for each record
+            for (Notion_Sync_Log__c log : syncLogs) {
+                if (log.Record_Id__c == testAccount.Id && accountNotionPageId == null) {
+                    accountNotionPageId = log.Notion_Page_Id__c;
+                }
+                if (log.Record_Id__c == testParent.Id && parentNotionPageId == null) {
+                    parentNotionPageId = log.Notion_Page_Id__c;
+                }
             }
+            
+            System.debug('Test Parent ID: ' + testParent.Id);
+            System.debug('Parent Notion Page ID from sync logs: ' + parentNotionPageId);
             
             // Verify update sync logs
             List<Notion_Sync_Log__c> updateLogs = [
@@ -366,7 +375,12 @@ public class NotionIntegrationTestExecutor {
                     Map<String, Object> selectValue = (Map<String, Object>) statusProperty.get('select');
                     if (selectValue != null) {
                         String notionStatus = (String) selectValue.get('name');
-                        assert(notionStatus == 'In Progress', 'Test Parent Status in Notion should be updated to In Progress');
+                        System.debug('Comparing status - Notion: "' + notionStatus + '", Expected: "In Progress"');
+                        System.debug('Status comparison result: ' + (notionStatus == 'In Progress'));
+                        assert(notionStatus == 'In Progress', 'Test Parent Status in Notion should be updated to In Progress, but was: ' + notionStatus);
+                    } else {
+                        System.debug('WARNING: selectValue is null in Status property');
+                        System.debug('Full Status property: ' + JSON.serialize(statusProperty));
                     }
                     
                     // Verify updated Amount property
