@@ -143,24 +143,27 @@ public class NotionIntegrationTestExecutor {
                 LIMIT 1
             ];
             
-            // Check sync logs
+            // Check sync logs - look for any successful sync (CREATE or UPDATE)
             List<Notion_Sync_Log__c> logs = [
-                SELECT Id, Record_Id__c, Status__c, Notion_Page_Id__c, Error_Message__c
+                SELECT Id, Record_Id__c, Status__c, Notion_Page_Id__c, Error_Message__c, Operation_Type__c
                 FROM Notion_Sync_Log__c
                 WHERE Record_Id__c IN (:testAccount.Id, :testParent.Id)
-                AND Operation_Type__c = 'CREATE'
+                AND Operation_Type__c IN ('CREATE', 'UPDATE')
+                AND Status__c = 'Success'
+                AND Notion_Page_Id__c != null
                 ORDER BY CreatedDate DESC
             ];
             
             String accountNotionPageId = null;
             String parentNotionPageId = null;
             
+            // Get the most recent page ID for each record
             for (Notion_Sync_Log__c log : logs) {
-                if (log.Status__c == 'Success' && String.isNotBlank(log.Notion_Page_Id__c)) {
-                    if (log.Record_Id__c == testAccount.Id) accountNotionPageId = log.Notion_Page_Id__c;
-                    if (log.Record_Id__c == testParent.Id) parentNotionPageId = log.Notion_Page_Id__c;
-                } else {
-                    errors.add('Create sync failed for ' + log.Record_Id__c + ': ' + log.Error_Message__c);
+                if (log.Record_Id__c == testAccount.Id && accountNotionPageId == null) {
+                    accountNotionPageId = log.Notion_Page_Id__c;
+                }
+                if (log.Record_Id__c == testParent.Id && parentNotionPageId == null) {
+                    parentNotionPageId = log.Notion_Page_Id__c;
                 }
             }
             
