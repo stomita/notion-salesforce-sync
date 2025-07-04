@@ -62,7 +62,7 @@ run_test "test-0-setup.sh"
 
 # Run all tests in sequence
 echo
-run_test "test-1-create-debug2.sh"
+run_test "test-1-create-debug3.sh"
 
 echo
 run_test "test-2-update.sh"
