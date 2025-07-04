@@ -4,12 +4,12 @@ System.debug('=== Debugging CI Sync Issue ===');
 // Check sync settings
 Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
 System.debug('getInstance() settings: ' + settings);
-System.debug('Logging enabled (getInstance): ' + (settings != null ? settings.Enable_Sync_Logging__c : 'null settings'));
+System.debug('Logging enabled (getInstance): ' + (settings != null ? String.valueOf(settings.Enable_Sync_Logging__c) : 'null settings'));
 
 // Check org defaults
 Notion_Sync_Settings__c orgDefaults = Notion_Sync_Settings__c.getOrgDefaults();
 System.debug('getOrgDefaults() settings: ' + orgDefaults);
-System.debug('Logging enabled (getOrgDefaults): ' + (orgDefaults != null ? orgDefaults.Enable_Sync_Logging__c : 'null settings'));
+System.debug('Logging enabled (getOrgDefaults): ' + (orgDefaults != null ? String.valueOf(orgDefaults.Enable_Sync_Logging__c) : 'null settings'));
 
 // Check if there are any sync logs at all
 Integer logCount = [SELECT COUNT() FROM Notion_Sync_Log__c];
