@@ -26,6 +26,9 @@ sleep 10
 echo ">>> Debug: Checking sync logs..."
 sf apex run -f "$SCRIPT_DIR/apex/debug-sync-logs.apex" $ORG_FLAG
 
+echo ">>> Debug: Checking sync status and forcing async processing..."
+sf apex run -f "$SCRIPT_DIR/apex/debug-sync-status.apex" $ORG_FLAG
+
 echo ">>> Checking results..."
 "$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-1-create-check.apex" "$ORG_FLAG"
 
