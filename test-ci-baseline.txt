@@ -1,1 +1,1 @@
-Testing CI with feature branch fix/batch-logging-status merged
+Testing CI with feature branch but NotionSyncLogger reverted to main
