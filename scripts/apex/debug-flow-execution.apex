@@ -13,9 +13,8 @@ for (FlowDefinitionView flow : flows) {
     System.debug('- ' + flow.ApiName + ' (Active: ' + flow.IsActive + ', Type: ' + flow.ProcessType + ')');
 }
 
-// Check platform events (if any)
-Integer eventCount = [SELECT COUNT() FROM Notion_Sync_Event__e];
-System.debug('Platform Events in queue: ' + eventCount);
+// Platform events are not used in this implementation
+System.debug('Platform Events: Not used in this implementation');
 
 // Check async apex jobs in detail
 List<AsyncApexJob> jobs = [
