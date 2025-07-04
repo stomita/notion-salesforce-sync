@@ -23,9 +23,6 @@ sf apex run -f "$SCRIPT_DIR/apex/test-1-create-run.apex" $ORG_FLAG
 echo ">>> Waiting 10 seconds for sync..."
 sleep 10
 
-echo ">>> Running debug check..."
-sf apex run -f "$SCRIPT_DIR/apex/debug-ci-sync.apex" $ORG_FLAG
-
 echo ">>> Checking results..."
 "$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-1-create-check.apex" "$ORG_FLAG"
 
