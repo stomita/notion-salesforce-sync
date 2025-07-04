@@ -30,8 +30,8 @@ echo "- Null/empty values clear page content"
 echo "- Various content scenarios work correctly"
 sf apex run -f "$SCRIPT_DIR/apex/test-6-body-content-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 30 seconds for all updates to sync..."
-sleep 30
+echo ">>> Waiting 40 seconds for all updates to sync..."
+sleep 40
 
 echo ">>> Checking results..."
 "$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-6-body-content-check.apex" "$ORG_FLAG"
