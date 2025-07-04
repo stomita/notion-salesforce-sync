@@ -20,8 +20,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo ">>> Running create test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-1-create-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 5 seconds for sync..."
-sleep 5
+echo ">>> Waiting 10 seconds for sync..."
+sleep 10
 
 echo ">>> Checking results..."
 "$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-1-create-check.apex" "$ORG_FLAG"
