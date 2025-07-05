@@ -180,9 +180,7 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             
             // Set status based on batch result
             if (result.status == 'Success') {
-                batchLog.withStatus('Success');
-                // Add batch details to error message field for successful batches
-                batchLog.message = batchDetails;
+                batchLog.withStatus('Success').withMessage(batchDetails);
             } else if (result.status == 'Rate Limited') {
                 batchLog.withRateLimit(result.retryAfterSeconds != null ? result.retryAfterSeconds : 1);
                 String errorMsg = batchDetails;
@@ -196,6 +194,15 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
                     errorMsg += ' | Error: ' + result.errorMessage;
                 }
                 batchLog.withStatus('Failed').withMessage(errorMsg);
+            } else if (result.status == 'Deferred') {
+                batchLog.withStatus('Deferred').withMessage(batchDetails);
+            } else {
+                // Default case for any other status
+                String statusMsg = batchDetails;
+                if (result.status != null) {
+                    statusMsg += ' | Status: ' + result.status;
+                }
+                batchLog.withStatus(result.status != null ? result.status : 'Unknown').withMessage(statusMsg);
             }
             
             // Log the batch result
@@ -255,11 +262,12 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             .withMetrics(totalCallouts, totalCpuTime);
         
         // Set status based on overall results
-        if (totalFailed > 0 || totalDeferred > 0) {
+        if (totalFailed > 0) {
             summaryLog.withStatus('Failed').withMessage(summaryMessage);
+        } else if (totalDeferred > 0) {
+            summaryLog.withStatus('Deferred').withMessage(summaryMessage);
         } else {
-            summaryLog.withStatus('Success');
-            summaryLog.message = summaryMessage;
+            summaryLog.withStatus('Success').withMessage(summaryMessage);
         }
         
         logger.log(summaryLog);
