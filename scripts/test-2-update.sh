@@ -20,16 +20,16 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo ">>> Setting up test data (ensure records exist)..."
 sf apex run -f "$SCRIPT_DIR/apex/test-2-update-setup.apex" $ORG_FLAG
 
-echo ">>> Waiting 5 seconds for setup sync..."
+echo ">>> Waiting for setup to complete..."
 sleep 5
 
 echo ">>> Running update test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-2-update-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 5 seconds for sync..."
+echo ">>> Waiting 5 seconds for initial sync..."
 sleep 5
 
-echo ">>> Checking results..."
-"$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-2-update-check.apex" "$ORG_FLAG"
+echo ">>> Checking results with retry (wait: 3s, max retries: 10)..."
+"$SCRIPT_DIR/retry-check.sh" "$SCRIPT_DIR/apex/test-2-update-check.apex" 3 10 "$ORG_FLAG"
 
 echo "Test 2 complete!"

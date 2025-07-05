@@ -26,10 +26,10 @@ sleep 5
 echo ">>> Running relationship test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-3-relationship-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 5 seconds for sync..."
+echo ">>> Waiting 5 seconds for initial sync..."
 sleep 5
 
-echo ">>> Checking results..."
-"$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-3-relationship-check.apex" "$ORG_FLAG"
+echo ">>> Checking results with retry (wait: 3s, max retries: 10)..."
+"$SCRIPT_DIR/retry-check.sh" "$SCRIPT_DIR/apex/test-3-relationship-check.apex" 3 10 "$ORG_FLAG"
 
 echo "Test 3 complete!"

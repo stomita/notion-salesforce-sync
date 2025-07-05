@@ -26,10 +26,10 @@ sleep 5
 echo ">>> Running deletion test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-5-delete-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 10 seconds for deletion sync..."
+echo ">>> Waiting 10 seconds for initial sync..."
 sleep 10
 
-echo ">>> Checking results..."
-"$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-5-delete-check.apex" "$ORG_FLAG"
+echo ">>> Checking results with retry (wait: 5s, max retries: 6)..."
+"$SCRIPT_DIR/retry-check.sh" "$SCRIPT_DIR/apex/test-5-delete-check.apex" 5 6 "$ORG_FLAG"
 
 echo "Test 5 complete!"
