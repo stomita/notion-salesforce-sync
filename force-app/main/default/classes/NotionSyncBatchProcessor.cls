@@ -94,10 +94,7 @@ public class NotionSyncBatchProcessor {
             Integer maxBatchForCallouts = (Integer)((Limits.getLimitCallouts() - Limits.getCallouts()) * 0.9 / 2);
             effectiveBatchSize = Math.min(effectiveBatchSize, Math.max(MIN_BATCH_SIZE, maxBatchForCallouts));
             
-            // Further reduce if still hitting limits
-            while (effectiveBatchSize > MIN_BATCH_SIZE && NotionRateLimiter.shouldDeferProcessing(effectiveBatchSize)) {
-                effectiveBatchSize = Math.max(MIN_BATCH_SIZE, effectiveBatchSize / 2);
-            }
+            // No need to further check shouldDeferProcessing since we've already sized appropriately
             
             System.debug('Using effective batch size: ' + effectiveBatchSize + ' for ' + objectType);
             
@@ -146,10 +143,10 @@ public class NotionSyncBatchProcessor {
         result.initialCallouts = initialStatus.calloutsUsed;
         
         try {
-            // Check if we should defer based on current limits
-            if (NotionRateLimiter.shouldDeferProcessing(batch.size())) {
+            // Check CPU and heap limits only (callout limits already handled in batch sizing)
+            if (NotionRateLimiter.shouldDeferProcessing()) {
                 result.shouldDefer = true;
-                result.deferReason = 'Governor limits approaching threshold';
+                result.deferReason = 'CPU or heap limits approaching threshold';
                 // Important: Set processed count to 0 since we didn't process this batch
                 result.processedCount = 0;
                 result.failedCount = 0;
