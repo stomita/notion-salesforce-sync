@@ -262,10 +262,8 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             .withMetrics(totalCallouts, totalCpuTime);
         
         // Set status based on overall results
-        if (totalFailed > 0) {
+        if (totalFailed > 0 || totalDeferred > 0) {
             summaryLog.withStatus('Failed').withMessage(summaryMessage);
-        } else if (totalDeferred > 0) {
-            summaryLog.withStatus('Deferred').withMessage(summaryMessage);
         } else {
             summaryLog.withStatus('Success').withMessage(summaryMessage);
         }
