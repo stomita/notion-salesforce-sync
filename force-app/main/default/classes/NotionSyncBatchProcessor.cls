@@ -44,15 +44,23 @@ public class NotionSyncBatchProcessor {
             
             // Check if we should defer remaining batches
             if (result.shouldDefer) {
-                // Queue remaining batches for async processing
-                List<NotionSync.Request> remainingRequests = new List<NotionSync.Request>();
-                for (Integer i = batches.indexOf(batch) + 1; i < batches.size(); i++) {
-                    remainingRequests.addAll(batches[i]);
+                // Calculate deferred requests including current batch if not processed
+                List<NotionSync.Request> deferredRequests = new List<NotionSync.Request>();
+                
+                // If current batch wasn't processed, include it
+                if (result.processedCount == 0) {
+                    deferredRequests.addAll(batch);
                 }
                 
-                if (!remainingRequests.isEmpty()) {
-                    queueRemainingRequests(remainingRequests);
-                    result.deferredCount = remainingRequests.size();
+                // Add remaining batches
+                for (Integer i = batches.indexOf(batch) + 1; i < batches.size(); i++) {
+                    deferredRequests.addAll(batches[i]);
+                }
+                
+                if (!deferredRequests.isEmpty()) {
+                    result.deferredCount = deferredRequests.size();
+                    // Queue the deferred requests for later processing
+                    queueRemainingRequests(deferredRequests);
                 }
                 break;
             }
@@ -80,9 +88,13 @@ public class NotionSyncBatchProcessor {
             // Calculate optimal batch size based on governor limits
             // Start with configured batch size and adjust down if needed
             Integer effectiveBatchSize = batchSize;
-            while (effectiveBatchSize > MIN_BATCH_SIZE && NotionRateLimiter.shouldDeferProcessing(effectiveBatchSize)) {
-                effectiveBatchSize = Math.max(MIN_BATCH_SIZE, effectiveBatchSize / 2);
-            }
+            
+            // For callout limits, ensure batch size doesn't exceed what we can handle
+            // Assuming 2 callouts per record, and keeping 10% buffer
+            Integer maxBatchForCallouts = (Integer)((Limits.getLimitCallouts() - Limits.getCallouts()) * 0.9 / 2);
+            effectiveBatchSize = Math.min(effectiveBatchSize, Math.max(MIN_BATCH_SIZE, maxBatchForCallouts));
+            
+            // No need to further check shouldDeferProcessing since we've already sized appropriately
             
             System.debug('Using effective batch size: ' + effectiveBatchSize + ' for ' + objectType);
             
@@ -131,10 +143,10 @@ public class NotionSyncBatchProcessor {
         result.initialCallouts = initialStatus.calloutsUsed;
         
         try {
-            // Check if we should defer based on current limits
-            if (NotionRateLimiter.shouldDeferProcessing(batch.size())) {
+            // Check CPU and heap limits only (callout limits already handled in batch sizing)
+            if (NotionRateLimiter.shouldDeferProcessing()) {
                 result.shouldDefer = true;
-                result.deferReason = 'Governor limits approaching threshold';
+                result.deferReason = 'CPU or heap limits approaching threshold';
                 // Important: Set processed count to 0 since we didn't process this batch
                 result.processedCount = 0;
                 result.failedCount = 0;
@@ -206,21 +218,18 @@ public class NotionSyncBatchProcessor {
         }
     }
     
+    
+    
     /**
-     * Queue remaining requests for async processing
+     * Queue remaining requests for asynchronous processing
      */
     private void queueRemainingRequests(List<NotionSync.Request> requests) {
-        // Check if we're already in an async context
         if (System.isFuture() || System.isQueueable() || System.isBatch()) {
-            // Already in async context - cannot chain another async job
-            // This should be handled by the calling context
             System.debug('WARNING: Cannot queue remaining requests - already in async context');
         } else {
-            // Queue for async processing
             System.enqueueJob(new NotionSyncQueueable(requests));
         }
     }
-    
     
     /**
      * Get current batch size
