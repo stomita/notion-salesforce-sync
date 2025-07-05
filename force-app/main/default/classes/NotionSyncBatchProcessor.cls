@@ -44,16 +44,23 @@ public class NotionSyncBatchProcessor {
             
             // Check if we should defer remaining batches
             if (result.shouldDefer) {
-                // Calculate deferred count
-                List<NotionSync.Request> remainingRequests = new List<NotionSync.Request>();
-                for (Integer i = batches.indexOf(batch) + 1; i < batches.size(); i++) {
-                    remainingRequests.addAll(batches[i]);
+                // Calculate deferred requests including current batch if not processed
+                List<NotionSync.Request> deferredRequests = new List<NotionSync.Request>();
+                
+                // If current batch wasn't processed, include it
+                if (result.processedCount == 0) {
+                    deferredRequests.addAll(batch);
                 }
                 
-                if (!remainingRequests.isEmpty()) {
-                    result.deferredCount = remainingRequests.size();
-                    // Queue the remaining requests for later processing
-                    queueRemainingRequests(remainingRequests);
+                // Add remaining batches
+                for (Integer i = batches.indexOf(batch) + 1; i < batches.size(); i++) {
+                    deferredRequests.addAll(batches[i]);
+                }
+                
+                if (!deferredRequests.isEmpty()) {
+                    result.deferredCount = deferredRequests.size();
+                    // Queue the deferred requests for later processing
+                    queueRemainingRequests(deferredRequests);
                 }
                 break;
             }
