@@ -23,10 +23,10 @@ sf apex run -f "$SCRIPT_DIR/apex/test-7-batch-setup.apex" $ORG_FLAG
 echo ">>> Running batch test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-7-batch-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 60 seconds for sync to complete (100 records)..."
+echo ">>> Waiting 60 seconds for initial sync (100 records)..."
 sleep 60
 
-echo ">>> Checking results..."
-"$SCRIPT_DIR/run-apex-with-validation.sh" "$SCRIPT_DIR/apex/test-7-batch-check.apex" "$ORG_FLAG"
+echo ">>> Checking results with retry (wait: 15s, max retries: 2)..."
+"$SCRIPT_DIR/retry-check.sh" "$SCRIPT_DIR/apex/test-7-batch-check.apex" 15 2 "$ORG_FLAG"
 
 echo "Test 7 complete!"
