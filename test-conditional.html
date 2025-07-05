@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Conditional Rendering</title>
+</head>
+<body>
+    <h1>Test LWC Conditional Rendering</h1>
+    <p>This tests if the conditional template rendering works correctly.</p>
+    
+    <script>
+        // Test data
+        const testCases = [
+            { fieldApiName: '', expectedShow: false },
+            { fieldApiName: 'Test', expectedShow: false },
+            { fieldApiName: 'Description', fieldType: 'TEXTAREA', expectedShow: true },
+            { fieldApiName: 'LongDescription', fieldType: 'LONGTEXTAREA', expectedShow: true },
+            { fieldApiName: 'RichDescription', fieldType: 'RICHTEXTAREA', expectedShow: true },
+            { fieldApiName: 'Name', fieldType: 'STRING', expectedShow: false },
+            { fieldApiName: 'Amount', fieldType: 'CURRENCY', expectedShow: false }
+        ];
+        
+        // Simulate the getter logic
+        function showBodyContentOption(newMapping, salesforceFields) {
+            if (!newMapping || !newMapping.salesforceFieldApiName) {
+                return false;
+            }
+            
+            const field = salesforceFields.find(f => f.apiName === newMapping.salesforceFieldApiName);
+            if (!field) {
+                return false;
+            }
+            
+            const textAreaTypes = ['TEXTAREA', 'LONGTEXTAREA', 'RICHTEXTAREA'];
+            return textAreaTypes.includes(field.type);
+        }
+        
+        // Test fields
+        const salesforceFields = [
+            { apiName: 'Description', type: 'TEXTAREA' },
+            { apiName: 'LongDescription', type: 'LONGTEXTAREA' },
+            { apiName: 'RichDescription', type: 'RICHTEXTAREA' },
+            { apiName: 'Name', type: 'STRING' },
+            { apiName: 'Amount', type: 'CURRENCY' }
+        ];
+        
+        // Run tests
+        console.log('Running conditional rendering tests...');
+        testCases.forEach(test => {
+            const newMapping = { salesforceFieldApiName: test.fieldApiName };
+            const result = showBodyContentOption(newMapping, salesforceFields);
+            const passed = result === test.expectedShow;
+            console.log(`Test: ${test.fieldApiName || '(empty)'} - Expected: ${test.expectedShow}, Got: ${result} - ${passed ? 'PASS' : 'FAIL'}`);
+        });
+    </script>
+</body>
+</html>
