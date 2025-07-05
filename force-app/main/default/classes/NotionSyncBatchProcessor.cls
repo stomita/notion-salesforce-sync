@@ -88,6 +88,13 @@ public class NotionSyncBatchProcessor {
             // Calculate optimal batch size based on governor limits
             // Start with configured batch size and adjust down if needed
             Integer effectiveBatchSize = batchSize;
+            
+            // For callout limits, ensure batch size doesn't exceed what we can handle
+            // Assuming 2 callouts per record, and keeping 10% buffer
+            Integer maxBatchForCallouts = (Integer)((Limits.getLimitCallouts() - Limits.getCallouts()) * 0.9 / 2);
+            effectiveBatchSize = Math.min(effectiveBatchSize, Math.max(MIN_BATCH_SIZE, maxBatchForCallouts));
+            
+            // Further reduce if still hitting limits
             while (effectiveBatchSize > MIN_BATCH_SIZE && NotionRateLimiter.shouldDeferProcessing(effectiveBatchSize)) {
                 effectiveBatchSize = Math.max(MIN_BATCH_SIZE, effectiveBatchSize / 2);
             }
