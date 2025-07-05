@@ -26,6 +26,11 @@
                 <default>false</default>
                 <label>Retrying</label>
             </value>
+            <value>
+                <fullName>Deferred</fullName>
+                <default>false</default>
+                <label>Deferred</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>
