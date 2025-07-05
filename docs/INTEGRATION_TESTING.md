@@ -462,6 +462,80 @@ sf data query -f scripts/soql/check-sync-logs.soql
 sf data query --query "SELECT Id, Status, JobType, MethodName, CreatedDate FROM AsyncApexJob WHERE JobType='Queueable' ORDER BY CreatedDate DESC LIMIT 10"
 ```
 
+## Integration Test Architecture
+
+### Test Execution Pattern
+
+All integration tests follow a standardized three-phase execution pattern to ensure consistency and reliability:
+
+1. **Setup Phase** (optional)
+   - Prepares test data and environment
+   - Ensures clean state before test execution
+   - May be omitted if test doesn't require pre-existing data
+
+2. **Run Phase** (required)
+   - Executes the actual test operation
+   - Triggers the sync process
+   - Performs the actions being tested
+
+3. **Check Phase** (required)
+   - Validates expected outcomes
+   - Verifies data consistency between Salesforce and Notion
+   - Reports success or failure with clear diagnostics
+
+### Test Implementation Guidelines
+
+When creating new integration tests:
+
+1. **Naming Convention**: 
+   - Test scripts: `test-N-descriptive-name.sh` (where N is the test number)
+   - Apex files: `test-N-descriptive-name-{setup|run|check}.apex`
+
+2. **Architecture Layers**:
+   - **Shell Scripts** (`test-*.sh`): Orchestrate test execution
+   - **Apex Scripts** (`test-*.apex`): Thin wrappers that instantiate and call test executor
+   - **Test Executor** (`NotionIntegrationTestExecutor`): Contains actual test logic
+
+3. **Shell Script Structure**:
+   - Accept optional org alias parameter
+   - Use `SCRIPT_DIR` for relative path resolution
+   - Implement appropriate wait times based on operation complexity
+   - Use `retry-check.sh` for resilient checking
+
+4. **Apex Script Structure**:
+   ```apex
+   // Instantiate the test executor
+   NotionIntegrationTestExecutor executor = new NotionIntegrationTestExecutor();
+   
+   // Call the appropriate method
+   executor.runYourTest();  // For run phase
+   executor.checkYourTestResults();  // For check phase
+   
+   // Handle success/failure reporting
+   System.debug('✓ Test passed');
+   System.debug('INTEGRATION_TEST_FAILURE_MARKER');  // On failure
+   ```
+
+5. **Test Executor Implementation**:
+   - Add new methods to `NotionIntegrationTestExecutor` class
+   - Follow existing patterns for consistency
+   - Implement both run and check methods for each test
+   - Use descriptive method names that match the test purpose
+
+6. **Timing Considerations**:
+   - Choose initial wait time based on expected sync duration
+   - Configure retry parameters to balance reliability and execution time
+   - Consider operation complexity when setting retry intervals
+
+### Test Infrastructure
+
+The integration test framework provides:
+
+- **`retry-check.sh`**: Handles retry logic for asynchronous operations
+- **`run-apex-with-validation.sh`**: Executes Apex and validates output
+- **`execute-integration-tests.sh`**: Runs all tests in sequence
+- **Test orchestration**: Numbered tests execute in order for dependencies
+
 ## Integration Test Structure
 
 The `force-app/integration` directory contains:
