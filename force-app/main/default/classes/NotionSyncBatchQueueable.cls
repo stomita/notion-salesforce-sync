@@ -87,7 +87,7 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
         } catch (Exception e) {
             handleBatchError(e);
         } finally {
-            // Flush logs directly - DML after callout is fine
+            // Flush logs directly - safe because deduplication is always deferred
             try {
                 logger.flush();
             } catch (Exception e) {
@@ -313,70 +313,32 @@ public class NotionSyncBatchQueueable implements Queueable, Database.AllowsCallo
             return;
         }
         
-        // Check governor limits before attempting deduplication
-        NotionRateLimiter.GovernorLimitStatus limits = NotionRateLimiter.getGovernorLimitStatus();
-        
-        // Calculate usage percentages
-        Decimal calloutPercentage = NotionRateLimiter.calculatePercentage(limits.calloutsUsed, limits.calloutLimit);
-        Decimal cpuPercentage = NotionRateLimiter.calculatePercentage(limits.cpuTimeUsed, limits.cpuTimeLimit);
-        
-        // Only deduplicate if we have at least 20% capacity remaining
-        if (calloutPercentage < 80 && cpuPercentage < 80) {
-            try {
-                // Extract unique record IDs from processed requests
-                Set<Id> processedRecordIds = extractRecordIds(processedRequests);
-                String objectType = processedRequests[0].objectType;
+        // Always defer deduplication to avoid "uncommitted work pending" errors
+        // Queue deduplication for later processing
+        try {
+            Set<Id> processedRecordIds = extractRecordIds(processedRequests);
+            String objectType = processedRequests[0].objectType;
+            
+            // Get sync configuration to verify it's active
+            NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
+            if (syncConfig != null && syncConfig.IsActive__c) {
+                queueDeferredDeduplication(processedRecordIds, objectType);
                 
-                // Get sync configuration
-                NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
-                if (syncConfig == null || !syncConfig.IsActive__c) {
-                    return;
-                }
-                
-                // Calculate safe deletion count based on remaining limits
-                Integer remainingCallouts = limits.calloutLimit - limits.calloutsUsed;
-                Integer maxDeletions = Math.max(1, (remainingCallouts - 5) / 2); // Reserve 5 callouts, 2 per deletion (query + delete)
-                
-                // Create processor with logger and perform deduplication
-                NotionSyncProcessor processor = new NotionSyncProcessor(logger);
-                NotionSyncProcessor.DeduplicationResult dedupResult = processor.deduplicateNotionPages(
-                    processedRecordIds, 
-                    syncConfig,
-                    maxDeletions
-                );
-                
-                // Log deduplication results
-                if (dedupResult.duplicatesFound > 0 || dedupResult.duplicatesDeleted > 0) {
-                    logger.log(
-                        new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
-                            .withSalesforceObject(objectType)
-                            .withStatus(dedupResult.deferred ? 'Deferred' : 'Success')
-                            .withDeduplication(dedupResult.duplicatesFound, dedupResult.duplicatesDeleted, dedupResult.deferred)
-                    );
-                }
-                
-                // If deduplication was deferred and we have remaining duplicates, queue separate job
-                if (dedupResult.deferred && dedupResult.duplicatesFound > dedupResult.duplicatesDeleted) {
-                    queueDeferredDeduplication(processedRecordIds, objectType);
-                }
-                
-            } catch (Exception e) {
-                System.debug('Deduplication error: ' + e.getMessage());
+                // Log that deduplication was deferred
                 logger.log(
                     new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
-                        .withStatus('Failed')
-                        .withMessage('Deduplication error: ' + e.getMessage())
+                        .withSalesforceObject(objectType)
+                        .withStatus('Deferred')
+                        .withMessage('Deduplication queued for ' + processedRecordIds.size() + ' records')
                 );
             }
-        } else {
-            // Queue deduplication for later if limits are tight
-            try {
-                Set<Id> processedRecordIds = extractRecordIds(processedRequests);
-                String objectType = processedRequests[0].objectType;
-                queueDeferredDeduplication(processedRecordIds, objectType);
-            } catch (Exception e) {
-                System.debug('Failed to queue deferred deduplication: ' + e.getMessage());
-            }
+        } catch (Exception e) {
+            System.debug('Failed to queue deferred deduplication: ' + e.getMessage());
+            logger.log(
+                new NotionSyncLogger.LogEntry('DEDUP_SUMMARY')
+                    .withStatus('Failed')
+                    .withMessage('Failed to queue deduplication: ' + e.getMessage())
+            );
         }
     }
     

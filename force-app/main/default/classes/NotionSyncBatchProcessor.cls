@@ -44,15 +44,16 @@ public class NotionSyncBatchProcessor {
             
             // Check if we should defer remaining batches
             if (result.shouldDefer) {
-                // Queue remaining batches for async processing
+                // Calculate deferred count
                 List<NotionSync.Request> remainingRequests = new List<NotionSync.Request>();
                 for (Integer i = batches.indexOf(batch) + 1; i < batches.size(); i++) {
                     remainingRequests.addAll(batches[i]);
                 }
                 
                 if (!remainingRequests.isEmpty()) {
-                    queueRemainingRequests(remainingRequests);
                     result.deferredCount = remainingRequests.size();
+                    // Queue the remaining requests for later processing
+                    queueRemainingRequests(remainingRequests);
                 }
                 break;
             }
@@ -206,21 +207,18 @@ public class NotionSyncBatchProcessor {
         }
     }
     
+    
+    
     /**
-     * Queue remaining requests for async processing
+     * Queue remaining requests for asynchronous processing
      */
     private void queueRemainingRequests(List<NotionSync.Request> requests) {
-        // Check if we're already in an async context
         if (System.isFuture() || System.isQueueable() || System.isBatch()) {
-            // Already in async context - cannot chain another async job
-            // This should be handled by the calling context
             System.debug('WARNING: Cannot queue remaining requests - already in async context');
         } else {
-            // Queue for async processing
             System.enqueueJob(new NotionSyncQueueable(requests));
         }
     }
-    
     
     /**
      * Get current batch size
