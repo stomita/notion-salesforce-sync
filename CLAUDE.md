@@ -233,8 +233,7 @@ This is critical for integration tests - see the specific instructions in the "P
 )
 public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
     // Process each sync request
-    // For single records: use @future for immediate processing
-    // For multiple records: use Queueable with runtime limit checking
+    // For single/multiple records: use Queueable with runtime limit checking
     // Queueable automatically chains when approaching governor limits
     // Maintains user context for Named Credential access
 }
