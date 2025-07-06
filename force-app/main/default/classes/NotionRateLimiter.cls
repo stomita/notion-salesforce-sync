@@ -55,6 +55,45 @@ public with sharing class NotionRateLimiter {
     }
     
     /**
+     * @description Check if processing should stop and chain to next queueable
+     * Used for runtime checking during record processing
+     * @return Boolean indicating whether to stop processing and chain
+     */
+    public static Boolean shouldStopProcessing() {
+        // Check callout limit - leave buffer for at least 2 more records (6 callouts)
+        Integer calloutsUsed = Limits.getCallouts();
+        Integer calloutLimit = Limits.getLimitCallouts();
+        Integer remainingCallouts = calloutLimit - calloutsUsed;
+        
+        // Check CPU time limit - leave 5 second buffer
+        Integer cpuUsed = Limits.getCpuTime();
+        Integer cpuLimit = Limits.getLimitCpuTime();
+        Integer remainingCpu = cpuLimit - cpuUsed;
+        
+        // Check heap size limit - leave 15% buffer
+        Integer heapUsed = Limits.getHeapSize();
+        Integer heapLimit = Limits.getLimitHeapSize();
+        Decimal heapUsage = heapLimit > 0 ? 
+            Decimal.valueOf(heapUsed) / heapLimit : 0;
+        
+        // Stop if:
+        // - Less than 6 callouts remaining (need ~3 per record)
+        // - Less than 5 seconds CPU time remaining
+        // - More than 85% heap used
+        Boolean shouldStop = (remainingCallouts < 6) || 
+                           (remainingCpu < 5000) || 
+                           (heapUsage > 0.85);
+        
+        if (shouldStop) {
+            System.debug('Should stop processing - Remaining callouts: ' + remainingCallouts + 
+                       ', Remaining CPU: ' + remainingCpu + 'ms, Heap usage: ' + 
+                       (heapUsage * 100).setScale(1) + '%');
+        }
+        
+        return shouldStop;
+    }
+    
+    /**
      * @description Enforces rate limiting by waiting if necessary
      * Uses busy wait with CPU time monitoring to maintain 3 req/sec rate limit
      * @throws RateLimitException if unable to wait due to governor limits
