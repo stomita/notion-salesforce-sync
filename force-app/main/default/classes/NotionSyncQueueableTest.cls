@@ -653,4 +653,46 @@ private class NotionSyncQueueableTest {
         // Note: In a real scenario with relationship metadata configured,
         // the properties would be enriched with parent Account relation data
     }
+    
+    @isTest
+    static void testStartIndexConstructor() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('CREATE'));
+        
+        List<Account> testAccounts = [SELECT Id FROM Account LIMIT 3];
+        
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        for (Account acc : testAccounts) {
+            requests.add(new NotionSync.Request(
+                acc.Id,
+                'Account',
+                'CREATE'
+            ));
+        }
+        
+        Test.startTest();
+        
+        // Test constructor with start index
+        NotionSyncQueueable job = new NotionSyncQueueable(requests, 1);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        // Verify only records from startIndex onwards were processed
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c
+            FROM Notion_Sync_Log__c
+        ];
+        
+        // Should only process 2 records (index 1 and 2)
+        System.assertEquals(2, syncLogs.size(), 'Only records from startIndex onwards should be processed');
+        
+        // Verify the first record (index 0) was not processed
+        Set<Id> processedIds = new Set<Id>();
+        for (Notion_Sync_Log__c log : syncLogs) {
+            processedIds.add(log.Record_Id__c);
+        }
+        System.assert(!processedIds.contains(testAccounts[0].Id), 'First record should not be processed');
+        System.assert(processedIds.contains(testAccounts[1].Id), 'Second record should be processed');
+        System.assert(processedIds.contains(testAccounts[2].Id), 'Third record should be processed');
+    }
 }

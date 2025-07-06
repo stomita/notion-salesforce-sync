@@ -239,4 +239,53 @@ private class NotionRateLimiterTest {
         
         Test.stopTest();
     }
+    
+    @isTest
+    static void testShouldStopProcessing_BelowThresholds() {
+        Test.startTest();
+        
+        // At start of test, limits should be low
+        Boolean shouldStop = NotionRateLimiter.shouldStopProcessing();
+        
+        Test.stopTest();
+        
+        System.assertEquals(false, shouldStop, 
+            'Should not stop processing when limits are below thresholds');
+    }
+    
+    @isTest
+    static void testShouldStopProcessing_LowCallouts() {
+        Test.startTest();
+        
+        // Can't actually consume callouts in test, but verify the method executes
+        Boolean shouldStop = NotionRateLimiter.shouldStopProcessing();
+        
+        // Get current status to understand the state
+        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatusMap();
+        Integer remainingCallouts = (Integer)status.get('calloutLimit') - (Integer)status.get('calloutsUsed');
+        
+        Test.stopTest();
+        
+        // At start of test, should have plenty of callouts remaining
+        System.assert(remainingCallouts > 6, 'Should have more than 6 callouts remaining');
+        System.assertEquals(false, shouldStop, 'Should not stop when callouts are sufficient');
+    }
+    
+    @isTest 
+    static void testShouldStopProcessing_HeapUsage() {
+        Test.startTest();
+        
+        // Verify method handles heap checking correctly
+        Boolean shouldStop = NotionRateLimiter.shouldStopProcessing();
+        
+        // Get current heap usage
+        Map<String, Object> status = NotionRateLimiter.getGovernorLimitStatusMap();
+        Decimal heapPercentage = (Decimal)status.get('heapPercentage');
+        
+        Test.stopTest();
+        
+        // In test context, heap usage should be low
+        System.assert(heapPercentage < 85, 'Heap usage should be below 85% threshold');
+        System.assertEquals(false, shouldStop, 'Should not stop when heap usage is low');
+    }
 }
