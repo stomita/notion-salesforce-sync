@@ -79,8 +79,10 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
             
             // Chain if we have more requests
             if (currentIndex < allRequests.size()) {
+                System.debug('More requests to process. Current: ' + currentIndex + ', Total: ' + allRequests.size());
                 chainNextBatch(currentIndex);
             } else {
+                System.debug('All requests processed. Total: ' + allRequests.size());
                 // All requests processed - trigger deduplication if needed
                 handleDeduplication();
             }
@@ -213,6 +215,16 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                 .withStatus('Failed')
                 .withMessage('Processing error after index ' + lastProcessedIndex + ': ' + e.getMessage())
         );
+        
+        // Try to chain remaining requests if possible
+        if (lastProcessedIndex < allRequests.size()) {
+            System.debug('Attempting to chain after error. Remaining: ' + (allRequests.size() - lastProcessedIndex));
+            try {
+                chainNextBatch(lastProcessedIndex);
+            } catch (Exception chainEx) {
+                System.debug(LoggingLevel.ERROR, 'Failed to chain after error: ' + chainEx.getMessage());
+            }
+        }
         
         // Don't rethrow - let the job complete
     }

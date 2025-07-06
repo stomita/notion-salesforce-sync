@@ -79,14 +79,14 @@ public class NotionIntegrationTestExecutor {
         System.debug('Sync logging enabled for tests');
         
         // Clean up any existing test data including deletion test records
-        delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];
         delete [SELECT Id FROM Contact WHERE LastName LIKE 'Integration Test%'];
-        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];
         delete [SELECT Id FROM Test_Child_Object__c WHERE Name LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test%'];
         
         // Clean up batch test data as well
-        delete [SELECT Id FROM Account WHERE Name LIKE 'Batch Test Account%'];
         delete [SELECT Id FROM Contact WHERE LastName LIKE 'Batch Test Contact%'];
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Batch Test Account%'];
         
         // Clean up body content test data
         delete [SELECT Id FROM Account WHERE Name LIKE 'Body Content Test%'];
