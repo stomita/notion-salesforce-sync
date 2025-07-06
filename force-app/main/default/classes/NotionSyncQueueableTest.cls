@@ -222,10 +222,11 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify sync logs were created for all requests
+        // Verify sync logs were created for all requests (excluding batch summary logs)
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c, Object_Type__c, Operation_Type__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
         ];
         
         System.assertEquals(5, syncLogs.size(), 'Five sync logs should be created (3 accounts + 2 contacts)');
@@ -446,8 +447,12 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify all requests were processed
-        List<Notion_Sync_Log__c> syncLogs = [SELECT Id, Record_Id__c FROM Notion_Sync_Log__c];
+        // Verify all requests were processed (excluding batch summary logs)
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Id, Record_Id__c 
+            FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
+        ];
         System.assertEquals(testAccounts.size(), syncLogs.size(), 
                           'Sync logs should be created for all test accounts');
     }
@@ -553,6 +558,7 @@ private class NotionSyncQueueableTest {
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c, Object_Type__c, Status__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
             ORDER BY Object_Type__c
         ];
         
@@ -602,10 +608,11 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify all records were processed
+        // Verify all records were processed (excluding batch summary logs)
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c, Object_Type__c, Status__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
             ORDER BY CreatedDate
         ];
         
@@ -652,5 +659,48 @@ private class NotionSyncQueueableTest {
         
         // Note: In a real scenario with relationship metadata configured,
         // the properties would be enriched with parent Account relation data
+    }
+    
+    @isTest
+    static void testStartIndexConstructor() {
+        Test.setMock(HttpCalloutMock.class, new NotionAPIHttpCalloutMock('CREATE'));
+        
+        List<Account> testAccounts = [SELECT Id FROM Account LIMIT 3];
+        
+        List<NotionSync.Request> requests = new List<NotionSync.Request>();
+        for (Account acc : testAccounts) {
+            requests.add(new NotionSync.Request(
+                acc.Id,
+                'Account',
+                'CREATE'
+            ));
+        }
+        
+        Test.startTest();
+        
+        // Test constructor with start index
+        NotionSyncQueueable job = new NotionSyncQueueable(requests, 1);
+        System.enqueueJob(job);
+        
+        Test.stopTest();
+        
+        // Verify only records from startIndex onwards were processed
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Record_Id__c
+            FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
+        ];
+        
+        // Should only process 2 records (index 1 and 2)
+        System.assertEquals(2, syncLogs.size(), 'Only records from startIndex onwards should be processed');
+        
+        // Verify the first record (index 0) was not processed
+        Set<Id> processedIds = new Set<Id>();
+        for (Notion_Sync_Log__c log : syncLogs) {
+            processedIds.add(log.Record_Id__c);
+        }
+        System.assert(!processedIds.contains(testAccounts[0].Id), 'First record should not be processed');
+        System.assert(processedIds.contains(testAccounts[1].Id), 'Second record should be processed');
+        System.assert(processedIds.contains(testAccounts[2].Id), 'Third record should be processed');
     }
 }

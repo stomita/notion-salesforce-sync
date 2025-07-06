@@ -97,15 +97,16 @@ The implemented Invocable Apex + Async Processing pattern provides optimal balan
 - Excellent user experience
 - Simple deployment model
 
-### Limitations:
-- Limited to ~30-40 records per sync due to API callout limits
-- No automatic retry mechanism in base implementation
-- Requires enhancement for large data volumes
+### Features:
+- Runtime governor limit checking handles any volume
+- Automatic queueable chaining for large datasets
+- Complete processing of all records through intelligent chaining
+- No manual batch size configuration needed
 
 ### Next Steps:
-For organizations needing to sync large data volumes or requiring batch processing capabilities, implement the patterns described in [LARGE_DATA_SYNC.md](LARGE_DATA_SYNC.md), which extends this base architecture with:
-- Batch Apex for large datasets
-- Queueable chaining for medium volumes
-- Retry mechanisms
-- Progress tracking
-- Scheduled sync capabilities
+For additional details on how the system handles large data volumes, see [LARGE_DATA_SYNC.md](LARGE_DATA_SYNC.md), which describes:
+- Runtime governor limit checking
+- Automatic queueable chaining
+- Processing characteristics
+- Monitoring and optimization
+- Scheduled sync patterns

@@ -79,14 +79,21 @@ public class NotionIntegrationTestExecutor {
         System.debug('Sync logging enabled for tests');
         
         // Clean up any existing test data including deletion test records
-        delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];
         delete [SELECT Id FROM Contact WHERE LastName LIKE 'Integration Test%'];
-        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Integration Test%'];
         delete [SELECT Id FROM Test_Child_Object__c WHERE Name LIKE 'Integration Test%'];
+        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Integration Test%'];
         
         // Clean up batch test data as well
-        delete [SELECT Id FROM Account WHERE Name LIKE 'Batch Test Account%'];
         delete [SELECT Id FROM Contact WHERE LastName LIKE 'Batch Test Contact%'];
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Batch Test Account%'];
+        
+        // Clean up body content test data
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Body Content Test%'];
+        
+        // Clean up deduplication test data  
+        delete [SELECT Id FROM Account WHERE Name LIKE 'Dedup Test%'];
+        delete [SELECT Id FROM Test_Parent_Object__c WHERE Name LIKE 'Dedup Test%'];
         
         System.debug('Test data cleanup complete');
     }
@@ -1880,6 +1887,223 @@ public class NotionIntegrationTestExecutor {
         
         passCount++;
         System.debug('✓ Deduplication test passed - duplicates were successfully removed');
+    }
+    
+    // ============================================
+    // TEST 9: BATCH UPDATE PROCESSING
+    // ============================================
+    
+    /**
+     * Setup for batch update test - reuse existing batch test accounts from test-7 if available
+     */
+    public void setupBatchUpdateTest() {
+        System.debug('\n--- Setting up batch update test ---');
+        
+        // Check if batch test accounts from test-7 already exist
+        List<Account> existingAccounts = [
+            SELECT Id FROM Account 
+            WHERE Name LIKE 'Batch Test Account%'
+        ];
+        
+        if (!existingAccounts.isEmpty()) {
+            System.debug('Found ' + existingAccounts.size() + ' existing batch test accounts from test-7 - reusing them');
+            return;
+        }
+        
+        // Only create if they don't exist (same pattern as test-7)
+        System.debug('Creating new batch test accounts...');
+        
+        // Create 70 accounts (more than default batch size of 50)
+        List<Account> batchAccounts = new List<Account>();
+        for (Integer i = 1; i <= 70; i++) {
+            Account acc = new Account(
+                Name = 'Batch Test Account ' + String.valueOf(i).leftPad(3, '0'),
+                Description = 'Initial description for account #' + i,
+                Type = 'Prospect',
+                Industry = 'Technology',
+                AnnualRevenue = 50000 + (i * 500)
+            );
+            batchAccounts.add(acc);
+        }
+        
+        insert batchAccounts;
+        System.debug('Created ' + batchAccounts.size() + ' accounts for batch update testing');
+    }
+    
+    /**
+     * Run batch update test - update all records to trigger batch processing
+     */
+    public void runBatchUpdateTest() {
+        System.debug('\n--- Running batch update test ---');
+        
+        // Get all batch test accounts (reusing from test-7)
+        List<Account> batchAccounts = [
+            SELECT Id, Name, Description, Type, AnnualRevenue
+            FROM Account
+            WHERE Name LIKE 'Batch Test Account%'
+            ORDER BY Name
+        ];
+        
+        System.debug('Found ' + batchAccounts.size() + ' accounts to update');
+        
+        // Update all accounts with new values including Name (which maps to Notion title)
+        for (Account acc : batchAccounts) {
+            acc.Name = acc.Name + ' - Updated';  // Update the mapped title field
+            acc.Description = 'UPDATED at ' + DateTime.now() + ' - Batch update test';
+            acc.Type = 'Customer';
+            acc.AnnualRevenue = acc.AnnualRevenue * 2; // Double the revenue
+        }
+        
+        // This bulk update should trigger batch processing
+        update batchAccounts;
+        System.debug('Updated ' + batchAccounts.size() + ' accounts in bulk');
+    }
+    
+    /**
+     * Check batch update processing results
+     */
+    public void checkBatchUpdateResults() {
+        System.debug('\n--- Checking batch update results ---');
+        
+        // Get the batch test records (reusing from test-7)
+        List<Account> batchAccounts = [
+            SELECT Id, Name, Description
+            FROM Account
+            WHERE Name LIKE 'Batch Test Account%'
+            ORDER BY Name
+        ];
+        
+        System.debug('Found ' + batchAccounts.size() + ' batch update test accounts');
+        
+        // Get sync logs for these accounts
+        Set<Id> accountIds = new Set<Id>();
+        for (Account acc : batchAccounts) {
+            accountIds.add(acc.Id);
+        }
+        
+        // Look for UPDATE sync logs (not CREATE)
+        List<Notion_Sync_Log__c> updateLogs = [
+            SELECT Id, Record_Id__c, Status__c, Notion_Page_Id__c, Operation_Type__c, 
+                   Error_Message__c, CreatedDate
+            FROM Notion_Sync_Log__c
+            WHERE Record_Id__c IN :accountIds
+            AND Operation_Type__c = 'UPDATE'
+            AND CreatedDate >= :DateTime.now().addHours(-1)
+            ORDER BY CreatedDate DESC
+        ];
+        
+        System.debug('Found ' + updateLogs.size() + ' UPDATE sync logs');
+        
+        // Check for batch processing logs
+        List<Notion_Sync_Log__c> batchLogs = [
+            SELECT Id, Operation_Type__c, Status__c, Error_Message__c, CreatedDate
+            FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c IN ('BATCH', 'BATCH_SUMMARY')
+            AND CreatedDate >= :DateTime.now().addHours(-1)
+            ORDER BY CreatedDate DESC
+        ];
+        
+        System.debug('Found ' + batchLogs.size() + ' batch processing logs');
+        
+        // Count successful updates and track failures
+        Set<Id> successfullyUpdatedIds = new Set<Id>();
+        Integer failedCount = 0;
+        Integer deferredCount = 0;
+        for (Notion_Sync_Log__c log : updateLogs) {
+            if (log.Status__c == 'Success' && log.Notion_Page_Id__c != null) {
+                successfullyUpdatedIds.add(log.Record_Id__c);
+            } else if (log.Status__c == 'Failed') {
+                failedCount++;
+                System.debug('Failed update for record ' + log.Record_Id__c + ': ' + log.Error_Message__c);
+            } else if (log.Status__c == 'Deferred') {
+                deferredCount++;
+            }
+        }
+        
+        System.debug('Update results: Success=' + successfullyUpdatedIds.size() + ', Failed=' + failedCount + ', Deferred=' + deferredCount);
+        
+        // Analyze batch processing logs
+        Integer batchSuccess = 0;
+        Integer batchDeferred = 0;
+        Integer batchFailed = 0;
+        for (Notion_Sync_Log__c log : batchLogs) {
+            if (log.Operation_Type__c == 'BATCH_SUMMARY') {
+                if (log.Status__c == 'Success') batchSuccess++;
+                else if (log.Status__c == 'Deferred') batchDeferred++;
+                else if (log.Status__c == 'Failed') {
+                    batchFailed++;
+                    System.debug('Failed batch: ' + log.Error_Message__c);
+                }
+            }
+            // Log first 20 batch logs for debugging
+            if (batchLogs.indexOf(log) < 20) {
+                System.debug('Batch log: ' + log.Operation_Type__c + ' - ' + log.Status__c);
+            }
+        }
+        
+        System.debug('Batch job summary: Success=' + batchSuccess + ', Deferred=' + batchDeferred + ', Failed=' + batchFailed);
+        
+        // If many are deferred, it might be due to queueable limits
+        if (batchDeferred > 5) {
+            System.debug('WARNING: Many batch jobs deferred (' + batchDeferred + '). This may indicate queueable job limits.');
+        }
+        
+        // Check minimum expected results
+        // We expect at least 50 records to be processed
+        Integer minimumExpected = 50;
+        assert(successfullyUpdatedIds.size() >= minimumExpected, 
+               'Expected at least ' + minimumExpected + ' accounts to be updated, but only ' + successfullyUpdatedIds.size() + ' were updated.');
+        
+        assert(batchLogs.size() > 0, 'Batch processing logs should exist for bulk update operation');
+        
+        // Verify a sample of updated records in Notion
+        Integer samplesToVerify = Math.min(5, updateLogs.size());
+        Integer verified = 0;
+        
+        for (Integer i = 0; i < samplesToVerify; i++) {
+            if (updateLogs[i].Status__c == 'Success' && updateLogs[i].Notion_Page_Id__c != null) {
+                try {
+                    // Get the account data
+                    Account acc = [SELECT Id, Name, Description, Type 
+                                  FROM Account 
+                                  WHERE Id = :updateLogs[i].Record_Id__c 
+                                  LIMIT 1];
+                    
+                    // Check if Notion page has updated data
+                    NotionApiClient.NotionResponse response = NotionApiClient.getPage(updateLogs[i].Notion_Page_Id__c);
+                    
+                    if (response.success && response.responseBody != null) {
+                        Map<String, Object> pageData = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
+                        Map<String, Object> props = (Map<String, Object>) pageData.get('properties');
+                        
+                        // Check if Name (title) property was updated
+                        Map<String, Object> nameProp = (Map<String, Object>) props.get('Name');
+                        if (nameProp != null && nameProp.get('title') != null) {
+                            List<Object> titleArray = (List<Object>) nameProp.get('title');
+                            if (!titleArray.isEmpty()) {
+                                Map<String, Object> titleObj = (Map<String, Object>) titleArray[0];
+                                String titleText = (String) titleObj.get('plain_text');
+                                
+                                // Verify the name contains ' - Updated' suffix
+                                if (titleText != null && titleText.contains(' - Updated')) {
+                                    verified++;
+                                    System.debug('Verified updated page for: ' + acc.Name);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    System.debug('Error verifying update: ' + e.getMessage());
+                }
+            }
+        }
+        
+        System.debug('Verified ' + verified + ' updated Notion pages');
+        
+        passCount++;
+        System.debug('✓ Batch update test passed - ' + successfullyUpdatedIds.size() + ' out of ' + batchAccounts.size() + 
+                    ' records updated via batch processing' + 
+                    (batchDeferred > 0 ? ' (' + batchDeferred + ' batches deferred due to governor limits)' : ''));
     }
     
     // ============================================

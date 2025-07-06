@@ -36,11 +36,11 @@ This is a Salesforce-to-Notion synchronization tool that runs entirely within Sa
 4. **Data Transformer**: Converts Salesforce data to Notion format
 5. **Relationship Handler**: Manages cross-object relationships
 6. **Queueable Classes**:
-   - `NotionSyncQueueable`: Core worker that performs actual sync operations (API calls, data transformation)
-   - `NotionSyncBatchQueueable`: Orchestrator for large volumes - splits work into batches and chains jobs
-7. **Batch Processor**: `NotionSyncBatchProcessor` - Intelligently sizes batches based on governor limits
-8. **Rate Limiter**: `NotionRateLimiter` - Enforces 3 req/sec limit and monitors governor limits
-9. **Error Logger**: `NotionSyncLogger` - Tracks sync status and failures in custom object
+   - `NotionSyncQueueable`: Core worker with runtime limit checking and self-chaining capability
+   - `NotionDeduplicationQueueable`: Handles duplicate detection after sync completion
+7. **Rate Limiter**: `NotionRateLimiter` - Enforces 3 req/sec limit and monitors governor limits at runtime
+8. **Error Logger**: `NotionSyncLogger` - Tracks sync status and failures in custom object
+9. **Sync Processor**: `NotionSyncProcessor` - Handles individual record processing
 
 ## Development Commands
 
@@ -233,8 +233,8 @@ This is critical for integration tests - see the specific instructions in the "P
 )
 public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
     // Process each sync request
-    // For single records: use @future for immediate processing
-    // For bulk operations: use Queueable
+    // Use Queueable with runtime limit checking
+    // Queueable automatically chains when approaching governor limits
     // Maintains user context for Named Credential access
 }
 ```
@@ -250,31 +250,30 @@ public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
 
 ### Queueable Architecture
 
-The system uses two queueable classes for different purposes:
+The system uses a single queueable class with self-chaining capability:
 
 #### NotionSyncQueueable (Core Worker)
-- **Purpose**: Performs actual sync operations to Notion
+- **Purpose**: Performs sync operations with runtime governor limit checking
 - **Responsibilities**:
+  - Processes records individually (not in batches)
   - Makes API calls to create/update/delete Notion pages
   - Transforms Salesforce data to Notion format
   - Handles relationships between objects
-  - Manages individual sync requests
-- **Used by**: NotionSyncInvocable (for ≤50 records) and NotionSyncBatchQueueable
-
-#### NotionSyncBatchQueueable (Batch Orchestrator)
-- **Purpose**: Manages large volume processing
-- **Responsibilities**:
-  - Splits large record sets into manageable batches
-  - Chains multiple queueable jobs together
-  - Monitors governor limits between batches
-  - Ensures sync logs are flushed after each batch
-- **Used by**: NotionSyncInvocable (for >50 records)
+  - Monitors governor limits at runtime and chains when approaching thresholds
+  - Tracks all record IDs for deduplication after complete processing
+- **Processing Pattern**:
+  - Processes ~19 records per execution before hitting governor limits
+  - Automatically chains to process remaining records
+  - Triggers deduplication after all records are processed
 
 ```
-Flow Trigger → NotionSyncInvocable
-                ├─ Small volume (≤50) → NotionSyncQueueable
-                └─ Large volume (>50) → NotionSyncBatchQueueable
-                                         └─ Multiple NotionSyncQueueable calls
+Flow Trigger → NotionSyncInvocable → NotionSyncQueueable
+                                         ↓ (if more records)
+                                     NotionSyncQueueable (chained)
+                                         ↓ (if more records)
+                                     NotionSyncQueueable (chained)
+                                         ↓ (when complete)
+                                     NotionDeduplicationQueueable
 ```
 
 ## Architecture
@@ -309,15 +308,19 @@ Flow Trigger → NotionSyncInvocable
 1. Flow triggers on record create/update/delete
 2. Flow calls NotionSyncInvocable with record details
 3. Invocable method determines processing strategy:
-   - Single record: @future for immediate processing
-   - Bulk/Delete: Queueable for batch processing
-4. Processing maintains user context for Named Credential access
-5. Query Salesforce objects based on metadata configuration
-6. Transform data according to field mappings
-7. Handle relationships by creating/updating related records first
-8. Make API calls to create/update/delete Notion database pages
-9. Store Salesforce IDs in designated Notion properties for future sync
-10. Log success/failure in Notion_Sync_Log__c custom object
+   - Queueable with runtime limit checking
+4. For queueable processing:
+   - Processes records individually with governor limit monitoring
+   - When approaching limits (~19 records), chains to next queueable
+   - Continues until all records are processed
+5. Processing maintains user context for Named Credential access
+6. Query Salesforce objects based on metadata configuration
+7. Transform data according to field mappings
+8. Handle relationships by creating/updating related records first
+9. Make API calls to create/update/delete Notion database pages
+10. Store Salesforce IDs in designated Notion properties for future sync
+11. Log success/failure in Notion_Sync_Log__c custom object
+12. After all records complete, run deduplication for CREATE/UPDATE operations
 
 ### API Integration
 - **Named Credentials**: Store Notion API authentication
@@ -341,16 +344,17 @@ Flow Trigger → NotionSyncInvocable
 - **Retry_Count__c**: Number of retry attempts
 - **Created_Date__c**: Timestamp of sync attempt
 
-### Current Limitations
+### Current Implementation Features
 
-**Important**: The current implementation is optimized for real-time, event-driven sync of individual records or small batches. It has the following limitations for large data volumes:
+**Important**: The implementation uses runtime governor limit checking to handle any volume of records:
 
-- **Maximum Records per Sync**: ~30-40 records (due to API callout limits)
-- **No Batch Processing**: All records processed in single transaction
-- **No Retry Mechanism**: Despite the Retry_Count__c field, automatic retries are not yet implemented
-- **Memory Constraints**: All data held in memory simultaneously
+- **Runtime Processing**: Records are processed individually with governor limit checks
+- **Automatic Chaining**: When approaching limits (~19 records), automatically chains to next queueable
+- **Complete Processing**: All records eventually processed through the queueable chain
+- **Deduplication**: After all records complete, deduplication runs for CREATE/UPDATE operations
+- **No Pre-Batching**: No need to divide records into batches - system handles this automatically
 
-For large data sync architecture and planned improvements, see [docs/LARGE_DATA_SYNC.md](docs/LARGE_DATA_SYNC.md).
+For additional details on handling large data volumes, see [docs/LARGE_DATA_SYNC.md](docs/LARGE_DATA_SYNC.md).
 
 ### Documentation
 

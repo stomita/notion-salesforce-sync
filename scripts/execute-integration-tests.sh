@@ -85,6 +85,9 @@ run_test "test-7-batch.sh"
 echo
 run_test "test-8-deduplication.sh"
 
+echo
+run_test "test-9-batch-update.sh"
+
 # Overall summary
 echo
 echo "=================================="

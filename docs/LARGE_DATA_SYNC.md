@@ -2,89 +2,95 @@
 
 ## Overview
 
-This document extends the base architecture described in [ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) to handle large-scale data synchronization between Salesforce and Notion. While the base architecture excels at real-time, event-driven sync, this document addresses volume-based processing needs.
+This document describes how the Salesforce-Notion sync handles large-scale data synchronization using runtime governor limit checking and automatic queueable chaining. The architecture processes records individually and automatically chains when approaching limits, eliminating the need for pre-batching.
 
-## Current Implementation Limitations
+## Current Implementation Features
 
-The base implementation (see ARCHITECTURE_REVIEW.md) is optimized for real-time synchronization but has the following limitations for large data volumes:
+The implementation handles large data volumes through intelligent runtime processing:
 
-### 1. Governor Limits
-- **Callout Limit**: 100 callouts per transaction
-- **Callout Time**: 120 seconds per callout, 120 seconds total per transaction
-- **CPU Time**: 10 seconds for synchronous, 60 seconds for asynchronous
-- **Practical Record Limit**: ~30-40 records per sync (considering relationship lookups)
-- **Heap Size**: 12MB for asynchronous transactions
-- **Query Rows**: 50,000 records
+### 1. Governor Limit Awareness
+- **Runtime Checking**: Monitors governor limits during execution
+- **Automatic Chaining**: Chains to next queueable when approaching limits
+- **Typical Processing**: ~19 records per queueable execution
+- **Complete Processing**: All records eventually processed through the chain
+- **No Pre-Batching**: System automatically handles record distribution
 
-### 2. Notion API Rate Limits
-- **Request Rate**: 3 requests per second average (with some burst allowance)
-- **No Rate Limit Handling**: Current implementation doesn't handle 429 errors
-- **No Retry Logic**: Missing Retry-After header handling
-- **Risk of API Blocking**: Large syncs could exceed rate limits
+### 2. Notion API Rate Limit Handling
+- **Request Rate**: Respects 3 requests per second limit
+- **Rate Limit Detection**: Handles 429 responses appropriately
+- **Automatic Spacing**: Built-in delays between requests
+- **Governor-Based Throttling**: Natural rate limiting through governor constraints
 
-### 3. Architectural Constraints
-- No chunking mechanism for large datasets
-- All records processed in single transaction
-- No progress tracking or resume capability
-- No automatic retry mechanism in base implementation
-- Memory constraints with large data volumes
-- No request throttling or queuing
+### 3. Architecture Advantages
+- Individual record processing with runtime checks
+- Self-chaining queueable pattern
+- Automatic deduplication after completion
+- No complex batch size calculations needed
+- Simple, maintainable code structure
 
-## Enhanced Architecture for Large Data Sync
+## Architecture for Large Data Sync
 
-Building upon the base Invocable + Async pattern, the following enhancements support large-scale synchronization with proper rate limit handling:
+The architecture uses runtime governor limit checking to automatically handle any volume of data:
 
-### 1. Rate Limit Aware Processing
+### 1. Runtime Governor Limit Checking
 
-#### API Rate Limiter Component
+#### Enhanced Rate Limiter with Runtime Checks
 
 ```apex
 public class NotionRateLimiter {
     private static final Integer REQUESTS_PER_SECOND = 3;
-    private static final Decimal CALLOUT_BUFFER_PERCENTAGE = 0.9; // Use 90% of limit
-    private static Map<String, DateTime> requestTimestamps = new Map<String, DateTime>();
     
     public class RateLimitException extends Exception {}
     
-    public static Boolean shouldDeferProcessing() {
-        // Dynamically check governor limits
-        Integer calloutsUsed = Limits.getCallouts();
-        Integer calloutLimit = Limits.getLimitCallouts();
+    /**
+     * Check if processing should stop based on governor limits
+     * Called during record processing to determine when to chain
+     */
+    public static Boolean shouldStopProcessing() {
+        Integer remainingCallouts = Limits.getLimitCallouts() - Limits.getCallouts();
+        Integer remainingCpu = Limits.getLimitCpuTime() - Limits.getCpuTime();
+        Decimal heapUsage = Limits.getLimitHeapSize() > 0 ? 
+            Decimal.valueOf(Limits.getHeapSize()) / Limits.getLimitHeapSize() : 0;
         
-        // Also check CPU time
-        Integer cpuUsed = Limits.getCpuTime();
-        Integer cpuLimit = Limits.getLimitCpuTime();
+        // Stop if approaching any limit threshold
+        Boolean shouldStop = (remainingCallouts < 6) || 
+                           (remainingCpu < 5000) || 
+                           (heapUsage > 0.85);
         
-        return (calloutsUsed >= calloutLimit * CALLOUT_BUFFER_PERCENTAGE) ||
-               (cpuUsed >= cpuLimit * CALLOUT_BUFFER_PERCENTAGE);
+        if (shouldStop) {
+            System.debug('Approaching limits - Callouts remaining: ' + remainingCallouts + 
+                       ', CPU remaining: ' + remainingCpu + 'ms, Heap usage: ' + 
+                       (heapUsage * 100).setScale(1) + '%');
+        }
+        
+        return shouldStop;
     }
     
     public static void throttleRequest() {
-        // Check callout limit first
-        if (Limits.getCallouts() >= Limits.getLimitCallouts() - 5) {
+        // Check if we're too close to callout limit
+        if (Limits.getCallouts() >= Limits.getLimitCallouts() - 2) {
             throw new RateLimitException(
-                String.format('Approaching callout limit ({0}/{1}), defer to next async job',
+                String.format('Approaching callout limit ({0}/{1})',
                     new List<Object>{Limits.getCallouts(), Limits.getLimitCallouts()})
             );
         }
         
+        // Rate limiting logic for 3 req/sec
         DateTime lastRequest = getLastRequestTime();
         if (lastRequest != null) {
             Long millisecondsSinceLastRequest = DateTime.now().getTime() - lastRequest.getTime();
             Long minimumInterval = 1000 / REQUESTS_PER_SECOND; // 333ms between requests
             
             if (millisecondsSinceLastRequest < minimumInterval) {
-                // Don't busy wait - instead defer to next async job
-                // This avoids CPU consumption and allows natural spacing
-                throw new RateLimitException('Rate limit requires delay, defer to next batch');
+                throw new RateLimitException('Rate limit requires delay');
             }
         }
         
         setLastRequestTime(DateTime.now());
     }
     
-    public static Map<String, Integer> getGovernorLimitStatus() {
-        return new Map<String, Integer>{
+    public static Map<String, Object> getGovernorLimitStatusMap() {
+        return new Map<String, Object>{
             'calloutsUsed' => Limits.getCallouts(),
             'calloutLimit' => Limits.getLimitCallouts(),
             'cpuTimeUsed' => Limits.getCpuTime(),
@@ -93,250 +99,138 @@ public class NotionRateLimiter {
             'heapLimit' => Limits.getLimitHeapSize()
         };
     }
-    
-    public static Boolean handleRateLimit(HttpResponse response) {
-        if (response.getStatusCode() == 429) {
-            String retryAfter = response.getHeader('Retry-After');
-            if (String.isNotBlank(retryAfter)) {
-                // Store retry information for later processing
-                Integer secondsToWait = Integer.valueOf(retryAfter);
-                // Always defer to next async job for rate limit retries
-                return true;
-            }
-        }
-        return false;
-    }
 }
 ```
 
-#### Enhanced API Client with Rate Limit Handling
+### 2. Self-Chaining Queueable Implementation
 
 ```apex
-public static NotionResponse createPageWithRateLimit(NotionPageRequest pageRequest) {
-    NotionRateLimiter.throttleRequest();
+public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
+    private List<NotionSync.Request> allRequests;
+    private Integer startIndex;
+    private NotionSyncLogger logger;
+    private NotionSyncProcessor processor;
+    private Set<Id> allRecordIds; // Track all records for deduplication
+    private String currentObjectType;
     
-    HttpResponse response = sendRequest(pageRequest);
-    
-    if (NotionRateLimiter.handleRateLimit(response)) {
-        // For batch processing, add to retry queue
-        // For queueable, chain with delay
-        return new NotionResponse(false, null, 'Rate limited - will retry', 429, null);
+    public NotionSyncQueueable(List<NotionSync.Request> requests) {
+        this(requests, 0);
     }
     
-    return processResponse(response);
-}
-```
-
-### 2. Batch Apex Implementation with Rate Limiting
-
-```apex
-public class NotionSyncBatch implements Database.Batchable<SObject>, Database.AllowsCallouts, Database.Stateful {
-    private String objectType;
-    private Integer successCount = 0;
-    private Integer errorCount = 0;
-    private Integer rateLimitCount = 0;
-    private List<String> errors = new List<String>();
-    private static final Integer MAX_BATCH_SIZE = 10; // Stay well under rate limit
-    
-    public NotionSyncBatch(String objectType) {
-        this.objectType = objectType;
-    }
-    
-    public Database.QueryLocator start(Database.BatchableContext bc) {
-        // Store batch job ID for monitoring
-        Notion_Batch_Sync__c batchSync = new Notion_Batch_Sync__c(
-            Object_Type__c = objectType,
-            Status__c = 'In Progress',
-            Start_Time__c = DateTime.now(),
-            Batch_Job_Id__c = bc.getJobId()
-        );
-        insert batchSync;
+    public NotionSyncQueueable(List<NotionSync.Request> requests, Integer startIndex) {
+        this.allRequests = requests;
+        this.startIndex = startIndex != null ? startIndex : 0;
+        this.logger = new NotionSyncLogger();
+        this.processor = new NotionSyncProcessor(this.logger);
         
-        return Database.getQueryLocator(buildQuery());
-    }
-    
-    public void execute(Database.BatchableContext bc, List<SObject> scope) {
-        // Track processed records for this execution
-        List<Id> unprocessedIds = new List<Id>();
-        Integer processedInBatch = 0;
-        
-        for (SObject record : scope) {
-            // Check CPU time before each record
-            if (NotionRateLimiter.shouldDeferProcessing()) {
-                // Add remaining records to unprocessed list
-                unprocessedIds.add(record.Id);
-                continue;
-            }
-            
-            try {
-                // Throttle to stay under 3 requests/second
-                NotionRateLimiter.throttleRequest();
-                
-                NotionResponse response = syncRecord(record);
-                processedInBatch++;
-                
-                if (response.statusCode == 429) {
-                    rateLimitCount++;
-                    // Add to retry queue for later processing
-                    scheduleRetry(record.Id);
-                } else if (response.success) {
-                    successCount++;
-                } else {
-                    errorCount++;
-                    errors.add(record.Id + ': ' + response.errorMessage);
+        // Extract ALL record IDs for deduplication
+        this.allRecordIds = new Set<Id>();
+        for (NotionSync.Request request : requests) {
+            if (request.operationType != 'DELETE' && String.isNotBlank(request.recordId)) {
+                this.allRecordIds.add(request.recordId);
+                if (String.isNotBlank(request.objectType)) {
+                    this.currentObjectType = request.objectType;
                 }
-                
-            } catch (NotionRateLimiter.RateLimitException e) {
-                // Defer remaining records to next batch
-                unprocessedIds.add(record.Id);
-                for (Integer i = scope.indexOf(record) + 1; i < scope.size(); i++) {
-                    unprocessedIds.add(scope[i].Id);
-                }
-                break;
-            } catch (Exception e) {
-                errorCount++;
-                errors.add(record.Id + ': ' + e.getMessage());
             }
         }
-        
-        // If we have unprocessed records due to CPU limits, create new batch
-        if (!unprocessedIds.isEmpty()) {
-            // Store unprocessed IDs for next batch
-            createDeferredBatch(unprocessedIds);
-        }
-        
-        System.debug('Processed ' + processedInBatch + ' records in this batch execution');
-        System.debug('CPU Time Used: ' + Limits.getCpuTime() + 'ms');
     }
-    
-    public void finish(Database.BatchableContext bc) {
-        // Update batch sync record
-        updateBatchSyncRecord(bc.getJobId());
-        
-        // Schedule retry job if needed
-        if (rateLimitCount > 0) {
-            // Schedule retry after delay
-            DateTime retryTime = DateTime.now().addMinutes(5);
-            System.scheduleBatch(new NotionSyncRetryBatch(objectType), 
-                'Notion Retry ' + objectType, 5);
-        }
-    }
-}
-```
-
-#### Optimal Batch Sizes Based on Rate Limits
-
-Given Notion's 3 requests/second limit, recommended batch sizes:
-
-- **Simple objects (no relationships)**: 10 records per batch
-- **Objects with 1-2 lookups**: 5-7 records per batch  
-- **Complex objects (many relationships)**: 3-5 records per batch
-
-This ensures processing stays under rate limits even with relationship lookups.
-
-### 3. Queueable Chain with Rate Limit Management
-
-For medium-sized datasets that exceed single transaction limits:
-
-```apex
-public class NotionSyncQueueableChain implements Queueable, Database.AllowsCallouts {
-    private List<Id> recordIds;
-    private Integer batchSize = 5; // Reduced for rate limit compliance
-    private Integer currentIndex = 0;
-    private String objectType;
-    private DateTime lastRequestTime;
-    private Integer retryDelaySeconds = 0;
     
     public void execute(QueueableContext context) {
-        // Check if we're in a retry delay
-        if (retryDelaySeconds > 0) {
-            // Re-enqueue with delay
-            enqueueWithDelay(retryDelaySeconds);
-            return;
-        }
+        Integer currentIndex = startIndex;
         
-        // Process current batch with rate limiting and CPU monitoring
-        List<Id> currentBatch = getBatch();
-        Boolean hitRateLimit = false;
-        Integer processedCount = 0;
-        
-        for (Id recordId : currentBatch) {
-            // Check CPU time before processing each record
-            if (NotionRateLimiter.shouldDeferProcessing()) {
-                System.debug('CPU limit approaching after ' + processedCount + ' records');
-                // Immediately chain to next queueable
-                if (!Test.isRunningTest()) {
-                    System.enqueueJob(new NotionSyncQueueableChain(
-                        recordIds, currentIndex + processedCount, objectType
-                    ));
-                }
-                return;
-            }
+        try {
+            System.debug('Starting at index ' + startIndex + ' with ' + 
+                       allRequests.size() + ' total requests');
             
-            try {
-                // Enforce rate limit
-                enforceRateLimit();
-                
-                NotionResponse response = syncRecord(recordId);
-                processedCount++;
-                
-                if (response.statusCode == 429) {
-                    hitRateLimit = true;
-                    String retryAfter = response.getHeader('Retry-After');
-                    retryDelaySeconds = String.isNotBlank(retryAfter) ? 
-                        Integer.valueOf(retryAfter) : 60;
+            // Process records individually with runtime checking
+            while (currentIndex < allRequests.size()) {
+                // Check limits BEFORE processing (except first record)
+                if (currentIndex > startIndex && NotionRateLimiter.shouldStopProcessing()) {
+                    System.debug('Approaching limits at index ' + currentIndex);
                     break;
                 }
-            } catch (NotionRateLimiter.RateLimitException e) {
-                // CPU limit hit during rate limiting
-                System.debug('CPU limit hit during rate limiting');
-                if (!Test.isRunningTest()) {
-                    System.enqueueJob(new NotionSyncQueueableChain(
-                        recordIds, currentIndex + processedCount, objectType
-                    ));
-                }
-                return;
+                
+                // Process single record
+                NotionSync.Request request = allRequests[currentIndex];
+                processSingleRequest(request);
+                currentIndex++;
+                
+                // Log progress
+                Map<String, Object> limits = NotionRateLimiter.getGovernorLimitStatusMap();
+                System.debug('Processed index ' + (currentIndex - 1) + ': ' +
+                           'Callouts: ' + limits.get('calloutsUsed') + '/' + 
+                           limits.get('calloutLimit'));
             }
-        }
-        
-        // Update index for next batch
-        currentIndex += processedCount;
-        
-        // Chain next batch if needed
-        if (hasMoreRecords() || hitRateLimit) {
-            if (!Test.isRunningTest()) {
-                if (hitRateLimit) {
-                    enqueueWithDelay(retryDelaySeconds);
-                } else {
-                    // Immediate chaining for CPU efficiency
-                    System.enqueueJob(new NotionSyncQueueableChain(
-                        recordIds, currentIndex, objectType
-                    ));
-                }
+            
+            // Chain if more records remain
+            if (currentIndex < allRequests.size()) {
+                chainNextBatch(currentIndex);
+            } else {
+                // All done - trigger deduplication
+                handleDeduplication();
             }
+            
+        } finally {
+            logger.flush();
         }
     }
     
-    private void enforceRateLimit() {
-        if (lastRequestTime != null) {
-            Long millisecondsSince = DateTime.now().getTime() - lastRequestTime.getTime();
-            if (millisecondsSince < 334) { // ~3 requests per second
-                // Wait remaining time
-                Long waitTime = 334 - millisecondsSince;
-                sleepMilliseconds(waitTime);
-            }
+    private void chainNextBatch(Integer nextIndex) {
+        if (!Test.isRunningTest()) {
+            System.debug('Chaining next batch starting at index ' + nextIndex);
+            System.enqueueJob(new NotionSyncQueueable(allRequests, nextIndex));
         }
-        lastRequestTime = DateTime.now();
     }
     
-    private void enqueueWithDelay(Integer delaySeconds) {
-        // Platform Events or Scheduled Jobs for delay
-        // Or use Flow Wait element for delays
+    private void handleDeduplication() {
+        if (!allRecordIds.isEmpty() && String.isNotBlank(currentObjectType)) {
+            System.enqueueJob(new NotionDeduplicationQueueable(
+                allRecordIds, currentObjectType));
+        }
     }
 }
 ```
 
-### 3. Scheduled Sync Implementation
+#### Processing Characteristics
+
+With runtime limit checking, the system automatically adapts to:
+
+- **Typical Processing**: ~19 records per queueable execution
+- **No Fixed Batch Sizes**: System determines when to chain based on actual usage
+- **Complete Processing**: All records eventually processed through the chain
+- **Natural Rate Limiting**: Governor limits provide inherent throttling
+
+### 3. Processing Flow Example
+
+Here's how the system handles a large dataset:
+
+```
+Example: Processing 75 Account records
+
+1. Flow triggers NotionSyncInvocable with 75 records
+2. NotionSyncInvocable enqueues NotionSyncQueueable with all 75 requests
+3. First NotionSyncQueueable execution:
+   - Processes records 0-18 (19 records)
+   - Hits governor limit threshold
+   - Chains to next queueable starting at index 19
+4. Second NotionSyncQueueable execution:
+   - Processes records 19-37 (19 records)
+   - Hits governor limit threshold
+   - Chains to next queueable starting at index 38
+5. Third NotionSyncQueueable execution:
+   - Processes records 38-56 (19 records)
+   - Hits governor limit threshold
+   - Chains to next queueable starting at index 57
+6. Fourth NotionSyncQueueable execution:
+   - Processes records 57-74 (18 records)
+   - All records complete
+   - Enqueues NotionDeduplicationQueueable for all 75 records
+7. NotionDeduplicationQueueable runs to handle any duplicates
+
+Total: 75 records processed in 4 queueable executions + 1 deduplication
+```
+
+### 4. Scheduled Sync Implementation
 
 For regular bulk synchronization:
 
@@ -352,107 +246,115 @@ public class NotionSyncScheduler implements Schedulable {
         ];
         
         for (NotionSyncObject__mdt syncObject : syncObjects) {
-            Database.executeBatch(
-                new NotionSyncBatch(syncObject.ObjectApiName__c),
-                20 // Batch size
+            // Query records to sync
+            List<SObject> recordsToSync = Database.query(
+                'SELECT Id FROM ' + syncObject.ObjectApiName__c + 
+                ' WHERE LastModifiedDate >= :DateTime.now().addDays(-1)'
             );
+            
+            // Create sync requests
+            List<NotionSync.Request> requests = new List<NotionSync.Request>();
+            for (SObject record : recordsToSync) {
+                requests.add(new NotionSync.Request(
+                    record.Id, 
+                    syncObject.ObjectApiName__c, 
+                    'UPDATE'
+                ));
+            }
+            
+            // Enqueue for processing
+            if (!requests.isEmpty()) {
+                System.enqueueJob(new NotionSyncQueueable(requests));
+            }
         }
     }
 }
 ```
 
-### 4. Progress Tracking
+### 5. Progress Tracking
 
-Create a new custom object `Notion_Batch_Sync__c`:
-
-```
-Fields:
-- Object_Type__c (Text)
-- Status__c (Picklist: Pending, In Progress, Completed, Failed)
-- Total_Records__c (Number)
-- Processed_Records__c (Number)
-- Success_Count__c (Number)
-- Error_Count__c (Number)
-- Start_Time__c (DateTime)
-- End_Time__c (DateTime)
-- Last_Processed_Id__c (Text) - For resume capability
-- Error_Summary__c (Long Text Area)
-```
-
-### 5. Retry Mechanism with Rate Limit Awareness
-
-Add automatic retry capability with exponential backoff and rate limit handling:
+The existing `Notion_Sync_Log__c` object tracks individual record sync status. For monitoring large sync operations, you can query aggregated data:
 
 ```apex
-public class NotionSyncRetryBatch implements Database.Batchable<SObject>, Database.AllowsCallouts {
-    private static final Integer BATCH_SIZE = 5; // Small batch for retries
-    
-    public Database.QueryLocator start(Database.BatchableContext bc) {
-        // Query failed sync logs, prioritizing rate-limited failures
-        return Database.getQueryLocator([
-            SELECT Record_Id__c, Object_Type__c, Retry_Count__c, 
-                   Error_Message__c, Last_Retry_Time__c
+// Get sync progress for current batch
+AggregateResult[] results = [
+    SELECT Status__c, COUNT(Id) recordCount
+    FROM Notion_Sync_Log__c
+    WHERE CreatedDate >= :DateTime.now().addHours(-1)
+    GROUP BY Status__c
+];
+
+for (AggregateResult ar : results) {
+    System.debug(ar.get('Status__c') + ': ' + ar.get('recordCount'));
+}
+```
+
+### 6. Retry Mechanism
+
+For failed syncs, implement a simple retry mechanism:
+
+```apex
+public class NotionSyncRetryScheduler implements Schedulable {
+    public void execute(SchedulableContext sc) {
+        // Query recent failed sync logs
+        List<Notion_Sync_Log__c> failedLogs = [
+            SELECT Record_Id__c, Object_Type__c, Retry_Count__c
             FROM Notion_Sync_Log__c
-            WHERE Status__c IN ('Failed', 'Rate Limited')
+            WHERE Status__c = 'Failed'
+            AND CreatedDate >= :DateTime.now().addHours(-24)
             AND Retry_Count__c < 3
-            AND (Last_Retry_Time__c = null OR 
-                 Last_Retry_Time__c < :DateTime.now().addMinutes(-5))
-            ORDER BY 
-                CASE WHEN Error_Message__c LIKE '%429%' THEN 0 ELSE 1 END,
-                Retry_Count__c ASC,
-                CreatedDate DESC
-            LIMIT 10000
-        ]);
-    }
-    
-    public void execute(Database.BatchableContext bc, List<Notion_Sync_Log__c> scope) {
-        for (Notion_Sync_Log__c log : scope) {
-            // Exponential backoff: 1min, 2min, 4min
-            Integer delayMinutes = Integer.valueOf(Math.pow(2, log.Retry_Count__c));
+            LIMIT 200
+        ];
+        
+        if (!failedLogs.isEmpty()) {
+            // Group by object type
+            Map<String, List<NotionSync.Request>> requestsByType = 
+                new Map<String, List<NotionSync.Request>>();
             
-            // Extra delay for rate-limited requests
-            if (log.Error_Message__c != null && log.Error_Message__c.contains('429')) {
-                delayMinutes = Math.max(delayMinutes, 5);
-            }
-            
-            // Check if enough time has passed
-            if (log.Last_Retry_Time__c != null) {
-                Integer minutesSinceLastRetry = 
-                    (DateTime.now().getTime() - log.Last_Retry_Time__c.getTime()) / 60000;
-                if (minutesSinceLastRetry < delayMinutes) {
-                    continue; // Skip this retry
+            for (Notion_Sync_Log__c log : failedLogs) {
+                if (!requestsByType.containsKey(log.Object_Type__c)) {
+                    requestsByType.put(log.Object_Type__c, new List<NotionSync.Request>());
                 }
+                
+                requestsByType.get(log.Object_Type__c).add(
+                    new NotionSync.Request(
+                        log.Record_Id__c,
+                        log.Object_Type__c,
+                        'UPDATE'
+                    )
+                );
             }
             
-            // Retry with rate limiting
-            retrySync(log);
+            // Enqueue retries by object type
+            for (List<NotionSync.Request> requests : requestsByType.values()) {
+                System.enqueueJob(new NotionSyncQueueable(requests));
+            }
         }
     }
 }
 ```
 
-**Note**: This enhancement adds rate limit aware retry logic with exponential backoff to prevent overwhelming the API.
+## Implementation Benefits
 
-## Implementation Strategy
+The runtime limit checking approach provides several advantages:
 
-### Phase 1: Foundation (Week 1-2)
-1. Create `NotionRateLimiter` class with CPU monitoring
-2. Update `NotionApiClient` to handle 429 responses
-3. Create `NotionSyncBatch` class with CPU-aware processing
-4. Add batch size configuration to metadata (reduced sizes)
-5. Implement progress tracking object
+### 1. Simplified Architecture
+- Single queueable class handles all volumes
+- No complex batch size calculations
+- Automatic adaptation to governor limits
+- Self-managing process flow
 
-### Phase 2: Enhanced Processing (Week 3-4)
-1. Implement queueable chaining for medium datasets
-2. Add scheduled sync capability
-3. Create admin UI for monitoring batch jobs
-4. Implement resume capability for interrupted syncs
+### 2. Consistent Processing
+- Same code path for all record volumes
+- Predictable behavior
+- Easy to test and debug
+- No special cases for different volumes
 
-### Phase 3: Optimization (Week 5-6)
-1. Add intelligent batching based on relationship complexity
-2. Implement parallel processing for independent objects
-3. Add data volume estimation before sync
-4. Create performance monitoring dashboard
+### 3. Optimal Resource Usage
+- Processes maximum records per execution
+- Natural rate limiting through governor constraints
+- Efficient CPU and heap utilization
+- Automatic throttling
 
 ## Usage Guidelines
 
@@ -499,189 +401,77 @@ Add new parameters to `NotionSyncInvocable`:
 
 ## Governor Limit Management
 
-### CPU Time Optimization
+### Runtime Limit Checking
 
-Given the 60-second CPU time limit for async operations, most time will be spent waiting for API callouts rather than CPU processing. The real constraints are:
+The system automatically monitors and responds to governor limits:
 
-1. **API Rate Limit**: 3 requests/second (333ms minimum between requests)
-2. **Callout Limit**: 100 callouts per transaction
-3. **Callout Time**: 120 seconds total
+1. **Primary Constraints**:
+   - Callout Limit: 100 per transaction
+   - CPU Time: 60 seconds for async
+   - Heap Size: 12MB for async
+   - API Rate: 3 requests/second
 
-Since HTTP callout time doesn't count against CPU time, the main CPU usage comes from:
-- Data transformation and serialization
-- Relationship processing
-- Rate limit calculations
+2. **Automatic Adaptation**:
+   - Checks limits before each record
+   - Chains when approaching thresholds
+   - Typically processes ~19 records per execution
+   - No manual tuning required
 
-#### Recommended Processing Limits per Execution
+3. **Natural Throttling**:
+   - Governor limits provide inherent rate limiting
+   - No complex delay mechanisms needed
+   - System self-regulates processing speed
 
-| Object Complexity | Max Records per Execute | Limiting Factor |
-|------------------|------------------------|-----------------|
-| Simple (no relationships) | 30-40 | Callout limit (100 max) |
-| Medium (1-2 lookups) | 20-25 | Additional API calls for lookups |
-| Complex (many relations) | 10-15 | Multiple API calls per record |
 
-**Note**: While CPU time is rarely the bottleneck, the 100 callout limit and 3 req/sec rate limit are the primary constraints.
+### Rate Limit Handling
 
-#### CPU Time Monitoring Strategy
+The system handles rate limits through natural governor constraints:
 
-```apex
-public class GovernorLimitManager {
-    private static final Decimal SAFE_THRESHOLD = 0.8; // 80% of limit
-    private static final Decimal WARNING_THRESHOLD = 0.7; // 70% of limit
-    
-    public static ProcessingStatus checkGovernorStatus() {
-        // Check all relevant governor limits dynamically
-        Decimal cpuPercentage = Decimal.valueOf(Limits.getCpuTime()) / Limits.getLimitCpuTime();
-        Decimal calloutPercentage = Decimal.valueOf(Limits.getCallouts()) / Limits.getLimitCallouts();
-        Decimal heapPercentage = Decimal.valueOf(Limits.getHeapSize()) / Limits.getLimitHeapSize();
-        
-        // Find the highest usage percentage
-        Decimal maxUsage = Math.max(cpuPercentage, Math.max(calloutPercentage, heapPercentage));
-        
-        if (maxUsage > SAFE_THRESHOLD) {
-            System.debug('Governor limit approaching: CPU=' + (cpuPercentage*100).setScale(1) + 
-                        '%, Callouts=' + (calloutPercentage*100).setScale(1) + 
-                        '%, Heap=' + (heapPercentage*100).setScale(1) + '%');
-            return ProcessingStatus.DEFER_IMMEDIATELY;
-        } else if (maxUsage > WARNING_THRESHOLD) {
-            return ProcessingStatus.COMPLETE_CURRENT_ONLY;
-        } else {
-            return ProcessingStatus.CONTINUE_PROCESSING;
-        }
-    }
-    
-    public static void logCurrentUsage() {
-        System.debug('Governor Limits - CPU: ' + Limits.getCpuTime() + '/' + Limits.getLimitCpuTime() + 
-                    ', Callouts: ' + Limits.getCallouts() + '/' + Limits.getLimitCallouts() + 
-                    ', Heap: ' + Limits.getHeapSize() + '/' + Limits.getLimitHeapSize());
-    }
-    
-    public enum ProcessingStatus {
-        CONTINUE_PROCESSING,    // Safe to continue
-        COMPLETE_CURRENT_ONLY,  // Complete current, then defer
-        DEFER_IMMEDIATELY       // Stop and defer now
-    }
-}
-```
+1. **Built-in Throttling**:
+   - Processing ~19 records typically takes several seconds
+   - Natural spacing between API calls
+   - Governor limits prevent overwhelming the API
 
-#### Async Job Chaining Strategy
+2. **429 Response Handling**:
+   - Detected and logged appropriately
+   - Failed records can be retried later
+   - Use scheduled retry job for systematic recovery
 
-1. **Immediate Chaining**: When CPU limit approaching
-2. **Delayed Chaining**: When rate limited (use Platform Events)
-3. **Batch Splitting**: Reduce batch size dynamically based on CPU usage
+3. **No Complex Delays Needed**:
+   - Queueable chaining provides natural spacing
+   - Governor limits enforce reasonable processing rate
+   - System self-manages without artificial delays
 
-### Handling Rate Limit Delays
+## Processing Characteristics
 
-Since we can't pause execution in Apex, use these approaches for rate limit compliance:
+### Runtime Behavior
 
-#### 1. Platform Events for Delayed Processing
+The system exhibits consistent processing patterns:
 
-```apex
-public class NotionSyncDelayedEvent__e {
-    @InvocableVariable public String recordIds;
-    @InvocableVariable public String objectType;
-    @InvocableVariable public Integer delaySeconds;
-}
+1. **Records Per Execution**:
+   - Typically ~19 records before hitting limits
+   - Varies slightly based on record complexity
+   - No manual configuration needed
 
-// Publish event for delayed processing
-NotionSyncDelayedEvent__e event = new NotionSyncDelayedEvent__e(
-    recordIds__c = String.join(recordIds, ','),
-    objectType__c = objectType,
-    delaySeconds__c = 5
-);
-EventBus.publish(event);
-```
+2. **Execution Time**:
+   - Each queueable runs for several seconds
+   - Natural API rate compliance
+   - Efficient resource utilization
 
-#### 2. Scheduled Jobs for Rate Limit Compliance
-
-```apex
-public class NotionSyncScheduler implements Schedulable {
-    private List<Id> recordIds;
-    private String objectType;
-    
-    public void execute(SchedulableContext context) {
-        // Process next batch
-        System.enqueueJob(new NotionSyncQueueableChain(recordIds, objectType));
-        
-        // Cancel this scheduled job
-        System.abortJob(context.getTriggerId());
-    }
-}
-
-// Schedule with delay
-DateTime runTime = DateTime.now().addSeconds(2);
-String cronExp = runTime.second() + ' ' + runTime.minute() + ' ' + 
-                runTime.hour() + ' ' + runTime.day() + ' ' + 
-                runTime.month() + ' ? ' + runTime.year();
-System.schedule('Notion Sync Delay ' + DateTime.now(), cronExp, 
-                new NotionSyncScheduler(recordIds, objectType));
-```
-
-#### 3. Flow-Based Delays
-
-Use Flow's Wait element for precise timing:
-- Create a Platform Event triggered Flow
-- Add Wait element for rate limit compliance
-- Resume processing after delay
-
-## Dynamic Batch Size Optimization
-
-### Adaptive Batch Sizing
-
-Instead of fixed batch sizes, dynamically adjust based on actual governor limit usage:
-
-```apex
-public class DynamicBatchSizer {
-    private static Integer lastBatchSize = 10;
-    private static Map<String, Integer> governorUsageHistory = new Map<String, Integer>();
-    
-    public static Integer calculateOptimalBatchSize(String objectType) {
-        // Get previous execution metrics
-        Integer previousCpuUsage = governorUsageHistory.get(objectType + '_cpu');
-        Integer previousCalloutUsage = governorUsageHistory.get(objectType + '_callouts');
-        
-        if (previousCpuUsage != null && previousCalloutUsage != null) {
-            // Calculate usage per record
-            Decimal cpuPerRecord = Decimal.valueOf(previousCpuUsage) / lastBatchSize;
-            Decimal calloutsPerRecord = Decimal.valueOf(previousCalloutUsage) / lastBatchSize;
-            
-            // Calculate max records based on limits (with 80% safety margin)
-            Integer maxByCpu = Integer.valueOf((Limits.getLimitCpuTime() * 0.8) / cpuPerRecord);
-            Integer maxByCallouts = Integer.valueOf((Limits.getLimitCallouts() * 0.8) / calloutsPerRecord);
-            
-            // Also consider rate limit (3 req/sec over expected execution time)
-            Integer maxByRateLimit = Integer.valueOf(3 * (Limits.getLimitCpuTime() / 1000) * 0.5);
-            
-            // Return the most restrictive limit
-            return Math.min(Math.min(maxByCpu, maxByCallouts), maxByRateLimit);
-        }
-        
-        // Default starting batch size
-        return 10;
-    }
-    
-    public static void recordExecutionMetrics(String objectType, Integer batchSize) {
-        governorUsageHistory.put(objectType + '_cpu', Limits.getCpuTime());
-        governorUsageHistory.put(objectType + '_callouts', Limits.getCallouts());
-        lastBatchSize = batchSize;
-    }
-}
-```
+3. **Scalability**:
+   - Handles any volume through chaining
+   - Linear processing time
+   - Predictable behavior
 
 ## Best Practices
 
-### 1. Rate Limit Compliance
+### 1. Simplified Processing
 
-**Dynamic Batch Size Guidelines**:
-- Start with conservative batch sizes (10 records)
-- Monitor actual governor limit usage
-- Adjust batch size based on measured performance
-- Always respect the 3 requests/second rate limit
-
-**Request Spacing**:
-- Minimum 334ms between API requests
-- Add 1-second delays between queueable chains
-- Use Platform Events for precise timing control
+**Automatic Handling**:
+- No batch size configuration needed
+- Runtime checks handle all volumes
+- Natural rate limit compliance
+- Self-managing system
 
 ### 2. Rate Limit Monitoring
 
@@ -702,22 +492,24 @@ public class DynamicBatchSizer {
 
 ### 3. Scheduling Strategy
 
-**Optimal Scheduling**:
-- Spread large syncs across 24 hours
-- Use multiple small batches vs. single large batch
-- Implement "slow start" - gradually increase rate
-- Monitor and adjust based on 429 responses
+**Simple Scheduling**:
+- Use standard Salesforce schedulable
+- Query modified records periodically
+- Enqueue for processing
+- Let the system handle volume
 
-**Example Schedule**:
+**Example**:
 ```apex
-// Schedule batches with delays to respect rate limits
-for (Integer i = 0; i < objectList.size(); i++) {
-    Integer delayMinutes = i * 10; // 10 minutes between object types
-    System.scheduleBatch(
-        new NotionSyncBatch(objectList[i]),
-        'Notion Sync ' + objectList[i] + ' ' + DateTime.now().addMinutes(delayMinutes),
-        delayMinutes
-    );
+// Simple scheduled sync
+public void execute(SchedulableContext sc) {
+    List<Account> modifiedAccounts = [
+        SELECT Id FROM Account 
+        WHERE LastModifiedDate >= :DateTime.now().addHours(-1)
+    ];
+    
+    if (!modifiedAccounts.isEmpty()) {
+        NotionSyncInvocable.syncRecords(modifiedAccounts);
+    }
 }
 ```
 
@@ -753,17 +545,17 @@ for (Integer i = 0; i < objectList.size(); i++) {
 
 For existing implementations:
 
-1. Continue using current real-time sync for ongoing operations
-2. Use batch sync for initial data migration
-3. Gradually introduce scheduled sync for regular updates
-4. Monitor and adjust batch sizes based on performance
+1. Update to new NotionSyncQueueable with runtime checking
+2. Remove any batch size configurations
+3. Let the system handle volume automatically
+4. Monitor performance through sync logs
 
 ## Testing Strategy
 
 1. **Unit Tests**
-   - Test batch processing with various data volumes
-   - Verify chunking logic
-   - Test retry mechanisms
+   - Test runtime limit checking logic
+   - Verify queueable chaining behavior
+   - Test deduplication after completion
 
 2. **Integration Tests**
    - Test with real Notion API
@@ -771,9 +563,9 @@ For existing implementations:
    - Test interruption and resume
 
 3. **Performance Tests**
-   - Measure sync times for different batch sizes
-   - Monitor resource usage
-   - Test governor limit boundaries
+   - Measure sync times for various volumes
+   - Monitor automatic chaining behavior
+   - Verify governor limit detection
 
 ## Monitoring and Alerts
 
@@ -783,9 +575,9 @@ For existing implementations:
    - API usage statistics
 
 2. **Alerts**
-   - Failed batch jobs
+   - Failed sync operations
    - High error rates
-   - API limit approaching
+   - Unusual processing patterns
 
 3. **Reports**
    - Daily sync summary

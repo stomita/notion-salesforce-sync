@@ -32,7 +32,7 @@ global with sharing class NotionSyncInvocable {
         try {
             // Always enqueue to separate the sync transaction from the Flow transaction
             // This prevents sync failures from affecting the Flow
-            System.enqueueJob(new NotionSyncBatchQueueable(requests));
+            System.enqueueJob(new NotionSyncQueueable(requests));
             
             // Return success for all
             for (NotionSync.Request request : requests) {
