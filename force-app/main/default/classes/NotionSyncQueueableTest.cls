@@ -222,10 +222,11 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify sync logs were created for all requests
+        // Verify sync logs were created for all requests (excluding batch summary logs)
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c, Object_Type__c, Operation_Type__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
         ];
         
         System.assertEquals(5, syncLogs.size(), 'Five sync logs should be created (3 accounts + 2 contacts)');
@@ -446,8 +447,12 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify all requests were processed
-        List<Notion_Sync_Log__c> syncLogs = [SELECT Id, Record_Id__c FROM Notion_Sync_Log__c];
+        // Verify all requests were processed (excluding batch summary logs)
+        List<Notion_Sync_Log__c> syncLogs = [
+            SELECT Id, Record_Id__c 
+            FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
+        ];
         System.assertEquals(testAccounts.size(), syncLogs.size(), 
                           'Sync logs should be created for all test accounts');
     }
@@ -553,6 +558,7 @@ private class NotionSyncQueueableTest {
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c, Object_Type__c, Status__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
             ORDER BY Object_Type__c
         ];
         
@@ -602,10 +608,11 @@ private class NotionSyncQueueableTest {
         
         Test.stopTest();
         
-        // Verify all records were processed
+        // Verify all records were processed (excluding batch summary logs)
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c, Object_Type__c, Status__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
             ORDER BY CreatedDate
         ];
         
@@ -681,6 +688,7 @@ private class NotionSyncQueueableTest {
         List<Notion_Sync_Log__c> syncLogs = [
             SELECT Record_Id__c
             FROM Notion_Sync_Log__c
+            WHERE Operation_Type__c != 'BATCH'
         ];
         
         // Should only process 2 records (index 1 and 2)
