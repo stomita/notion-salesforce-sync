@@ -465,6 +465,20 @@ public class NotionApiClient {
         };
     }
     
+    public static Map<String, Object> buildPhoneProperty(String value) {
+        // Notion accepts null to clear phone, but not empty string
+        return new Map<String, Object>{
+            'phone_number' => String.isBlank(value) ? null : value
+        };
+    }
+    
+    public static Map<String, Object> buildUrlProperty(String value) {
+        // Notion accepts null to clear URL, but not empty string
+        return new Map<String, Object>{
+            'url' => String.isBlank(value) ? null : value
+        };
+    }
+    
     public static Map<String, Object> buildMultiSelectProperty(List<String> values) {
         if (values == null || values.isEmpty()) {
             return new Map<String, Object>{
