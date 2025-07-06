@@ -101,4 +101,19 @@
         <field>Notion_Sync_Log__c.Event_Timestamp__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Duplicates_Found__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Duplicates_Deleted__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Notion_Sync_Log__c.Deduplication_Deferred__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 </PermissionSet>
