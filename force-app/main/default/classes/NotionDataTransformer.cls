@@ -56,7 +56,10 @@ public class NotionDataTransformer {
                                          propertyType == 'number' ||
                                          propertyType == 'select' ||
                                          propertyType == 'date' ||
-                                         propertyType == 'email';
+                                         propertyType == 'email' ||
+                                         propertyType == 'multi_select' ||
+                                         propertyType == 'phone_number' ||
+                                         propertyType == 'url';
                 
                 if (fieldValue == null && !supportsClearing) {
                     continue;
@@ -129,22 +132,33 @@ public class NotionDataTransformer {
                 }
             }
             when 'multi_select' {
+                System.debug('Multi-select field - fieldValue: ' + fieldValue + ', is null: ' + (fieldValue == null));
                 List<Map<String, Object>> multiSelectValues = new List<Map<String, Object>>();
-                String multiSelectString = String.valueOf(fieldValue);
                 
-                if (multiSelectString.contains(';')) {
-                    List<String> values = multiSelectString.split(';');
-                    for (String value : values) {
-                        multiSelectValues.add(new Map<String, Object>{
-                            'name' => value.trim()
-                        });
+                if (fieldValue != null && String.valueOf(fieldValue) != 'null') {
+                    String multiSelectString = String.valueOf(fieldValue);
+                    System.debug('Multi-select field - multiSelectString after String.valueOf: ' + multiSelectString);
+                    
+                    if (String.isNotBlank(multiSelectString)) {
+                        if (multiSelectString.contains(';')) {
+                            List<String> values = multiSelectString.split(';');
+                            for (String value : values) {
+                                String trimmedValue = value.trim();
+                                if (String.isNotBlank(trimmedValue)) {
+                                    multiSelectValues.add(new Map<String, Object>{
+                                        'name' => trimmedValue
+                                    });
+                                }
+                            }
+                        } else {
+                            multiSelectValues.add(new Map<String, Object>{
+                                'name' => multiSelectString
+                            });
+                        }
                     }
-                } else {
-                    multiSelectValues.add(new Map<String, Object>{
-                        'name' => multiSelectString
-                    });
                 }
                 
+                System.debug('Multi-select field - final multiSelectValues: ' + JSON.serialize(multiSelectValues));
                 propertyValue.put(PROPERTY_TYPE_MULTI_SELECT, multiSelectValues);
             }
             when 'date' {
@@ -180,15 +194,33 @@ public class NotionDataTransformer {
                 }
             }
             when 'url' {
-                propertyValue.put(PROPERTY_TYPE_URL, String.valueOf(fieldValue));
+                System.debug('URL field - fieldValue: ' + fieldValue + ', is null: ' + (fieldValue == null));
+                if (fieldValue == null) {
+                    propertyValue.put(PROPERTY_TYPE_URL, null);
+                } else {
+                    String urlValue = String.valueOf(fieldValue);
+                    System.debug('URL field - urlValue after String.valueOf: ' + urlValue);
+                    propertyValue.put(PROPERTY_TYPE_URL, String.isBlank(urlValue) || urlValue == 'null' ? null : urlValue);
+                }
             }
             when 'email' {
                 // Always include email property - Notion accepts null to clear
-                String emailValue = fieldValue != null ? String.valueOf(fieldValue) : '';
-                propertyValue.put(PROPERTY_TYPE_EMAIL, String.isBlank(emailValue) ? null : emailValue);
+                if (fieldValue == null) {
+                    propertyValue.put(PROPERTY_TYPE_EMAIL, null);
+                } else {
+                    String emailValue = String.valueOf(fieldValue);
+                    propertyValue.put(PROPERTY_TYPE_EMAIL, String.isBlank(emailValue) || emailValue == 'null' ? null : emailValue);
+                }
             }
             when 'phone_number' {
-                propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.valueOf(fieldValue));
+                System.debug('Phone field - fieldValue: ' + fieldValue + ', is null: ' + (fieldValue == null));
+                if (fieldValue == null) {
+                    propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, null);
+                } else {
+                    String phoneValue = String.valueOf(fieldValue);
+                    System.debug('Phone field - phoneValue after String.valueOf: ' + phoneValue);
+                    propertyValue.put(PROPERTY_TYPE_PHONE_NUMBER, String.isBlank(phoneValue) || phoneValue == 'null' ? null : phoneValue);
+                }
             }
             when 'people' {
                 List<Map<String, Object>> peopleArray = new List<Map<String, Object>>();
@@ -252,6 +284,7 @@ public class NotionDataTransformer {
         }
         
         if (shouldAddProperty) {
+            System.debug('Adding property: ' + mapping.NotionPropertyName__c + ' -> ' + JSON.serialize(propertyValue));
             notionPage.properties.put(mapping.NotionPropertyName__c, propertyValue);
         }
     }

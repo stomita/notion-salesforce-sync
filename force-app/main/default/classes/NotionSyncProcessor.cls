@@ -253,7 +253,10 @@ public class NotionSyncProcessor {
                                      propertyType == 'number' ||
                                      propertyType == 'select' ||
                                      propertyType == 'date' ||
-                                     propertyType == 'email';
+                                     propertyType == 'email' ||
+                                     propertyType == 'phone_number' ||
+                                     propertyType == 'url' ||
+                                     propertyType == 'multi_select';
             
             if (fieldValue != null || supportsClearing) {
                 properties.put(mapping.NotionPropertyName__c, 
@@ -308,6 +311,24 @@ public class NotionSyncProcessor {
                 // Always return email property to support clearing (null) in Notion
                 String emailValue = value != null ? String.valueOf(value) : '';
                 return NotionApiClient.buildEmailProperty(emailValue);
+            }
+            when 'phone_number' {
+                String phoneValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildPhoneProperty(phoneValue);
+            }
+            when 'url' {
+                String urlValue = value != null ? String.valueOf(value) : '';
+                return NotionApiClient.buildUrlProperty(urlValue);
+            }
+            when 'multi_select' {
+                if (value == null) {
+                    return NotionApiClient.buildMultiSelectProperty(new List<String>());
+                }
+                String multiSelectString = String.valueOf(value);
+                List<String> values = multiSelectString.contains(';') ? 
+                    multiSelectString.split(';') : 
+                    new List<String>{ multiSelectString };
+                return NotionApiClient.buildMultiSelectProperty(values);
             }
             when else {
                 // Default to rich_text for unknown types
