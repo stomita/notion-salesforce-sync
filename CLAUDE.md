@@ -120,10 +120,31 @@ URL=$(sf org open --url-only -o notion-sync-scratch)
    ```
 
 3. If you have Notion API credentials configured, run integration tests:
+   
+   **For Human Users:**
    ```bash
    # The script will automatically load .env file if present
    ./scripts/run-integration-tests.sh
    ```
+   
+   **For Claude Code Sessions:**
+   Integration tests require special handling due to their long execution time and extensive output:
+   
+   ```
+   Bash command: ./scripts/run-integration-tests.sh 2>&1 | tee /tmp/integration-test-output.log
+   timeout: 600000
+   ```
+   
+   After completion, check results with:
+   ```
+   Bash command: tail -100 /tmp/integration-test-output.log | grep -E "(✅|❌|All integration tests)"
+   ```
+   
+   **Critical Notes:**
+   - Tests take 10+ minutes to complete - use `timeout: 600000` parameter
+   - Output MUST be redirected to a file to see complete results
+   - NEVER interrupt the command once started - this will terminate the process
+   - Wait for natural completion - output truncation is display-only
 
 Only push your changes after all tests complete successfully.
 
@@ -170,6 +191,30 @@ See `docs/CI_SETUP.md` for detailed setup instructions.
 - **Language**: All code, comments, and documentation must be written in English
 - **Naming**: Use descriptive English names for classes, methods, variables, and metadata
 - **Comments**: All inline comments and method documentation in English
+
+## Claude Code Operational Notes
+
+### Long-Running Bash Commands
+**CRITICAL**: When executing any long-running Bash commands (integration tests, deployments, builds, etc.):
+- **DO NOT interrupt the command once started** - any interruption will immediately terminate the process
+- **DO NOT attempt to monitor or check on the process** - this will kill it
+- **Output truncation is display-only** - the process continues running even if output is truncated
+- **Wait for the full timeout period** - let the command complete naturally
+- **The command will show results when done** - be patient
+
+This is especially important for:
+- Integration tests (10+ minutes)
+- Package builds
+- Large deployments
+- Any command with long execution times
+
+### Output Management for Long Commands
+**ALWAYS save output to a file** for commands that produce extensive output:
+- Long-running commands often produce output that will be truncated in terminal
+- Without file output, you cannot verify completion status or results
+- Terminal truncation makes it impossible to see the final summary
+
+This is critical for integration tests - see the specific instructions in the "Pre-Push Testing Requirement" section above.
 
 ## CRITICAL Git Rules - MUST FOLLOW
 
