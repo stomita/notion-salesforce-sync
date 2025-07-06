@@ -108,13 +108,20 @@ public class NotionIntegrationTestExecutor {
         );
         insert testAccount;
         
-        // Create test parent object
+        // Create test parent object with all fields including new ones
         Test_Parent_Object__c testParent = new Test_Parent_Object__c(
             Name = 'Integration Test Parent ' + DateTime.now().getTime(),
             Description__c = 'Test parent description',
             Status__c = 'New',
+            Priority__c = 'High',  // Second picklist field
             Amount__c = 1000.00,
-            Active__c = true
+            Active__c = true,
+            Email__c = 'test@example.com',
+            Phone__c = '+1-555-123-4567',
+            Website__c = 'https://www.example.com',
+            Tags__c = 'Important;Urgent;Review',  // Multi-select picklist
+            Due_DateTime__c = DateTime.now().addDays(7),
+            Completion_Percentage__c = 25.5
         );
         insert testParent;
         
@@ -136,7 +143,8 @@ public class NotionIntegrationTestExecutor {
             ];
             
             Test_Parent_Object__c testParent = [
-                SELECT Id, Name, Description__c, Status__c, Amount__c, Active__c
+                SELECT Id, Name, Description__c, Status__c, Priority__c, Amount__c, Active__c,
+                       Email__c, Phone__c, Website__c, Tags__c, Due_DateTime__c, Completion_Percentage__c
                 FROM Test_Parent_Object__c
                 WHERE Name LIKE 'Integration Test Parent%'
                 ORDER BY CreatedDate DESC
@@ -206,23 +214,97 @@ public class NotionIntegrationTestExecutor {
                     Map<String, Object> parentPage = (Map<String, Object>) JSON.deserializeUntyped(parentResponse.responseBody);
                     Map<String, Object> properties = (Map<String, Object>) parentPage.get('properties');
                     
-                    // Verify Status property
+                    System.debug('Notion properties available: ' + properties.keySet());
+                    
+                    // Verify Name property
+                    Map<String, Object> nameProperty = (Map<String, Object>) properties.get('Name');
+                    assert(nameProperty != null, 'Name property should exist in Notion');
+                    List<Object> titleArray = (List<Object>) nameProperty.get('title');
+                    if (!titleArray.isEmpty()) {
+                        Map<String, Object> titleText = (Map<String, Object>) titleArray.get(0);
+                        Map<String, Object> text = (Map<String, Object>) titleText.get('text');
+                        String notionName = (String) text.get('content');
+                        assert(notionName == testParent.Name, 'Test Parent Name in Notion should match Salesforce');
+                    }
+                    
+                    // Verify Status property (first picklist)
                     Map<String, Object> statusProperty = (Map<String, Object>) properties.get('Status');
+                    assert(statusProperty != null, 'Status property should exist in Notion');
                     Map<String, Object> selectValue = (Map<String, Object>) statusProperty.get('select');
                     if (selectValue != null) {
                         String notionStatus = (String) selectValue.get('name');
-                        assert(notionStatus == testParent.Status__c, 'Test Parent Status in Notion should match Salesforce');
+                        assert(notionStatus == testParent.Status__c, 'Test Parent Status in Notion should match Salesforce. Expected: ' + testParent.Status__c + ', Actual: ' + notionStatus);
                     }
+                    
                     
                     // Verify Amount property
                     Map<String, Object> amountProperty = (Map<String, Object>) properties.get('Amount');
+                    assert(amountProperty != null, 'Amount property should exist in Notion');
                     Decimal notionAmount = (Decimal) amountProperty.get('number');
                     assert(notionAmount == testParent.Amount__c, 'Test Parent Amount in Notion should match Salesforce');
                     
                     // Verify Active property
                     Map<String, Object> activeProperty = (Map<String, Object>) properties.get('Active');
+                    assert(activeProperty != null, 'Active property should exist in Notion');
                     Boolean notionActive = (Boolean) activeProperty.get('checkbox');
                     assert(notionActive == testParent.Active__c, 'Test Parent Active in Notion should match Salesforce');
+                    
+                    // Verify Priority property (second picklist)
+                    Map<String, Object> priorityProperty = (Map<String, Object>) properties.get('Priority');
+                    assert(priorityProperty != null, 'Priority property should exist in Notion');
+                    Map<String, Object> prioritySelect = (Map<String, Object>) priorityProperty.get('select');
+                    if (prioritySelect != null) {
+                        String notionPriority = (String) prioritySelect.get('name');
+                        assert(notionPriority == testParent.Priority__c, 'Test Parent Priority in Notion should match Salesforce. Expected: ' + testParent.Priority__c + ', Actual: ' + notionPriority);
+                    }
+                    
+                    // Verify Email property
+                    Map<String, Object> emailProperty = (Map<String, Object>) properties.get('Email');
+                    assert(emailProperty != null, 'Email property should exist in Notion');
+                    String notionEmail = (String) emailProperty.get('email');
+                    assert(notionEmail == testParent.Email__c, 'Test Parent Email in Notion should match Salesforce');
+                    
+                    // Verify Phone property
+                    Map<String, Object> phoneProperty = (Map<String, Object>) properties.get('Phone');
+                    assert(phoneProperty != null, 'Phone property should exist in Notion');
+                    String notionPhone = (String) phoneProperty.get('phone_number');
+                    assert(notionPhone == testParent.Phone__c, 'Test Parent Phone in Notion should match Salesforce');
+                    
+                    // Verify Website property
+                    Map<String, Object> websiteProperty = (Map<String, Object>) properties.get('Website');
+                    assert(websiteProperty != null, 'Website property should exist in Notion');
+                    String notionWebsite = (String) websiteProperty.get('url');
+                    assert(notionWebsite == testParent.Website__c, 'Test Parent Website in Notion should match Salesforce');
+                    
+                    // Verify Tags property (multi-select)
+                    Map<String, Object> tagsProperty = (Map<String, Object>) properties.get('Tags');
+                    assert(tagsProperty != null, 'Tags property should exist in Notion');
+                    List<Object> tagsArray = (List<Object>) tagsProperty.get('multi_select');
+                    if (tagsArray != null && !tagsArray.isEmpty()) {
+                        Set<String> notionTags = new Set<String>();
+                        for (Object tagObj : tagsArray) {
+                            Map<String, Object> tag = (Map<String, Object>) tagObj;
+                            notionTags.add((String) tag.get('name'));
+                        }
+                        Set<String> expectedTags = new Set<String>(testParent.Tags__c.split(';'));
+                        assert(notionTags.equals(expectedTags), 'Test Parent Tags in Notion should match Salesforce');
+                    }
+                    
+                    // Verify Due DateTime property
+                    Map<String, Object> dueDateProperty = (Map<String, Object>) properties.get('Due DateTime');
+                    assert(dueDateProperty != null, 'Due DateTime property should exist in Notion');
+                    Map<String, Object> dateValue = (Map<String, Object>) dueDateProperty.get('date');
+                    if (dateValue != null) {
+                        String notionDateTime = (String) dateValue.get('start');
+                        // DateTime comparison is tricky due to timezone, just verify it exists
+                        assert(String.isNotBlank(notionDateTime), 'Test Parent Due DateTime should be set in Notion');
+                    }
+                    
+                    // Verify Completion Percentage property
+                    Map<String, Object> completionProperty = (Map<String, Object>) properties.get('Completion %');
+                    assert(completionProperty != null, 'Completion % property should exist in Notion');
+                    Decimal notionCompletion = (Decimal) completionProperty.get('number');
+                    assert(notionCompletion == testParent.Completion_Percentage__c, 'Test Parent Completion Percentage in Notion should match Salesforce');
                 }
             }
             
@@ -271,19 +353,28 @@ public class NotionIntegrationTestExecutor {
         ];
         
         Test_Parent_Object__c testParent = [
-            SELECT Id, Name, Status__c, Amount__c
+            SELECT Id, Name, Status__c, Priority__c, Amount__c, Active__c,
+                   Email__c, Phone__c, Website__c, Tags__c, Due_DateTime__c, Completion_Percentage__c
             FROM Test_Parent_Object__c
             WHERE Name LIKE 'Integration Test Parent%'
             ORDER BY CreatedDate DESC
             LIMIT 1
         ];
         
-        // Update records
+        // Update records including new fields
         testAccount.Description = 'Updated by integration test at ' + DateTime.now();
         update testAccount;
         
         testParent.Status__c = 'In Progress';
+        testParent.Priority__c = 'Critical';  // Changed priority (second picklist)
         testParent.Amount__c = 2500.00;
+        testParent.Active__c = false;  // Changed active status
+        testParent.Email__c = 'updated@example.com';  // Changed email
+        testParent.Phone__c = '+1-555-987-6543';  // Changed phone
+        testParent.Website__c = 'https://www.updated-example.com';  // Changed URL
+        testParent.Tags__c = 'Updated;Testing;Verified';  // Changed multi-select picklist
+        testParent.Due_DateTime__c = DateTime.now().addDays(14);  // Changed datetime
+        testParent.Completion_Percentage__c = 75.5;  // Changed percent
         update testParent;
         
         System.debug('Test records updated');
@@ -304,7 +395,7 @@ public class NotionIntegrationTestExecutor {
             ];
             
             Test_Parent_Object__c testParent = [
-                SELECT Id, Name, Status__c, Amount__c
+                SELECT Id, Name, Status__c, Priority__c, Amount__c, Active__c
                 FROM Test_Parent_Object__c
                 WHERE Name LIKE 'Integration Test Parent%'
                 ORDER BY CreatedDate DESC
@@ -386,10 +477,67 @@ public class NotionIntegrationTestExecutor {
                         System.debug('Full Status property: ' + JSON.serialize(statusProperty));
                     }
                     
+                    // Verify updated Priority property (second picklist)
+                    Map<String, Object> priorityProperty = (Map<String, Object>) properties.get('Priority');
+                    Map<String, Object> prioritySelect = (Map<String, Object>) priorityProperty.get('select');
+                    if (prioritySelect != null) {
+                        String notionPriority = (String) prioritySelect.get('name');
+                        assert(notionPriority == 'Critical', 'Test Parent Priority in Notion should be updated to Critical, but was: ' + notionPriority);
+                    }
+                    
                     // Verify updated Amount property
                     Map<String, Object> amountProperty = (Map<String, Object>) properties.get('Amount');
                     Decimal notionAmount = (Decimal) amountProperty.get('number');
                     assert(notionAmount == 2500.00, 'Test Parent Amount in Notion should be updated to 2500.00');
+                    
+                    // Verify updated Active property
+                    Map<String, Object> activeProperty = (Map<String, Object>) properties.get('Active');
+                    Boolean notionActive = (Boolean) activeProperty.get('checkbox');
+                    assert(notionActive == false, 'Test Parent Active in Notion should be updated to false');
+                    
+                    // Verify updated Email property
+                    Map<String, Object> emailProperty = (Map<String, Object>) properties.get('Email');
+                    String notionEmail = (String) emailProperty.get('email');
+                    assert(notionEmail == 'updated@example.com', 'Test Parent Email in Notion should be updated@example.com, but was: ' + notionEmail);
+                    
+                    // Verify updated Phone property
+                    Map<String, Object> phoneProperty = (Map<String, Object>) properties.get('Phone');
+                    String notionPhone = (String) phoneProperty.get('phone_number');
+                    assert(notionPhone == '+1-555-987-6543', 'Test Parent Phone in Notion should be +1-555-987-6543, but was: ' + notionPhone);
+                    
+                    // Verify updated Website property
+                    Map<String, Object> websiteProperty = (Map<String, Object>) properties.get('Website');
+                    String notionWebsite = (String) websiteProperty.get('url');
+                    assert(notionWebsite == 'https://www.updated-example.com', 'Test Parent Website in Notion should be https://www.updated-example.com, but was: ' + notionWebsite);
+                    
+                    // Verify updated Tags property (multi-select)
+                    Map<String, Object> tagsProperty = (Map<String, Object>) properties.get('Tags');
+                    List<Object> tagsArray = (List<Object>) tagsProperty.get('multi_select');
+                    if (tagsArray != null) {
+                        Set<String> notionTags = new Set<String>();
+                        for (Object tagObj : tagsArray) {
+                            Map<String, Object> tag = (Map<String, Object>) tagObj;
+                            notionTags.add((String) tag.get('name'));
+                        }
+                        assert(notionTags.contains('Updated'), 'Tags should contain "Updated"');
+                        assert(notionTags.contains('Testing'), 'Tags should contain "Testing"');
+                        assert(notionTags.contains('Verified'), 'Tags should contain "Verified"');
+                    }
+                    
+                    // Verify updated Due DateTime property
+                    Map<String, Object> dueDateTimeProperty = (Map<String, Object>) properties.get('Due DateTime');
+                    Map<String, Object> dateValue = (Map<String, Object>) dueDateTimeProperty.get('date');
+                    if (dateValue != null) {
+                        String notionDateTime = (String) dateValue.get('start');
+                        System.debug('Due DateTime in Notion: ' + notionDateTime);
+                        // Due date should be approximately 14 days from now
+                        assert(String.isNotBlank(notionDateTime), 'Due DateTime should not be blank');
+                    }
+                    
+                    // Verify updated Completion % property
+                    Map<String, Object> completionProperty = (Map<String, Object>) properties.get('Completion %');
+                    Decimal notionCompletion = (Decimal) completionProperty.get('number');
+                    assert(notionCompletion == 75.5, 'Test Parent Completion % in Notion should be 75.5, but was: ' + notionCompletion);
                 }
             }
             
