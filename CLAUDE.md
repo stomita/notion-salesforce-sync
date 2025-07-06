@@ -233,7 +233,7 @@ This is critical for integration tests - see the specific instructions in the "P
 )
 public static List<SyncResult> syncToNotion(List<SyncRequest> requests) {
     // Process each sync request
-    // For single/multiple records: use Queueable with runtime limit checking
+    // Use Queueable with runtime limit checking
     // Queueable automatically chains when approaching governor limits
     // Maintains user context for Named Credential access
 }
@@ -308,8 +308,7 @@ Flow Trigger → NotionSyncInvocable → NotionSyncQueueable
 1. Flow triggers on record create/update/delete
 2. Flow calls NotionSyncInvocable with record details
 3. Invocable method determines processing strategy:
-   - Single record: @future for immediate processing
-   - Multiple records: Queueable with runtime limit checking
+   - Queueable with runtime limit checking
 4. For queueable processing:
    - Processes records individually with governor limit monitoring
    - When approaching limits (~19 records), chains to next queueable
