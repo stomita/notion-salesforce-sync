@@ -7,7 +7,8 @@ public with sharing class NotionSyncLogger {
     public NotionSyncLogger() {
         this.logs = new List<LogEntry>();
         // Check settings once during construction
-        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getInstance();
+        // Use getOrgDefaults() to match how settings are saved in NotionAdminController
+        Notion_Sync_Settings__c settings = Notion_Sync_Settings__c.getOrgDefaults();
         this.loggingEnabled = (settings != null && settings.Enable_Sync_Logging__c == true);
     }
     
@@ -65,7 +66,23 @@ public with sharing class NotionSyncLogger {
                 // Clear logs after successful insert
                 logs.clear();
             } catch (Exception e) {
-                System.debug('Failed to insert sync logs: ' + e.getMessage());
+                System.debug(LoggingLevel.ERROR, 'Failed to insert sync logs: ' + e.getMessage());
+                System.debug(LoggingLevel.ERROR, 'Stack trace: ' + e.getStackTraceString());
+                
+                // Create a minimal error log entry that might succeed
+                try {
+                    Notion_Sync_Log__c errorLog = new Notion_Sync_Log__c(
+                        Object_Type__c = 'System',
+                        Operation_Type__c = 'LOGGING_ERROR',
+                        Status__c = 'Failed',
+                        Error_Message__c = 'Logger Error: ' + e.getMessage().left(250),
+                        Event_Timestamp__c = DateTime.now()
+                    );
+                    insert errorLog;
+                } catch (Exception innerEx) {
+                    // Last resort - log to debug
+                    System.debug(LoggingLevel.ERROR, 'Could not create error log: ' + innerEx.getMessage());
+                }
             }
         }
     }
