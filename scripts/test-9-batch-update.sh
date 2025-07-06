@@ -26,8 +26,8 @@ sleep 15
 echo ">>> Running batch update test..."
 sf apex run -f "$SCRIPT_DIR/apex/test-9-batch-update-run.apex" $ORG_FLAG
 
-echo ">>> Waiting 60 seconds for batch update sync (may require multiple queueable jobs)..."
-sleep 60
+echo ">>> Waiting 120 seconds (2 minutes) for batch update sync (may require multiple queueable jobs)..."
+sleep 120
 
 echo ">>> Checking results with retry (wait: 30s, max retries: 6)..."
 "$SCRIPT_DIR/retry-check.sh" "$SCRIPT_DIR/apex/test-9-batch-update-check.apex" 30 6 "$ORG_FLAG"
