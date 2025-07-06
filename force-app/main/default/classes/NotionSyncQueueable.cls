@@ -74,8 +74,11 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
                            'CPU: ' + limitStatus.get('cpuTimeUsed') + '/' + limitStatus.get('cpuTimeLimit') + 'ms');
             }
             
-            // Log batch summary for this execution
-            logExecutionSummary(currentIndex - startIndex, currentIndex < allRequests.size());
+            // Log batch summary for this execution only if records were processed
+            Integer processedCount = currentIndex - startIndex;
+            if (processedCount > 0) {
+                logExecutionSummary(processedCount, currentIndex < allRequests.size());
+            }
             
             // Chain if we have more requests
             if (currentIndex < allRequests.size()) {
@@ -210,11 +213,15 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
         System.debug(LoggingLevel.ERROR, 'Sync processing error: ' + e.getMessage());
         System.debug(LoggingLevel.ERROR, 'Stack trace: ' + e.getStackTraceString());
         
-        logger.log(
-            new NotionSyncLogger.LogEntry('BATCH')
-                .withStatus('Failed')
-                .withMessage('Processing error after index ' + lastProcessedIndex + ': ' + e.getMessage())
-        );
+        // Only log batch error if some processing occurred
+        Integer processedCount = lastProcessedIndex - startIndex;
+        if (processedCount > 0) {
+            logger.log(
+                new NotionSyncLogger.LogEntry('BATCH')
+                    .withStatus('Failed')
+                    .withMessage('Processing error after ' + processedCount + ' records: ' + e.getMessage())
+            );
+        }
         
         // Try to chain remaining requests if possible
         if (lastProcessedIndex < allRequests.size()) {
