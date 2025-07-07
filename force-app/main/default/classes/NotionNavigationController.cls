@@ -61,7 +61,6 @@ public with sharing class NotionNavigationController {
             
             // Create sync request
             NotionSync.Request syncRequest = new NotionSync.Request(recordId, objectType, operationType);
-            List<NotionSync.Request> requests = new List<NotionSync.Request>{ syncRequest };
             
             // Create a logger but DO NOT flush it yet (no DML before callouts)
             NotionSyncLogger logger = new NotionSyncLogger();
@@ -72,7 +71,7 @@ public with sharing class NotionNavigationController {
             
             try {
                 // Process sync - this will make callouts but NOT perform DML
-                processor.processSyncRequests(requests);
+                processor.processSyncRequest(syncRequest);
                 
                 // Extract the page ID from the logger entries if successful
                 List<NotionSyncLogger.LogEntry> entries = logger.getPendingEntries();

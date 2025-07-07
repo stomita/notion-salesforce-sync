@@ -132,6 +132,25 @@ jobs:
           
           ./scripts/execute-integration-tests.sh ci-scratch
       
+      - name: Dump Sync Logs for Debugging
+        if: always()
+        run: |
+          echo "=== Dumping All Notion Sync Logs ==="
+          # Query all sync logs using SOQL
+          sf data query --query "SELECT Id, Record_Id__c, Object_Type__c, Operation_Type__c, Status__c, Error_Message__c, Notion_Page_Id__c, Retry_Count__c, Event_Timestamp__c, CreatedDate FROM Notion_Sync_Log__c ORDER BY Event_Timestamp__c DESC" --target-org ci-scratch --result-format human || echo "Failed to dump sync logs"
+          
+          # Also save to CSV file for artifact upload
+          echo "=== Saving sync logs to CSV file ==="
+          sf data query --query "SELECT Id, Record_Id__c, Object_Type__c, Operation_Type__c, Status__c, Error_Message__c, Notion_Page_Id__c, Retry_Count__c, Event_Timestamp__c, CreatedDate FROM Notion_Sync_Log__c ORDER BY Event_Timestamp__c DESC" --target-org ci-scratch --result-format csv > sync-logs.csv || echo "Failed to export sync logs to CSV"
+      
+      - name: Upload Sync Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notion-sync-logs
+          path: sync-logs.csv
+          retention-days: 7
+      
       - name: Delete Scratch Org
         if: always()
         run: |
