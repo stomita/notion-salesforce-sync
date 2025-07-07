@@ -108,8 +108,7 @@ public class NotionSyncQueueable implements Queueable, Database.AllowsCallouts {
     private void processSingleRequest(NotionSync.Request request) {
         try {
             // Use processor to handle the request
-            List<NotionSync.Request> singleRequest = new List<NotionSync.Request>{request};
-            processor.processSyncRequests(singleRequest);
+            processor.processSyncRequest(request);
             
         } catch (NotionRateLimiter.RateLimitException e) {
             // Rate limit hit - log and re-throw to stop processing

@@ -116,17 +116,16 @@ private class NotionCoverageEnhancementTest {
         
         Test.startTest();
         
-        // Test processSyncRequests
-        List<NotionSync.Request> requests = new List<NotionSync.Request>();
-        requests.add(new NotionSync.Request(acc.Id, 'Account', 'CREATE'));
+        // Test processSyncRequest
+        NotionSync.Request request = new NotionSync.Request(acc.Id, 'Account', 'CREATE');
         
         // Mock the callout
         Test.setMock(HttpCalloutMock.class, new NotionApiMock());
         
-        // Process requests - NotionSyncProcessor requires logger
+        // Process request - NotionSyncProcessor requires logger
         NotionSyncLogger logger = new NotionSyncLogger();
         NotionSyncProcessor processor = new NotionSyncProcessor(logger);
-        processor.processSyncRequests(requests);
+        processor.processSyncRequest(request);
         
         Test.stopTest();
         

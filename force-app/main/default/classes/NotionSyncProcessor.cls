@@ -12,65 +12,50 @@ public class NotionSyncProcessor {
     }
     
     /**
-     * Process sync requests
-     * @param syncRequests List of sync requests to process
+     * Process a sync request
+     * @param request Sync request to process
      */
-    public void processSyncRequests(List<NotionSync.Request> syncRequests) {
-        Map<String, List<NotionSync.Request>> requestsByObjectType = groupRequestsByObjectType(syncRequests);
-        
-        List<String> processingOrder = relationshipHandler.getProcessingOrder(requestsByObjectType.keySet());
-        
-        for (String objectType : processingOrder) {
-            if (requestsByObjectType.containsKey(objectType)) {
-                List<NotionSync.Request> objectRequests = requestsByObjectType.get(objectType);
-                processObjectRequests(objectType, objectRequests);
-            }
-        }
-    }
-    
-    private Map<String, List<NotionSync.Request>> groupRequestsByObjectType(List<NotionSync.Request> syncRequests) {
-        Map<String, List<NotionSync.Request>> grouped = new Map<String, List<NotionSync.Request>>();
-        
-        for (NotionSync.Request request : syncRequests) {
-            if (!grouped.containsKey(request.objectType)) {
-                grouped.put(request.objectType, new List<NotionSync.Request>());
-            }
-            grouped.get(request.objectType).add(request);
-        }
-        
-        return grouped;
-    }
-    
-    private void processObjectRequests(String objectType, List<NotionSync.Request> objectRequests) {
-        NotionSyncObject__mdt syncConfig = getSyncConfiguration(objectType);
+    public void processSyncRequest(NotionSync.Request request) {
+        // Get sync configuration
+        NotionSyncObject__mdt syncConfig = getSyncConfiguration(request.objectType);
         if (syncConfig == null) {
-            logErrorsForRequests(objectRequests, 'No sync configuration found for object type: ' + objectType);
-            return;
-        }
-        
-        if (!syncConfig.IsActive__c) {
-            logErrorsForRequests(objectRequests, 'Sync is disabled for object type: ' + objectType);
-            return;
-        }
-        
-        List<NotionSyncField__mdt> fieldMappings = getFieldMappings(syncConfig.Id);
-        Map<Id, SObject> recordsMap = getRecords(objectType, objectRequests);
-        
-        for (NotionSync.Request request : objectRequests) {
-            processSingleRequest(request, syncConfig, fieldMappings, recordsMap.get(request.recordId));
-        }
-    }
-    
-    private void logErrorsForRequests(List<NotionSync.Request> requests, String errorMessage) {
-        for (NotionSync.Request request : requests) {
             logger.log(
                 new NotionSyncLogger.LogEntry(request.operationType)
                     .withRecord(request.objectType, request.recordId)
                     .withStatus('Failed')
-                    .withMessage(errorMessage)
+                    .withMessage('No sync configuration found for object type: ' + request.objectType)
             );
+            return;
         }
+        
+        if (!syncConfig.IsActive__c) {
+            logger.log(
+                new NotionSyncLogger.LogEntry(request.operationType)
+                    .withRecord(request.objectType, request.recordId)
+                    .withStatus('Failed')
+                    .withMessage('Sync is disabled for object type: ' + request.objectType)
+            );
+            return;
+        }
+        
+        // Get field mappings
+        List<NotionSyncField__mdt> fieldMappings = getFieldMappings(syncConfig.Id);
+        
+        // Get record data if not a delete operation
+        SObject record = null;
+        if (request.operationType != 'DELETE') {
+            Set<Id> recordIds = new Set<Id>{request.recordId};
+            String query = buildDynamicQuery(request.objectType, recordIds);
+            List<SObject> records = Database.query(query);
+            if (!records.isEmpty()) {
+                record = records[0];
+            }
+        }
+        
+        // Process the request using the existing private method
+        processRequestInternal(request, syncConfig, fieldMappings, record);
     }
+    
     
     private NotionSyncObject__mdt getSyncConfiguration(String objectType) {
         List<NotionSyncObject__mdt> configs = [
@@ -91,31 +76,6 @@ public class NotionSyncProcessor {
         ];
     }
     
-    private Map<Id, SObject> getRecords(String objectType, List<NotionSync.Request> objectRequests) {
-        Set<Id> recordIds = new Set<Id>();
-        List<NotionSync.Request> nonDeleteRequests = new List<NotionSync.Request>();
-        
-        for (NotionSync.Request request : objectRequests) {
-            if (request.operationType != 'DELETE') {
-                recordIds.add(request.recordId);
-                nonDeleteRequests.add(request);
-            }
-        }
-        
-        if (recordIds.isEmpty()) {
-            return new Map<Id, SObject>();
-        }
-        
-        String query = buildDynamicQuery(objectType, recordIds);
-        List<SObject> records = Database.query(query);
-        
-        Map<Id, SObject> recordsMap = new Map<Id, SObject>();
-        for (SObject record : records) {
-            recordsMap.put(record.Id, record);
-        }
-        
-        return recordsMap;
-    }
     
     private String buildDynamicQuery(String objectType, Set<Id> recordIds) {
         String baseQuery = 'SELECT Id';
@@ -153,7 +113,7 @@ public class NotionSyncProcessor {
         return baseQuery;
     }
     
-    private void processSingleRequest(NotionSync.Request request, NotionSyncObject__mdt syncConfig, 
+    private void processRequestInternal(NotionSync.Request request, NotionSyncObject__mdt syncConfig, 
                                     List<NotionSyncField__mdt> fieldMappings, SObject record) {
         try {
             String notionPageId = null;
@@ -181,6 +141,8 @@ public class NotionSyncProcessor {
                     .withMessage(e.getMessage())
                     .withRateLimit(1)  // Default to 1 second retry
             );
+            // Re-throw to let the queueable handle stopping the batch
+            throw e;
         } catch (Exception e) {
             // Log error
             logger.log(
