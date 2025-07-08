@@ -126,6 +126,12 @@ public class NotionApiClient {
         } catch (NotionRateLimiter.RateLimitException e) {
             // Return rate limit error
             return new NotionResponse(false, pageId, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (CalloutException e) {
+            // Handle timeout specifically
+            if (e.getMessage().contains('maximum time allotted for callout')) {
+                return new NotionResponse(false, pageId, 'Update timeout: Response took longer than 110 seconds. The page may be too large or Notion is responding slowly.', null, null);
+            }
+            return new NotionResponse(false, pageId, 'Callout exception during page update: ' + e.getMessage(), null, null);
         } catch (Exception e) {
             return new NotionResponse(false, pageId, 'Exception during page update: ' + e.getMessage(), null, null);
         }
@@ -187,6 +193,12 @@ public class NotionApiClient {
         } catch (NotionRateLimiter.RateLimitException e) {
             // Return rate limit error
             return new NotionResponse(false, null, 'Rate limit exceeded: ' + e.getMessage(), null, null, true, null);
+        } catch (CalloutException e) {
+            // Handle timeout specifically
+            if (e.getMessage().contains('maximum time allotted for callout')) {
+                return new NotionResponse(false, null, 'Query timeout: Response took longer than 110 seconds. Try reducing the query scope.', null, null);
+            }
+            return new NotionResponse(false, null, 'Callout exception during database query: ' + e.getMessage(), null, null);
         } catch (Exception e) {
             return new NotionResponse(false, null, 'Exception during database query: ' + e.getMessage(), null, null);
         }
@@ -285,7 +297,9 @@ public class NotionApiClient {
         request.setHeader('Content-Type', 'application/json');
         // Notion-Version header is handled by Named Credential
         // Authorization header is handled by External Credential
-        request.setTimeout(60000);
+        // Set timeout to 110 seconds (just under Salesforce's 120 second limit)
+        // This gives us time to handle the timeout gracefully
+        request.setTimeout(110000);
         
         return request;
     }
