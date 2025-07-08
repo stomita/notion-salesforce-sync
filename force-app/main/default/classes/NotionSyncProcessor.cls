@@ -642,66 +642,92 @@ public class NotionSyncProcessor {
     /**
      * Query Notion pages for deduplication
      * Uses OR filter to query multiple Salesforce IDs efficiently
+     * Batches queries to respect Notion API limit of 100 items per OR filter
+     * 
+     * Timeout Prevention Strategy:
+     * - Extended HTTP timeout to 110 seconds (near Salesforce's 120s limit)
+     * - Use max batch size (100) to minimize number of callouts
+     * - Use max page_size (100) to minimize pagination callouts
+     * - For extreme cases with many duplicates per ID, timeout handling will catch it
+     * - When callout limit is approached, NotionRateLimiter will defer to next queueable
      */
     private List<Map<String, Object>> queryPagesForDeduplication(NotionSyncObject__mdt syncConfig, Set<Id> recordIds) {
         List<Map<String, Object>> allPages = new List<Map<String, Object>>();
         
-        // Build OR filter for all record IDs
-        List<Object> orConditions = new List<Object>();
-        for (Id recordId : recordIds) {
-            orConditions.add(new Map<String, Object>{
-                'property' => syncConfig.SalesforceIdPropertyName__c,
-                'rich_text' => new Map<String, Object>{
-                    'equals' => String.valueOf(recordId)
-                }
-            });
-        }
+        // Convert Set to List for batching
+        List<Id> recordIdList = new List<Id>(recordIds);
         
-        Map<String, Object> filter = new Map<String, Object>{
-            'or' => orConditions
-        };
+        // Notion API limit: max 100 items in OR filter
+        // The Notion API returns HTTP 400 error: "body.filter.or.length should be ≤ 100"
+        // when we try to query more than 100 items in a single OR filter
+        // In deduplication, most records have few duplicates (1-3 typically)
+        // We use the maximum allowed to minimize callouts while staying within limits
+        Integer batchSize = 100; // Max allowed by Notion API
+        Integer totalRecords = recordIdList.size();
         
-        // Query with pagination support
-        String startCursor = null;
-        Boolean hasMore = true;
-        
-        while (hasMore) {
-            // Check limits before each API call
-            if (NotionRateLimiter.shouldDeferProcessing()) {
-                break;
+        // Process in batches
+        for (Integer batchStart = 0; batchStart < totalRecords; batchStart += batchSize) {
+            // Calculate batch end
+            Integer batchEnd = Math.min(batchStart + batchSize, totalRecords);
+            
+            // Build OR filter for this batch
+            List<Object> orConditions = new List<Object>();
+            for (Integer i = batchStart; i < batchEnd; i++) {
+                orConditions.add(new Map<String, Object>{
+                    'property' => syncConfig.SalesforceIdPropertyName__c,
+                    'rich_text' => new Map<String, Object>{
+                        'equals' => String.valueOf(recordIdList[i])
+                    }
+                });
             }
             
-            NotionApiClient.NotionResponse response = NotionApiClient.queryDatabase(
-                syncConfig.NotionDatabaseId__c, 
-                filter,
-                startCursor,
-                100 // page size
-            );
+            Map<String, Object> filter = new Map<String, Object>{
+                'or' => orConditions
+            };
             
-            if (response.success && String.isNotBlank(response.responseBody)) {
-                Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
-                List<Object> results = (List<Object>) responseBody.get('results');
+            // Query with pagination support for this batch
+            String startCursor = null;
+            Boolean hasMore = true;
+            
+            while (hasMore) {
+                // Check limits before each API call
+                if (NotionRateLimiter.shouldDeferProcessing()) {
+                    // Return what we have so far
+                    return allPages;
+                }
                 
-                if (results != null) {
-                    for (Object result : results) {
-                        allPages.add((Map<String, Object>) result);
+                NotionApiClient.NotionResponse response = NotionApiClient.queryDatabase(
+                    syncConfig.NotionDatabaseId__c, 
+                    filter,
+                    startCursor,
+                    100 // Max page size to minimize pagination callouts
+                );
+                
+                if (response.success && String.isNotBlank(response.responseBody)) {
+                    Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.responseBody);
+                    List<Object> results = (List<Object>) responseBody.get('results');
+                    
+                    if (results != null) {
+                        for (Object result : results) {
+                            allPages.add((Map<String, Object>) result);
+                        }
                     }
-                }
-                
-                // Check for more pages
-                hasMore = (Boolean) responseBody.get('has_more');
-                if (hasMore) {
-                    startCursor = (String) responseBody.get('next_cursor');
-                }
-            } else {
-                hasMore = false;
-                
-                if (response.isRateLimited) {
-                    throw new NotionRateLimiter.RateLimitException(
-                        'Rate limited during deduplication query. Retry after: ' + response.retryAfterSeconds
-                    );
-                } else if (!response.success) {
-                    throw new NotionSync.SyncException('Failed to query pages for deduplication: ' + response.errorMessage);
+                    
+                    // Check for more pages
+                    hasMore = (Boolean) responseBody.get('has_more');
+                    if (hasMore) {
+                        startCursor = (String) responseBody.get('next_cursor');
+                    }
+                } else {
+                    hasMore = false;
+                    
+                    if (response.isRateLimited) {
+                        throw new NotionRateLimiter.RateLimitException(
+                            'Rate limited during deduplication query. Retry after: ' + response.retryAfterSeconds
+                        );
+                    } else if (!response.success) {
+                        throw new NotionSync.SyncException('Failed to query pages for deduplication: ' + response.errorMessage);
+                    }
                 }
             }
         }

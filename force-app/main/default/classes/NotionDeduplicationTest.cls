@@ -272,6 +272,44 @@ private class NotionDeduplicationTest {
         System.assert(comparator.compare(page3, page1) > 0, 'Null should be after non-null');
     }
     
+    @isTest
+    static void testDeduplicationWithLargeBatch() {
+        NotionSyncLogger logger = new NotionSyncLogger();
+        NotionSyncProcessor processor = new NotionSyncProcessor(logger);
+        
+        // Create 150 test accounts (more than the 100 limit)
+        List<Account> accounts = new List<Account>();
+        for (Integer i = 0; i < 150; i++) {
+            accounts.add(new Account(Name = 'Test Account Batch ' + i));
+        }
+        insert accounts;
+        
+        // Collect all IDs
+        Set<Id> recordIds = new Set<Id>();
+        for (Account acc : accounts) {
+            recordIds.add(acc.Id);
+        }
+        
+        NotionSyncObject__mdt syncConfig = new NotionSyncObject__mdt(
+            ObjectApiName__c = 'Account',
+            NotionDatabaseId__c = 'test-database-id',
+            SalesforceIdPropertyName__c = 'salesforce_id',
+            IsActive__c = true
+        );
+        
+        // Mock API responses
+        Test.setMock(HttpCalloutMock.class, new NotionDeduplicationMock(true, false));
+        
+        Test.startTest();
+        // This should not throw an error even with 150 records
+        NotionSyncProcessor.DeduplicationResult result = processor.deduplicateNotionPages(recordIds, syncConfig, 50);
+        Test.stopTest();
+        
+        // Verify result (with mocked response, it should process successfully)
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.duplicatesFound >= 0, 'Should handle large batches without error');
+    }
+    
     /**
      * Mock class for Notion API responses
      */
