@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Due Date</label>
+    <protected>false</protected>
+    <values>
+        <field>DisplayOrder__c</field>
+        <value xsi:type="xsd:double">2.0</value>
+    </values>
+    <values>
+        <field>IsSortable__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>IsVisible__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>NotionPropertyName__c</field>
+        <value xsi:type="xsd:string">Due Date</value>
+    </values>
+    <values>
+        <field>NotionPropertyType__c</field>
+        <value xsi:type="xsd:string">date</value>
+    </values>
+    <values>
+        <field>NotionWidget__c</field>
+        <value xsi:type="xsd:string">Test_Child_Records</value>
+    </values>
+</CustomMetadata>

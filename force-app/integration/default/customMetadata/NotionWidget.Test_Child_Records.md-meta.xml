@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Test Child Records</label>
+    <protected>false</protected>
+    <values>
+        <field>ContextObjectApiName__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
+    <values>
+        <field>ContextRelationProperty__c</field>
+        <value xsi:type="xsd:string"></value>
+    </values>
+    <values>
+        <field>DefaultSortDirection__c</field>
+        <value xsi:type="xsd:string">descending</value>
+    </values>
+    <values>
+        <field>DefaultSortProperty__c</field>
+        <value xsi:type="xsd:string">Name</value>
+    </values>
+    <values>
+        <field>Description__c</field>
+        <value xsi:type="xsd:string">Standalone widget listing all Test Child records</value>
+    </values>
+    <values>
+        <field>IsActive__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>NotionDatabaseId__c</field>
+        <value xsi:type="xsd:string">REPLACE_WITH_NOTION_DATABASE_ID_FOR_TEST_CHILD</value>
+    </values>
+    <values>
+        <field>PageSize__c</field>
+        <value xsi:type="xsd:double">10.0</value>
+    </values>
+    <values>
+        <field>ShowNewButton__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+</CustomMetadata>

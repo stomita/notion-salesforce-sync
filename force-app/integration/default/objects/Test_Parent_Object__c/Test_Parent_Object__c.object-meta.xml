@@ -132,8 +132,10 @@
     </actionOverrides>
     <actionOverrides>
         <actionName>View</actionName>
+        <content>Test_Parent_Record_Page</content>
         <formFactor>Large</formFactor>
-        <type>Default</type>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
+        <type>Flexipage</type>
     </actionOverrides>
     <actionOverrides>
         <actionName>View</actionName>
