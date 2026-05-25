@@ -313,8 +313,6 @@ public with sharing class NotionWidgetController {
             String orgUrl = URL.getOrgDomainUrl().toExternalForm();
             service.endpoint_x = orgUrl + '/services/Soap/m/61.0';
 
-            List<MetadataService.Metadata> metadataToUpsert = new List<MetadataService.Metadata>();
-
             // Build widget metadata
             MetadataService.CustomMetadata widgetMetadata = new MetadataService.CustomMetadata();
             widgetMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionWidget') + '.' + config.developerName;
@@ -331,14 +329,14 @@ public with sharing class NotionWidgetController {
             addMetadataValue(widgetMetadata, 'ShowNewButton__c', String.valueOf(config.showNewButton != false));
             addMetadataValue(widgetMetadata, 'Description__c', config.description);
 
-            metadataToUpsert.add(widgetMetadata);
+            // Build children
+            List<MetadataService.Metadata> childMetadata = new List<MetadataService.Metadata>();
 
-            // Build column metadata
             if (config.columns != null) {
                 for (Integer i = 0; i < config.columns.size(); i++) {
                     ColumnConfiguration col = config.columns[i];
                     String colDevName = col.developerName != null ? col.developerName :
-                        sanitizeDeveloperName(config.developerName + '_' + col.notionPropertyName);
+                        buildChildDevName(config.developerName, col.notionPropertyName, i, 'col');
 
                     MetadataService.CustomMetadata colMetadata = new MetadataService.CustomMetadata();
                     colMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionWidgetColumn') + '.' + colDevName;
@@ -353,16 +351,15 @@ public with sharing class NotionWidgetController {
                     addMetadataValue(colMetadata, 'IsVisible__c', String.valueOf(col.isVisible != false));
                     addMetadataValue(colMetadata, 'IsSortable__c', String.valueOf(col.isSortable != false));
 
-                    metadataToUpsert.add(colMetadata);
+                    childMetadata.add(colMetadata);
                 }
             }
 
-            // Build filter metadata
             if (config.filters != null) {
                 for (Integer i = 0; i < config.filters.size(); i++) {
                     FilterConfiguration filter = config.filters[i];
                     String filterDevName = filter.developerName != null ? filter.developerName :
-                        sanitizeDeveloperName(config.developerName + '_Filter_' + (i + 1));
+                        buildChildDevName(config.developerName, 'filter_' + (i + 1), i, 'filter');
 
                     MetadataService.CustomMetadata filterMetadata = new MetadataService.CustomMetadata();
                     filterMetadata.fullName = NamespaceUtil.getMetadataTypeName('NotionWidgetFilter') + '.' + filterDevName;
@@ -379,35 +376,35 @@ public with sharing class NotionWidgetController {
                     addMetadataValue(filterMetadata, 'FilterOrder__c', String.valueOf(i + 1));
                     addMetadataValue(filterMetadata, 'LogicalOperator__c', filter.logicalOperator);
 
-                    metadataToUpsert.add(filterMetadata);
+                    childMetadata.add(filterMetadata);
                 }
             }
 
-            // Deploy all metadata
-            if (!metadataToUpsert.isEmpty()) {
-                MetadataService.UpsertResult[] results = service.upsertMetadata(metadataToUpsert);
+            // Two-pass deploy:
+            //   (1) Upsert the parent widget alone so its DeveloperName exists for the children
+            //       to resolve their MetadataRelationship (NotionWidget__c). Without this split,
+            //       a fresh widget save fails on first attempt with
+            //       INVALID_CROSS_REFERENCE_KEY: "no CustomMetadata named NotionWidget.<name> found"
+            //       because Salesforce evaluates child references before the parent commits in the
+            //       same upsert batch.
+            //   (2) Upsert the columns and filters now that the widget reference is resolvable.
+            List<String> errors = new List<String>();
 
-                // Check for errors
-                List<String> errors = new List<String>();
-                for (MetadataService.UpsertResult result : results) {
-                    if (!result.success) {
-                        String errorMessage = '';
-                        if (result.errors != null) {
-                            for (MetadataService.Error err : result.errors) {
-                                errorMessage += err.message + '; ';
-                            }
-                        }
-                        errors.add(errorMessage);
-                    }
-                }
+            MetadataService.UpsertResult[] parentResults =
+                service.upsertMetadata(new List<MetadataService.Metadata>{ widgetMetadata });
+            collectUpsertErrors(parentResults, errors);
 
-                if (!errors.isEmpty()) {
-                    SaveResult saveResult = new SaveResult();
-                    saveResult.success = false;
-                    saveResult.message = 'Error deploying widget configuration';
-                    saveResult.errors = errors;
-                    return saveResult;
-                }
+            if (errors.isEmpty() && !childMetadata.isEmpty()) {
+                MetadataService.UpsertResult[] childResults = service.upsertMetadata(childMetadata);
+                collectUpsertErrors(childResults, errors);
+            }
+
+            if (!errors.isEmpty()) {
+                SaveResult saveResult = new SaveResult();
+                saveResult.success = false;
+                saveResult.message = 'Error deploying widget configuration';
+                saveResult.errors = errors;
+                return saveResult;
             }
 
             SaveResult result = new SaveResult();
@@ -432,17 +429,51 @@ public with sharing class NotionWidgetController {
         metadata.values.add(customField);
     }
 
+    private static void collectUpsertErrors(MetadataService.UpsertResult[] results, List<String> errors) {
+        if (results == null) return;
+        for (MetadataService.UpsertResult r : results) {
+            if (r.success) continue;
+            String msg = '[' + r.fullName + '] ';
+            if (r.errors != null) {
+                for (MetadataService.Error err : r.errors) {
+                    msg += err.message + ' (statusCode=' + err.statusCode + '); ';
+                }
+            }
+            errors.add(msg);
+        }
+    }
+
+    /**
+     * Build a stable, collision-free DeveloperName for a child record (column / filter)
+     * when no existing DeveloperName is supplied by the caller. Falls back to a 1-based
+     * index suffix if the property-derived part sanitizes to empty (e.g. property name
+     * is only special characters). Keep in sync with buildChildDevName() in the LWC.
+     */
+    private static String buildChildDevName(String widgetDev, String propBasedSuffix, Integer index, String prefix) {
+        String sanitizedSuffix = sanitizeDeveloperName(propBasedSuffix == null ? '' : propBasedSuffix);
+        Boolean usable = String.isNotBlank(sanitizedSuffix) && sanitizedSuffix != 'X';
+        String suffix = usable ? sanitizedSuffix : (prefix + (index + 1));
+        return sanitizeDeveloperName(widgetDev + '_' + suffix);
+    }
+
+    /**
+     * Normalize a string into a valid CustomMetadata DeveloperName: alphanumerics +
+     * underscore only, no consecutive underscores, no leading/trailing underscore,
+     * must start with a letter, max 40 chars (with trailing underscore re-trimmed
+     * after any truncation). Keep this in sync with sanitizeDevName() in
+     * notionWidgetDesigner.js.
+     */
     private static String sanitizeDeveloperName(String name) {
         if (String.isBlank(name)) return '';
-        // Replace spaces and special characters with underscores
         String sanitized = name.replaceAll('[^a-zA-Z0-9_]', '_');
-        // Ensure it starts with a letter
-        if (!sanitized.substring(0, 1).isAlpha()) {
-            sanitized = 'X' + sanitized;
+        sanitized = sanitized.replaceAll('_+', '_');
+        sanitized = sanitized.replaceAll('^_+|_+$', '');
+        if (String.isBlank(sanitized) || !sanitized.substring(0, 1).isAlpha()) {
+            sanitized = 'X' + (sanitized == null ? '' : sanitized);
         }
-        // Limit to 40 characters (Salesforce metadata name limit)
         if (sanitized.length() > 40) {
             sanitized = sanitized.substring(0, 40);
+            sanitized = sanitized.replaceAll('_+$', '');
         }
         return sanitized;
     }

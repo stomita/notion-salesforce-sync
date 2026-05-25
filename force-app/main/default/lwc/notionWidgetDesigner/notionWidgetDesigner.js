@@ -1,5 +1,41 @@
 import { LightningElement, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+// Sanitize a string into a valid Salesforce CustomMetadata DeveloperName:
+// alphanumerics + underscore only, no consecutive underscores, no leading/trailing
+// underscore, must start with a letter, max 40 chars. Matches the server-side
+// sanitization in NotionWidgetController.sanitizeDeveloperName.
+function sanitizeDevName(s) {
+    let out = String(s || '')
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    if (!out || !/^[a-zA-Z]/.test(out)) {
+        out = 'X' + out;
+    }
+    if (out.length > 40) {
+        out = out.substring(0, 40).replace(/_+$/, '');
+    }
+    return out;
+}
+
+// Build a stable, collision-free DeveloperName for a child record (column / filter).
+// - Prefer the existing DeveloperName when present so renaming/reordering does not
+//   orphan previously-saved records.
+// - Otherwise use the sanitized property-derived suffix; if that collapses to empty
+//   (e.g. property name contains only special characters), fall back to a 1-based
+//   index suffix to guarantee uniqueness within the widget.
+function buildChildDevName(widgetDev, existingDevName, propBasedSuffix, index, prefix) {
+    if (existingDevName) {
+        return existingDevName;
+    }
+    const sanitizedSuffix = sanitizeDevName(propBasedSuffix || '');
+    // The 'X' prefix is added by sanitizeDevName when the input is empty/invalid;
+    // treat the lone 'X' as "no usable suffix" and fall back to the index.
+    const usable = sanitizedSuffix && sanitizedSuffix !== 'X';
+    const suffix = usable ? sanitizedSuffix : `${prefix}${index + 1}`;
+    return sanitizeDevName(`${widgetDev}_${suffix}`);
+}
 import getDatabases from '@salesforce/apex/NotionAdminController.getDatabases';
 import getDatabaseSchema from '@salesforce/apex/NotionAdminController.getDatabaseSchema';
 import getObjectFields from '@salesforce/apex/NotionAdminController.getObjectFields';
@@ -392,6 +428,7 @@ export default class NotionWidgetDesigner extends LightningElement {
         this.editingWidget = {
             ...this.editingWidget,
             columns: columns.map(col => ({
+                developerName: col.developerName,
                 propertyName: col.propertyName,
                 propertyType: col.propertyType,
                 label: col.label,
@@ -408,6 +445,7 @@ export default class NotionWidgetDesigner extends LightningElement {
         this.editingWidget = {
             ...this.editingWidget,
             filters: filters.map(filter => ({
+                developerName: filter.developerName,
                 propertyName: filter.propertyName,
                 propertyType: filter.propertyType,
                 operator: filter.operator,
@@ -436,9 +474,10 @@ export default class NotionWidgetDesigner extends LightningElement {
 
         this.isLoading = true;
         try {
+            const widgetDev = this.editingWidget.developerName;
             // Transform columns to match expected format
-            const columnsToSave = (this.editingWidget.columns || []).map(col => ({
-                developerName: `${this.editingWidget.developerName}_${col.propertyName}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+            const columnsToSave = (this.editingWidget.columns || []).map((col, index) => ({
+                developerName: buildChildDevName(widgetDev, col.developerName, col.propertyName, index, 'col'),
                 label: col.label || col.propertyName,
                 notionPropertyName: col.propertyName,
                 notionPropertyType: col.propertyType,
@@ -450,7 +489,7 @@ export default class NotionWidgetDesigner extends LightningElement {
 
             // Transform filters to match expected format
             const filtersToSave = (this.editingWidget.filters || []).map((filter, index) => ({
-                developerName: `${this.editingWidget.developerName}_filter_${index + 1}`,
+                developerName: buildChildDevName(widgetDev, filter.developerName, `filter_${index + 1}`, index, 'filter'),
                 label: `Filter ${index + 1}`,
                 notionPropertyName: filter.propertyName,
                 notionPropertyType: filter.propertyType,
@@ -487,7 +526,8 @@ export default class NotionWidgetDesigner extends LightningElement {
                 await this.loadWidgets();
                 this.currentView = 'list';
             } else {
-                this.showToast('Error', result.message || 'Failed to save widget', 'error');
+                const detail = (result.errors || []).join(' | ');
+                this.showToast('Error', `${result.message || 'Failed to save widget'}: ${detail}`, 'error');
             }
         } catch (error) {
             this.handleError('Error saving widget', error);
@@ -521,6 +561,7 @@ export default class NotionWidgetDesigner extends LightningElement {
             const propertyType = col.propertyType || col.notionPropertyType;
             return {
                 id: `col-${index}`,
+                developerName: col.developerName,
                 propertyName: propertyName,
                 propertyType: propertyType,
                 label: col.label || propertyName,
@@ -545,6 +586,7 @@ export default class NotionWidgetDesigner extends LightningElement {
             const contextField = filter.contextField || filter.contextSalesforceField;
             return {
                 id: `filter-${index}`,
+                developerName: filter.developerName,
                 propertyName: propertyName,
                 propertyType: propertyType,
                 operator: operator,
