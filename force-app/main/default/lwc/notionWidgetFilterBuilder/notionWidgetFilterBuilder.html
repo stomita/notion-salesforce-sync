@@ -1,0 +1,225 @@
+<template>
+    <div class="slds-p-horizontal_small">
+        <!-- Header -->
+        <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+            <div class="slds-col">
+                <h3 class="slds-text-heading_small">Filter Configuration</h3>
+            </div>
+            <div class="slds-col slds-no-flex">
+                <lightning-button
+                    label="Clear All"
+                    icon-name="utility:clear"
+                    onclick={handleClearAllFilters}
+                    disabled={noFilters}
+                    title="Remove all filters"
+                ></lightning-button>
+            </div>
+        </div>
+
+        <!-- Context field warning -->
+        <template if:true={showContextFieldWarning}>
+            <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_small" role="alert">
+                <span class="slds-assistive-text">warning</span>
+                <lightning-icon icon-name="utility:warning" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                <span>{contextFieldWarningMessage}</span>
+            </div>
+        </template>
+
+        <!-- Existing Filters -->
+        <template if:true={hasFilters}>
+            <div class="slds-m-bottom_medium">
+                <template for:each={filtersWithMetadata} for:item="filter" for:index="index">
+                    <div key={filter.id} class="slds-box slds-box_x-small slds-m-bottom_x-small filter-item">
+                        <!-- Logical operator (for filters after the first) -->
+                        <template if:true={filter.showLogicalOperator}>
+                            <div class="slds-m-bottom_x-small">
+                                <lightning-combobox
+                                    name="logicalOperator"
+                                    value={filter.logicalOperator}
+                                    options={logicalOperatorOptions}
+                                    data-id={filter.id}
+                                    onchange={handleFilterLogicalOperatorChange}
+                                    variant="label-hidden"
+                                    label="Logical Operator"
+                                    class="logical-operator-combo"
+                                ></lightning-combobox>
+                            </div>
+                        </template>
+
+                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                            <div class="slds-col">
+                                <div class="filter-expression">
+                                    <span class="property-name">{filter.propertyName}</span>
+                                    <span class="slds-text-color_weak"> ({filter.propertyTypeLabel})</span>
+                                    <span class="operator">{filter.operatorLabel}</span>
+                                    <template if:true={filter.valueDisplay}>
+                                        <span class="value">
+                                            <template if:true={filter.contextField}>
+                                                <lightning-badge label={filter.valueDisplay} class="context-badge"></lightning-badge>
+                                            </template>
+                                            <template if:false={filter.contextField}>
+                                                "{filter.valueDisplay}"
+                                            </template>
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="slds-col slds-no-flex">
+                                <lightning-button-icon
+                                    icon-name="utility:delete"
+                                    alternative-text="Remove filter"
+                                    title="Remove filter"
+                                    variant="bare"
+                                    size="small"
+                                    data-id={filter.id}
+                                    onclick={handleRemoveFilter}
+                                ></lightning-button-icon>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <!-- Empty state -->
+        <template if:false={hasFilters}>
+            <div class="slds-box slds-box_small slds-text-align_center slds-m-bottom_medium">
+                <p class="slds-text-color_weak">No filters configured. Add filters to limit the data shown in the widget.</p>
+            </div>
+        </template>
+
+        <!-- Add Filter Button -->
+        <template if:false={isAddingFilter}>
+            <lightning-button
+                label="Add Filter"
+                icon-name="utility:filterList"
+                onclick={handleShowAddFilter}
+                disabled={noProperties}
+                variant="neutral"
+            ></lightning-button>
+        </template>
+
+        <!-- Add Filter Form -->
+        <template if:true={isAddingFilter}>
+            <div class="slds-box slds-m-top_small">
+                <h4 class="slds-text-heading_small slds-m-bottom_small">Add Filter</h4>
+
+                <!-- Logical operator (if there are existing filters) -->
+                <template if:true={hasFilters}>
+                    <div class="slds-m-bottom_small">
+                        <lightning-combobox
+                            name="logicalOperator"
+                            label="Combine with previous filters using"
+                            value={newFilter.logicalOperator}
+                            options={logicalOperatorOptions}
+                            onchange={handleLogicalOperatorChange}
+                        ></lightning-combobox>
+                    </div>
+                </template>
+
+                <!-- Property selection -->
+                <div class="slds-m-bottom_small">
+                    <lightning-combobox
+                        name="property"
+                        label="Property"
+                        value={newFilter.propertyName}
+                        placeholder="Select a Notion property"
+                        options={propertyOptions}
+                        onchange={handlePropertyChange}
+                        required
+                    ></lightning-combobox>
+                </div>
+
+                <!-- Operator selection -->
+                <div class="slds-m-bottom_small">
+                    <lightning-combobox
+                        name="operator"
+                        label="Operator"
+                        value={newFilter.operator}
+                        placeholder="Select an operator"
+                        options={newFilterOperatorOptions}
+                        onchange={handleOperatorChange}
+                        required
+                        disabled={noPropertySelected}
+                    ></lightning-combobox>
+                </div>
+
+                <!-- Value type selection -->
+                <div class="slds-m-bottom_small">
+                    <lightning-combobox
+                        name="valueType"
+                        label="Value Type"
+                        value={newFilter.valueType}
+                        options={valueTypeOptions}
+                        onchange={handleValueTypeChange}
+                    ></lightning-combobox>
+                </div>
+
+                <!-- Static value input -->
+                <template if:true={showNewFilterStaticValue}>
+                    <div class="slds-m-bottom_small">
+                        <lightning-input
+                            type="text"
+                            label="Value"
+                            value={newFilter.staticValue}
+                            onchange={handleStaticValueChange}
+                            placeholder="Enter filter value"
+                        ></lightning-input>
+                    </div>
+                </template>
+
+                <!-- Context field selection -->
+                <template if:true={showNewFilterContextField}>
+                    <template if:true={hasContextFields}>
+                        <div class="slds-m-bottom_small">
+                            <lightning-combobox
+                                name="contextField"
+                                label="Context Record Field"
+                                value={newFilter.contextField}
+                                placeholder="Select a Salesforce field"
+                                options={contextFieldOptions}
+                                onchange={handleContextFieldChange}
+                            ></lightning-combobox>
+                            <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                                The filter will use the value from this field on the current record.
+                            </div>
+                        </div>
+                    </template>
+                    <template if:false={hasContextFields}>
+                        <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_small" role="alert">
+                            <span class="slds-assistive-text">warning</span>
+                            <span>Context fields are not available. Set a Context Object on the widget first.</span>
+                        </div>
+                    </template>
+                </template>
+
+                <!-- Action buttons -->
+                <div class="slds-m-top_medium">
+                    <lightning-button-group>
+                        <lightning-button
+                            label="Cancel"
+                            onclick={handleCancelAddFilter}
+                        ></lightning-button>
+                        <lightning-button
+                            label="Add Filter"
+                            variant="brand"
+                            onclick={handleAddFilter}
+                            disabled={cannotAddFilter}
+                        ></lightning-button>
+                    </lightning-button-group>
+                </div>
+            </div>
+        </template>
+
+        <!-- Help text -->
+        <div class="slds-m-top_medium slds-text-body_small slds-text-color_weak">
+            <p><strong>Tips:</strong></p>
+            <ul class="slds-list_dotted">
+                <li>Use <strong>Static Value</strong> for fixed filter values</li>
+                <li>Use <strong>Context Record Field</strong> to filter based on the current Salesforce record's field values</li>
+                <li>Context fields require setting a Context Object on the widget</li>
+                <li>Multiple filters can be combined using AND/OR operators</li>
+            </ul>
+        </div>
+    </div>
+</template>

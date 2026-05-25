@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Grants access to view Notion Widget components embedded in Lightning pages. This permission set is for end users who need to see widget data but do not configure widgets.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Notion Widget User</label>
+    <!-- Custom Metadata Type Access (Read-only) -->
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionWidget__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionWidgetColumn__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionWidgetFilter__mdt</name>
+    </customMetadataTypeAccesses>
+    <!-- Apex Class Access -->
+    <classAccesses>
+        <apexClass>NotionWidgetController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NotionPropertyRenderer</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NotionApiClient</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <!-- User Permissions -->
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>ApiEnabled</name>
+    </userPermissions>
+</PermissionSet>

@@ -1,0 +1,426 @@
+<template>
+    <!-- Loading Overlay -->
+    <template if:true={isLoading}>
+        <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+    </template>
+
+    <!-- List View -->
+    <template if:true={showListView}>
+        <div class="slds-p-around_medium">
+            <!-- Header -->
+            <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
+                <div class="slds-col">
+                    <h2 class="slds-text-heading_medium">Widget Configurations</h2>
+                    <p class="slds-text-body_small slds-text-color_weak">
+                        Create and manage Notion widgets that can be embedded in Lightning pages
+                    </p>
+                </div>
+                <div class="slds-col slds-no-flex">
+                    <lightning-button-group>
+                        <lightning-button
+                            label="Refresh"
+                            icon-name="utility:refresh"
+                            onclick={handleRefreshList}
+                        ></lightning-button>
+                        <lightning-button
+                            label="New Widget"
+                            icon-name="utility:add"
+                            variant="brand"
+                            onclick={handleNewWidget}
+                        ></lightning-button>
+                    </lightning-button-group>
+                </div>
+            </div>
+
+            <!-- Widget List -->
+            <template if:true={hasWidgets}>
+                <div class="slds-card">
+                    <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_striped">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th scope="col"><div class="slds-truncate">Widget Name</div></th>
+                                <th scope="col"><div class="slds-truncate">Developer Name</div></th>
+                                <th scope="col"><div class="slds-truncate">Notion Database</div></th>
+                                <th scope="col"><div class="slds-truncate">Context Object</div></th>
+                                <th scope="col"><div class="slds-truncate">Status</div></th>
+                                <th scope="col"><div class="slds-truncate">Columns</div></th>
+                                <th scope="col"><div class="slds-truncate">Filters</div></th>
+                                <th scope="col" style="width: 100px;"><div class="slds-truncate">Actions</div></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={widgetsWithMetadata} for:item="widget">
+                                <tr key={widget.developerName}>
+                                    <td><strong>{widget.label}</strong></td>
+                                    <td><span class="slds-text-body_small">{widget.developerName}</span></td>
+                                    <td>
+                                        <span class="slds-truncate" title={widget.notionDatabaseId}>
+                                            {widget.notionDatabaseName}
+                                        </span>
+                                    </td>
+                                    <td>{widget.contextObjectLabel}</td>
+                                    <td>
+                                        <lightning-badge label={widget.statusLabel} class={widget.statusVariant}></lightning-badge>
+                                    </td>
+                                    <td>{widget.columnCount}</td>
+                                    <td>{widget.filterCount}</td>
+                                    <td>
+                                        <lightning-button-icon
+                                            icon-name="utility:edit"
+                                            alternative-text="Edit"
+                                            title="Edit widget"
+                                            variant="bare"
+                                            data-name={widget.developerName}
+                                            onclick={handleEditWidget}
+                                        ></lightning-button-icon>
+                                        <lightning-button-icon
+                                            icon-name="utility:delete"
+                                            alternative-text="Delete"
+                                            title="Delete widget"
+                                            variant="bare"
+                                            class="slds-m-left_x-small"
+                                            data-name={widget.developerName}
+                                            data-label={widget.label}
+                                            onclick={handleDeleteWidget}
+                                        ></lightning-button-icon>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+
+            <!-- Empty State -->
+            <template if:false={hasWidgets}>
+                <div class="slds-box slds-text-align_center slds-p-around_large">
+                    <div class="slds-illustration slds-illustration_small">
+                        <lightning-icon icon-name="custom:custom63" size="large"></lightning-icon>
+                        <div class="slds-text-longform slds-m-top_medium">
+                            <h3 class="slds-text-heading_medium">No Widgets Configured</h3>
+                            <p class="slds-text-body_regular">
+                                Create your first widget to display Notion data in Lightning pages.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- Edit View -->
+    <template if:true={showEditView}>
+        <div class="slds-p-around_medium">
+            <!-- Header -->
+            <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
+                <div class="slds-col">
+                    <lightning-button
+                        label="Back to List"
+                        icon-name="utility:back"
+                        onclick={handleBackToList}
+                        variant="base"
+                    ></lightning-button>
+                    <h2 class="slds-text-heading_medium slds-m-top_small">{editViewTitle}</h2>
+                </div>
+                <div class="slds-col slds-no-flex">
+                    <lightning-button
+                        label="Save Widget"
+                        icon-name="utility:save"
+                        variant="brand"
+                        onclick={handleSaveWidget}
+                    ></lightning-button>
+                </div>
+            </div>
+
+            <!-- Basic Settings -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">Basic Settings</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <div class="slds-grid slds-gutters slds-wrap">
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-input
+                                type="text"
+                                label="Widget Label"
+                                value={editingWidget.label}
+                                data-field="label"
+                                onchange={handleInputChange}
+                                required
+                            ></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-input
+                                type="text"
+                                label="Developer Name"
+                                value={editingWidget.developerName}
+                                data-field="developerName"
+                                onchange={handleInputChange}
+                                required
+                                disabled={developerNameDisabled}
+                                pattern="[a-zA-Z][a-zA-Z0-9_]*"
+                                message-when-pattern-mismatch="Must start with a letter, containing only letters, numbers, and underscores"
+                            ></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-m-top_small">
+                            <lightning-textarea
+                                label="Description"
+                                value={editingWidget.description}
+                                data-field="description"
+                                onchange={handleInputChange}
+                                max-length="500"
+                            ></lightning-textarea>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                            <lightning-input
+                                type="checkbox"
+                                label="Active"
+                                checked={editingWidget.isActive}
+                                data-field="isActive"
+                                onchange={handleInputChange}
+                            ></lightning-input>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notion Database -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">Notion Database</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <div class="slds-grid slds-gutters slds-grid_vertical-align-end">
+                        <div class="slds-col slds-size_2-of-3">
+                            <lightning-input
+                                type="text"
+                                label="Selected Database"
+                                value={editingWidget.notionDatabaseName}
+                                readonly
+                                placeholder="No database selected"
+                            ></lightning-input>
+                            <template if:true={editingWidget.notionDatabaseId}>
+                                <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                                    ID: {editingWidget.notionDatabaseId}
+                                </div>
+                            </template>
+                        </div>
+                        <div class="slds-col slds-size_1-of-3">
+                            <lightning-button
+                                label="Select Database"
+                                icon-name="utility:search"
+                                onclick={handleSelectDatabase}
+                            ></lightning-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Settings -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">Display Settings</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <div class="slds-grid slds-gutters slds-wrap">
+                        <div class="slds-col slds-size_1-of-3">
+                            <lightning-combobox
+                                label="Page Size"
+                                value={editingWidget.pageSize}
+                                options={pageSizeOptions}
+                                data-field="pageSize"
+                                onchange={handleInputChange}
+                            ></lightning-combobox>
+                        </div>
+                        <div class="slds-col slds-size_1-of-3">
+                            <lightning-combobox
+                                label="Default Sort Property"
+                                value={editingWidget.defaultSortProperty}
+                                options={sortPropertyOptions}
+                                data-field="defaultSortProperty"
+                                onchange={handleInputChange}
+                                placeholder="Select property"
+                                disabled={noNotionProperties}
+                            ></lightning-combobox>
+                        </div>
+                        <div class="slds-col slds-size_1-of-3">
+                            <lightning-combobox
+                                label="Default Sort Direction"
+                                value={editingWidget.defaultSortDirection}
+                                options={sortDirectionOptions}
+                                data-field="defaultSortDirection"
+                                onchange={handleInputChange}
+                            ></lightning-combobox>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Context Object -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">Context Object (for Record Pages)</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <div class="slds-grid slds-gutters slds-wrap">
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-input
+                                type="text"
+                                label="Context Object API Name"
+                                value={editingWidget.contextObjectApiName}
+                                data-field="contextObjectApiName"
+                                onchange={handleInputChange}
+                                placeholder="e.g., Account, Contact, CustomObject__c"
+                            ></lightning-input>
+                            <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                                Set this to enable context field filters and the relation property below.
+                            </div>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-combobox
+                                label="Context Relation Property"
+                                value={editingWidget.contextRelationProperty}
+                                options={relationPropertyOptions}
+                                data-field="contextRelationProperty"
+                                onchange={handleInputChange}
+                                placeholder="(none)"
+                                disabled={noNotionProperties}
+                            ></lightning-combobox>
+                            <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                                When set, the widget acts as a related list: rows are filtered to those whose relation includes the context Notion page, and new pages auto-set this relation.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Page Creation -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">New Page Creation</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <lightning-input
+                        type="checkbox"
+                        label="Show 'New' Button"
+                        checked={editingWidget.showNewButton}
+                        data-field="showNewButton"
+                        onchange={handleInputChange}
+                    ></lightning-input>
+                    <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                        When enabled, the widget displays a "New" button that creates a page in the target Notion database using its default template.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column Configuration -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">Columns</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <template if:true={hasNotionProperties}>
+                        <c-notion-widget-column-configurator
+                            notion-database-id={editingWidget.notionDatabaseId}
+                            notion-properties={notionProperties}
+                            configured-columns={columnConfiguratorColumns}
+                            oncolumnchange={handleColumnChange}
+                        ></c-notion-widget-column-configurator>
+                    </template>
+                    <template if:false={hasNotionProperties}>
+                        <div class="slds-text-color_weak slds-text-align_center slds-p-around_medium">
+                            Select a Notion database to configure columns.
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Filter Configuration -->
+            <div class="slds-card slds-m-bottom_medium">
+                <div class="slds-card__header">
+                    <h3 class="slds-card__header-title">Filters</h3>
+                </div>
+                <div class="slds-card__body slds-card__body_inner">
+                    <template if:true={hasNotionProperties}>
+                        <c-notion-widget-filter-builder
+                            notion-properties={notionProperties}
+                            salesforce-fields={salesforceFields}
+                            context-object-api-name={editingWidget.contextObjectApiName}
+                            configured-filters={filterBuilderFilters}
+                            onfilterchange={handleFilterChange}
+                        ></c-notion-widget-filter-builder>
+                    </template>
+                    <template if:false={hasNotionProperties}>
+                        <div class="slds-text-color_weak slds-text-align_center slds-p-around_medium">
+                            Select a Notion database to configure filters.
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Database Selector Modal -->
+    <template if:true={showDatabaseSelector}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open slds-modal_large">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon
+                        icon-name="utility:close"
+                        alternative-text="Close"
+                        onclick={handleCancelDatabaseSelection}
+                        class="slds-modal__close"
+                    ></lightning-button-icon>
+                    <h2 class="slds-modal__title">Select Notion Database</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <!-- Search -->
+                    <lightning-input
+                        type="search"
+                        label="Search Databases"
+                        value={searchTerm}
+                        onchange={handleDatabaseSearch}
+                        placeholder="Search by name or ID..."
+                        class="slds-m-bottom_small"
+                    ></lightning-input>
+
+                    <!-- Database Table -->
+                    <template if:true={hasDatabases}>
+                        <lightning-datatable
+                            key-field="id"
+                            data={filteredDatabases}
+                            columns={databaseColumns}
+                            onrowselection={handleDatabaseRowSelection}
+                            max-row-selection="1"
+                            show-row-number-column
+                        ></lightning-datatable>
+                    </template>
+                    <template if:false={hasDatabases}>
+                        <div class="slds-text-align_center slds-p-around_large slds-text-color_weak">
+                            <template if:true={searchTerm}>
+                                No databases found matching "{searchTerm}"
+                            </template>
+                            <template if:false={searchTerm}>
+                                No databases found in your Notion workspace
+                            </template>
+                        </div>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button
+                        label="Cancel"
+                        onclick={handleCancelDatabaseSelection}
+                    ></lightning-button>
+                    <lightning-button
+                        label="Select Database"
+                        variant="brand"
+                        onclick={handleConfirmDatabaseSelection}
+                        disabled={databaseSelectionDisabled}
+                        class="slds-m-left_x-small"
+                    ></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

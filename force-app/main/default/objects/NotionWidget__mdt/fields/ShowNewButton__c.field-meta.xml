@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ShowNewButton__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Whether to show the "New" button on the widget that lets users create a new page in the target Notion database.</description>
+    <externalId>false</externalId>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Show New Button</label>
+    <type>Checkbox</type>
+</CustomField>

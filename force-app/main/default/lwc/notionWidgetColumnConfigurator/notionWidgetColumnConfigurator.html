@@ -1,0 +1,232 @@
+<template>
+    <div class="slds-p-horizontal_small">
+        <!-- Header with quick actions -->
+        <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+            <div class="slds-col">
+                <h3 class="slds-text-heading_small">Column Configuration</h3>
+            </div>
+            <div class="slds-col slds-no-flex">
+                <lightning-button-group>
+                    <lightning-button
+                        label="Add All"
+                        icon-name="utility:add"
+                        onclick={handleAddAllColumns}
+                        disabled={noAvailableProperties}
+                        title="Add all available properties as columns"
+                    ></lightning-button>
+                    <lightning-button
+                        label="Clear All"
+                        icon-name="utility:clear"
+                        onclick={handleClearAllColumns}
+                        disabled={noColumns}
+                        title="Remove all columns"
+                    ></lightning-button>
+                </lightning-button-group>
+            </div>
+        </div>
+
+        <!-- Columns List -->
+        <template if:true={hasColumns}>
+            <div class="slds-m-bottom_medium">
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <th scope="col" style="width: 60px;">
+                                <div class="slds-truncate" title="Order">Order</div>
+                            </th>
+                            <th scope="col">
+                                <div class="slds-truncate" title="Property">Property</div>
+                            </th>
+                            <th scope="col">
+                                <div class="slds-truncate" title="Label">Display Label</div>
+                            </th>
+                            <th scope="col" style="width: 100px;">
+                                <div class="slds-truncate" title="Width">Width (px)</div>
+                            </th>
+                            <th scope="col" style="width: 80px;">
+                                <div class="slds-truncate" title="Sortable">Sortable</div>
+                            </th>
+                            <th scope="col" style="width: 80px;">
+                                <div class="slds-truncate" title="Visible">Visible</div>
+                            </th>
+                            <th scope="col" style="width: 100px;">
+                                <div class="slds-truncate" title="Actions">Actions</div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={columnsWithMetadata} for:item="column">
+                            <tr key={column.id} class="slds-hint-parent">
+                                <!-- Order controls -->
+                                <td>
+                                    <div class="slds-grid slds-grid_vertical-align-center">
+                                        <lightning-button-icon
+                                            icon-name="utility:arrowup"
+                                            alternative-text="Move up"
+                                            title="Move up"
+                                            variant="bare"
+                                            size="small"
+                                            data-id={column.id}
+                                            onclick={handleMoveUp}
+                                            disabled={column.isFirst}
+                                        ></lightning-button-icon>
+                                        <lightning-button-icon
+                                            icon-name="utility:arrowdown"
+                                            alternative-text="Move down"
+                                            title="Move down"
+                                            variant="bare"
+                                            size="small"
+                                            data-id={column.id}
+                                            onclick={handleMoveDown}
+                                            disabled={column.isLast}
+                                        ></lightning-button-icon>
+                                    </div>
+                                </td>
+
+                                <!-- Property info -->
+                                <td>
+                                    <div class="slds-truncate">
+                                        <strong>{column.propertyName}</strong>
+                                        <br/>
+                                        <span class="slds-text-color_weak slds-text-body_small">
+                                            {column.propertyTypeLabel}
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <!-- Display label -->
+                                <td>
+                                    <lightning-input
+                                        type="text"
+                                        value={column.label}
+                                        data-id={column.id}
+                                        onchange={handleLabelChange}
+                                        variant="label-hidden"
+                                        label="Display Label"
+                                    ></lightning-input>
+                                </td>
+
+                                <!-- Width -->
+                                <td>
+                                    <lightning-input
+                                        type="number"
+                                        value={column.width}
+                                        data-id={column.id}
+                                        onchange={handleWidthChange}
+                                        variant="label-hidden"
+                                        label="Width"
+                                        placeholder="Auto"
+                                        min="50"
+                                        max="500"
+                                    ></lightning-input>
+                                </td>
+
+                                <!-- Sortable -->
+                                <td class="slds-text-align_center">
+                                    <lightning-input
+                                        type="checkbox"
+                                        checked={column.isSortable}
+                                        data-id={column.id}
+                                        onchange={handleSortableChange}
+                                        variant="label-hidden"
+                                        label="Sortable"
+                                    ></lightning-input>
+                                </td>
+
+                                <!-- Visible -->
+                                <td class="slds-text-align_center">
+                                    <lightning-input
+                                        type="checkbox"
+                                        checked={column.isVisible}
+                                        data-id={column.id}
+                                        onchange={handleVisibleChange}
+                                        variant="label-hidden"
+                                        label="Visible"
+                                    ></lightning-input>
+                                </td>
+
+                                <!-- Actions -->
+                                <td>
+                                    <lightning-button-icon
+                                        icon-name="utility:delete"
+                                        alternative-text="Remove"
+                                        title="Remove column"
+                                        variant="bare"
+                                        size="small"
+                                        data-id={column.id}
+                                        onclick={handleRemoveColumn}
+                                    ></lightning-button-icon>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+
+        <!-- Empty state -->
+        <template if:false={hasColumns}>
+            <div class="slds-box slds-box_small slds-text-align_center slds-m-bottom_medium">
+                <p class="slds-text-color_weak">No columns configured. Add columns to display data from Notion.</p>
+            </div>
+        </template>
+
+        <!-- Add Column Form -->
+        <template if:false={isAddingColumn}>
+            <lightning-button
+                label="Add Column"
+                icon-name="utility:add"
+                onclick={handleShowAddColumn}
+                disabled={noAvailableProperties}
+                variant="neutral"
+            ></lightning-button>
+            <template if:false={hasAvailableProperties}>
+                <span class="slds-text-color_weak slds-m-left_small">
+                    All properties have been added
+                </span>
+            </template>
+        </template>
+
+        <template if:true={isAddingColumn}>
+            <div class="slds-box slds-m-top_small">
+                <h4 class="slds-text-heading_small slds-m-bottom_small">Add Column</h4>
+
+                <lightning-combobox
+                    name="property"
+                    label="Select Property"
+                    value={selectedPropertyForAdd}
+                    placeholder="Choose a Notion property"
+                    options={availableProperties}
+                    onchange={handlePropertySelection}
+                    required
+                ></lightning-combobox>
+
+                <div class="slds-m-top_medium">
+                    <lightning-button-group>
+                        <lightning-button
+                            label="Cancel"
+                            onclick={handleCancelAddColumn}
+                        ></lightning-button>
+                        <lightning-button
+                            label="Add Column"
+                            variant="brand"
+                            onclick={handleAddColumn}
+                            disabled={noSelectedPropertyForAdd}
+                        ></lightning-button>
+                    </lightning-button-group>
+                </div>
+            </div>
+        </template>
+
+        <!-- Help text -->
+        <div class="slds-m-top_medium slds-text-body_small slds-text-color_weak">
+            <p><strong>Tips:</strong></p>
+            <ul class="slds-list_dotted">
+                <li>Drag columns to reorder them using the arrow buttons</li>
+                <li>Set a custom display label to override the property name</li>
+                <li>Use "Auto" render type to let the system choose based on property type</li>
+                <li>Title and URL properties are automatically rendered as links</li>
+            </ul>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Column configuration for Notion widgets, defining which properties to display and how to render them</description>
+    <label>Notion Widget Column</label>
+    <pluralLabel>Notion Widget Columns</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

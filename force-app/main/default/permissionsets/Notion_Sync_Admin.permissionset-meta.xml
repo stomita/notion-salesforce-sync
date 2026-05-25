@@ -20,6 +20,18 @@
         <enabled>true</enabled>
         <name>NotionSyncObject__mdt</name>
     </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionWidget__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionWidgetColumn__mdt</name>
+    </customMetadataTypeAccesses>
+    <customMetadataTypeAccesses>
+        <enabled>true</enabled>
+        <name>NotionWidgetFilter__mdt</name>
+    </customMetadataTypeAccesses>
     <!-- Apex Class Access -->
     <classAccesses>
         <apexClass>NotionAdminController</apexClass>
@@ -31,6 +43,14 @@
     </classAccesses>
     <classAccesses>
         <apexClass>NotionApiClient</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NotionWidgetController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NotionPropertyRenderer</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <!-- User Permissions -->

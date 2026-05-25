@@ -1,0 +1,44 @@
+/* notionWidgetFilterBuilder styles */
+
+:host {
+    display: block;
+}
+
+/* Filter item styling */
+.filter-item {
+    background-color: #f3f3f3;
+}
+
+/* Filter expression styling */
+.filter-expression {
+    font-size: 0.875rem;
+}
+
+.filter-expression .property-name {
+    font-weight: 600;
+}
+
+.filter-expression .operator {
+    color: #0070d2;
+    margin: 0 0.5rem;
+}
+
+.filter-expression .value {
+    font-style: italic;
+}
+
+/* Context badge styling */
+.context-badge {
+    --slds-c-badge-color-background: #0070d2;
+    --slds-c-badge-text-color: white;
+}
+
+/* Logical operator combo */
+.logical-operator-combo {
+    max-width: 100px;
+}
+
+/* Warning alert compact */
+.slds-alert_warning {
+    padding: 0.5rem 1rem;
+}
