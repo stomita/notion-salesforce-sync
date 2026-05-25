@@ -1,0 +1,32 @@
+:host {
+    display: block;
+}
+
+.notion-widget-table-wrapper {
+    overflow-x: auto;
+}
+
+.notion-widget-table-wrapper table th .slds-th__action {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.notion-widget-table-wrapper td a + a {
+    margin-left: 0;
+}
+
+.slds-alert_error {
+    background-color: #c23934;
+    color: white;
+}
+
+.slds-alert_warning {
+    background-color: #fe9339;
+    color: white;
+}
+
+.notion-widget-untitled {
+    font-style: italic;
+    color: #706e6b;
+}

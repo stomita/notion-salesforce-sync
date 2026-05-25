@@ -1,0 +1,38 @@
+/* notionWidgetDesigner styles */
+
+:host {
+    display: block;
+}
+
+/* Modal styling */
+.slds-modal__container {
+    max-width: 900px;
+}
+
+/* Card header styling */
+.slds-card__header-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Table styling */
+.slds-table th,
+.slds-table td {
+    vertical-align: middle;
+}
+
+/* Status badge styling */
+.success {
+    --slds-c-badge-color-background: #2e844a;
+    --slds-c-badge-text-color: white;
+}
+
+/* Empty state illustration */
+.slds-illustration {
+    padding: 2rem;
+}
+
+/* Truncate long text in tables */
+.slds-truncate {
+    max-width: 200px;
+}

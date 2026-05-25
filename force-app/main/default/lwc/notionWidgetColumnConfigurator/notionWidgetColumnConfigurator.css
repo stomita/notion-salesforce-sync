@@ -1,0 +1,28 @@
+/* notionWidgetColumnConfigurator styles */
+
+:host {
+    display: block;
+}
+
+/* Compact table styling */
+.slds-table td {
+    vertical-align: middle;
+}
+
+/* Order column styling */
+.slds-table td:first-child {
+    padding: 0.25rem;
+}
+
+/* Ensure inputs fit well in table cells */
+lightning-input,
+lightning-combobox {
+    --slds-c-input-spacing-horizontal-start: 0.5rem;
+    --slds-c-input-spacing-horizontal-end: 0.5rem;
+}
+
+/* Checkbox centering */
+.slds-text-align_center lightning-input {
+    display: flex;
+    justify-content: center;
+}

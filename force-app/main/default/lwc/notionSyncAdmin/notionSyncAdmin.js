@@ -26,7 +26,7 @@ export default class NotionSyncAdmin extends LightningElement {
     @track showDatabaseBrowser = false;
     @track showFieldMapping = false;
     @track showRelationshipConfig = false;
-    @track activeTab = 'configurations';
+    @track activeTab = 'sync';
 
     connectedCallback() {
         this.checkPermissionAndLoadData();
@@ -509,8 +509,8 @@ export default class NotionSyncAdmin extends LightningElement {
         // Force a fresh load of the configuration
         this.currentConfiguration = null;
         
-        // Switch to configurations tab to show the edit form
-        this.activeTab = 'configurations';
+        // Switch to sync tab to show the edit form
+        this.activeTab = 'sync';
         
         // Load the configuration
         console.log('[EDIT] About to load configuration for:', objectApiName);

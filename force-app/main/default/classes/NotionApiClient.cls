@@ -162,31 +162,39 @@ public class NotionApiClient {
     }
     
     public static NotionResponse queryDatabase(String databaseId, Map<String, Object> filter) {
-        return queryDatabase(databaseId, filter, null, null);
+        return queryDatabase(databaseId, filter, null, null, null);
     }
-    
+
     public static NotionResponse queryDatabase(String databaseId, Map<String, Object> filter, String startCursor, Integer pageSize) {
+        return queryDatabase(databaseId, filter, startCursor, pageSize, null);
+    }
+
+    public static NotionResponse queryDatabase(String databaseId, Map<String, Object> filter, String startCursor, Integer pageSize, List<Map<String, Object>> sorts) {
         try {
             // Apply rate limiting before making the request
             NotionRateLimiter.throttleRequest();
-            
+
             HttpRequest request = buildHttpRequest('POST', '/v1/databases/' + databaseId + '/query');
-            
+
             Map<String, Object> requestBody = new Map<String, Object>();
             if (filter != null && !filter.isEmpty()) {
                 requestBody.put('filter', filter);
             }
-            
+
             if (String.isNotBlank(startCursor)) {
                 requestBody.put('start_cursor', startCursor);
             }
-            
+
             if (pageSize != null && pageSize > 0) {
                 requestBody.put('page_size', Math.min(pageSize, 100)); // Notion max is 100
             }
-            
+
+            if (sorts != null && !sorts.isEmpty()) {
+                requestBody.put('sorts', sorts);
+            }
+
             request.setBody(JSON.serialize(requestBody));
-            
+
             HttpResponse response = new Http().send(request);
             return processResponse(response);
             

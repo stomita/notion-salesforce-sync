@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ContextRelationProperty__c</fullName>
+    <description>Name of the Notion relation property on the target database that relates pages to the context Notion page. When set, the widget acts like a Salesforce related list: rows are filtered to those whose relation includes the context Notion page, and new pages created from the widget have this relation auto-populated with the context Notion page.</description>
+    <externalId>false</externalId>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Context Relation Property</label>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

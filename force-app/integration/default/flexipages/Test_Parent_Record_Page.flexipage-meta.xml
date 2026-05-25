@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexiPage xmlns="http://soap.sforce.com/2006/04/metadata">
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>force:highlightsPanel</componentName>
+                <identifier>highlights</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>header</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>c:notionWidget</componentName>
+                <componentInstanceProperties>
+                    <name>widgetDeveloperName</name>
+                    <value>Parent_Children</value>
+                </componentInstanceProperties>
+                <identifier>parentChildrenWidget</identifier>
+            </componentInstance>
+        </itemInstances>
+        <itemInstances>
+            <componentInstance>
+                <componentName>c:notionWidget</componentName>
+                <componentInstanceProperties>
+                    <name>widgetDeveloperName</name>
+                    <value>Test_Child_Records</value>
+                </componentInstanceProperties>
+                <identifier>allChildRecordsWidget</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>main</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <masterLabel>Test Parent Object Record Page</masterLabel>
+    <sobjectType>Test_Parent_Object__c</sobjectType>
+    <template>
+        <name>flexipage:recordHomeTemplateDesktop</name>
+    </template>
+    <type>RecordPage</type>
+</FlexiPage>
