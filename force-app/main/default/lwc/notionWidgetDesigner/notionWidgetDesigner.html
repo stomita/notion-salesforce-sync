@@ -264,14 +264,14 @@
                 <div class="slds-card__body slds-card__body_inner">
                     <div class="slds-grid slds-gutters slds-wrap">
                         <div class="slds-col slds-size_1-of-2">
-                            <lightning-input
-                                type="text"
-                                label="Context Object API Name"
+                            <lightning-combobox
+                                label="Context Object"
                                 value={editingWidget.contextObjectApiName}
+                                options={contextObjectOptions}
                                 data-field="contextObjectApiName"
                                 onchange={handleInputChange}
-                                placeholder="e.g., Account, Contact, CustomObject__c"
-                            ></lightning-input>
+                                placeholder="(none)"
+                            ></lightning-combobox>
                             <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
                                 Set this to enable context field filters and the relation property below.
                             </div>

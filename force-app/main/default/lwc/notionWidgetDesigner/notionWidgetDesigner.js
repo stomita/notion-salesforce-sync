@@ -1,8 +1,9 @@
-import { LightningElement, track } from 'lwc';
+import { LightningElement, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getDatabases from '@salesforce/apex/NotionAdminController.getDatabases';
 import getDatabaseSchema from '@salesforce/apex/NotionAdminController.getDatabaseSchema';
 import getObjectFields from '@salesforce/apex/NotionAdminController.getObjectFields';
+import getSalesforceObjects from '@salesforce/apex/NotionAdminController.getSalesforceObjects';
 import getAllWidgetConfigurations from '@salesforce/apex/NotionWidgetController.getAllWidgetConfigurations';
 import getWidgetConfiguration from '@salesforce/apex/NotionWidgetController.getWidgetConfiguration';
 import saveWidgetConfiguration from '@salesforce/apex/NotionWidgetController.saveWidgetConfiguration';
@@ -23,6 +24,14 @@ export default class NotionWidgetDesigner extends LightningElement {
     @track editingWidget = null;
     @track notionProperties = [];
     @track salesforceFields = [];
+    @track salesforceObjects = [];
+
+    @wire(getSalesforceObjects)
+    wiredObjects({ data }) {
+        if (data) {
+            this.salesforceObjects = data;
+        }
+    }
 
     // Database browser data
     @track databases = [];
@@ -207,6 +216,17 @@ export default class NotionWidgetDesigner extends LightningElement {
         this.notionProperties
             .filter(p => p.type === 'relation')
             .forEach(p => options.push({ label: p.name, value: p.name }));
+        return options;
+    }
+
+    get contextObjectOptions() {
+        const options = [{ label: '(none)', value: '' }];
+        for (const obj of this.salesforceObjects || []) {
+            options.push({
+                label: `${obj.label} (${obj.apiName})`,
+                value: obj.apiName
+            });
+        }
         return options;
     }
 
