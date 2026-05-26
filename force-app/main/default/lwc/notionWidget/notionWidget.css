@@ -16,6 +16,28 @@
     margin-left: 0;
 }
 
+/* slds-table_fixed-layout sets table-layout: fixed but does not clip cell
+   content. Without overflow:hidden the title link and badge spans escape
+   the cell box and visually overlap adjacent columns. */
+.notion-widget-table-wrapper td {
+    overflow: hidden;
+    vertical-align: top;
+}
+
+/* Title link and the direct text spans (text / number / date) need
+   inline-block + ellipsis to actually truncate inside a fixed-layout cell;
+   plain text inheriting nowrap from slds-truncate alone is not enough
+   because the anchor itself has no width constraint. */
+.notion-widget-table-wrapper td > a,
+.notion-widget-table-wrapper td > span {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 .slds-alert_error {
     background-color: #c23934;
     color: white;
