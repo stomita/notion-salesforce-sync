@@ -236,8 +236,12 @@ export default class NotionWidgetColumnConfigurator extends LightningElement {
     }
 
     notifyChange() {
+        // swapColumns mutates displayOrder values without reordering the internal
+        // array, so emit a copy sorted by displayOrder. Otherwise the consumer would
+        // persist the columns in their original creation order and the user's
+        // reorder would be silently lost on save.
         this.dispatchEvent(new CustomEvent('columnchange', {
-            detail: { columns: this.columns }
+            detail: { columns: this.sortedColumns }
         }));
     }
 
