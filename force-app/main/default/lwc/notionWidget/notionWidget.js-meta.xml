@@ -12,7 +12,8 @@
     <targetConfigs>
         <targetConfig targets="lightning__RecordPage,lightning__AppPage,lightning__HomePage">
             <property name="widgetDeveloperName" type="String" label="Widget Configuration"
-                      description="The Developer Name of the NotionWidget custom metadata configuration" required="true"/>
+                      description="The Developer Name of the NotionWidget custom metadata configuration"
+                      datasource="apex://NotionWidgetPicklist" required="true"/>
         </targetConfig>
     </targetConfigs>
 </LightningComponentBundle>
