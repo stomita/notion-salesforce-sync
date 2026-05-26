@@ -14,6 +14,7 @@ CODE_COVERAGE=true
 PACKAGE_ID=""
 PACKAGE_NAME="Notion Salesforce Sync"
 VERSION_DESCRIPTION=""
+BUMP="minor"
 
 # Load environment variables if .env file exists
 if [ -f .env ]; then
@@ -44,6 +45,10 @@ while [[ $# -gt 0 ]]; do
             VERSION_DESCRIPTION="$2"
             shift 2
             ;;
+        --bump)
+            BUMP="$2"
+            shift 2
+            ;;
         --skip-validation)
             SKIP_VALIDATION=true
             shift
@@ -61,6 +66,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --package-id <id>            The package ID (defaults to NOTION_SYNC_PACKAGE_ID from .env)"
             echo "  --wait <minutes>             Wait time for package creation (default: 20)"
             echo "  --version-description <desc> Version description for the package"
+            echo "  --bump <minor|major>         Bump the major or minor version (default: minor)"
             echo "  --skip-validation            Skip validation during package creation"
             echo "  --no-code-coverage           Skip code coverage calculation"
             echo "  --help                       Show this help message"
@@ -170,10 +176,15 @@ if command -v jq &> /dev/null; then
         # Extract major and minor versions
         MAJOR=$(echo "$LATEST_VERSION" | cut -d. -f1)
         MINOR=$(echo "$LATEST_VERSION" | cut -d. -f2)
-        # Increment minor version
-        NEXT_MINOR=$((MINOR + 1))
-        VERSION_NUMBER="${MAJOR}.${NEXT_MINOR}.0.NEXT"
-        VERSION_NAME="Version ${MAJOR}.${NEXT_MINOR}"
+        if [ "$BUMP" = "major" ]; then
+            NEXT_MAJOR=$((MAJOR + 1))
+            VERSION_NUMBER="${NEXT_MAJOR}.0.0.NEXT"
+            VERSION_NAME="Version ${NEXT_MAJOR}.0"
+        else
+            NEXT_MINOR=$((MINOR + 1))
+            VERSION_NUMBER="${MAJOR}.${NEXT_MINOR}.0.NEXT"
+            VERSION_NAME="Version ${MAJOR}.${NEXT_MINOR}"
+        fi
     else
         # Default to 1.0 if no versions exist
         VERSION_NUMBER="1.0.0.NEXT"
