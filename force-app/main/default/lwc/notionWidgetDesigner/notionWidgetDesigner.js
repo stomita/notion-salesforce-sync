@@ -475,13 +475,17 @@ export default class NotionWidgetDesigner extends LightningElement {
         this.isLoading = true;
         try {
             const widgetDev = this.editingWidget.developerName;
-            // Transform columns to match expected format
-            const columnsToSave = (this.editingWidget.columns || []).map((col, index) => ({
+            // Transform columns to match expected format.
+            // Defensive sort by displayOrder: Apex persists DisplayOrder__c from the
+            // array index, so the array order is what actually defines the saved order.
+            const orderedColumns = [...(this.editingWidget.columns || [])]
+                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+            const columnsToSave = orderedColumns.map((col, index) => ({
                 developerName: buildChildDevName(widgetDev, col.developerName, col.propertyName, index, 'col'),
                 label: col.label || col.propertyName,
                 notionPropertyName: col.propertyName,
                 notionPropertyType: col.propertyType,
-                displayOrder: col.displayOrder,
+                displayOrder: index + 1,
                 columnWidth: col.columnWidth,
                 isVisible: col.isVisible !== false,
                 isSortable: col.isSortable !== false
