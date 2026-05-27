@@ -408,7 +408,7 @@ export default class NotionWidget extends LightningElement {
     }
 
     get widgetTitle() {
-        return this.widgetConfig?.label || this.widgetDeveloperName || 'Notion Widget';
+        return this.widgetConfig?.label || '';
     }
 
     get headerColumns() {
@@ -420,18 +420,21 @@ export default class NotionWidget extends LightningElement {
                 ? (direction === 'ascending' ? 'ascending'
                     : direction === 'descending' ? 'descending' : 'none')
                 : null;
-            // SLDS data table th classes — pairs `slds-is-sortable` with
-            // `slds-is-sorted` (+ direction) so the SLDS rule that hides
-            // `.slds-is-sortable__icon` flips on for sorted columns. Also
-            // adds `slds-is-resizable` so the divider handle gets SLDS styling.
+            // SLDS data table th classes. Native lightning-datatable applies
+            // `slds-is-sorted_asc` even on unsorted-but-sortable columns so
+            // that the hover preview of the sort icon points up — matching
+            // the direction the first click will take (ascending). Without
+            // `slds-is-sorted` the icon stays hidden until hovered (SLDS only
+            // promotes it to inline-block on `:hover` or when sorted).
             const classes = ['slds-is-resizable'];
             if (col.sortable) {
                 classes.push('slds-is-sortable');
-                if (direction === 'ascending') {
-                    classes.push('slds-is-sorted', 'slds-is-sorted_asc');
-                } else if (direction === 'descending') {
-                    classes.push('slds-is-sorted', 'slds-is-sorted_desc');
+                if (direction !== null) {
+                    classes.push('slds-is-sorted');
                 }
+                classes.push(direction === 'descending'
+                    ? 'slds-is-sorted_desc'
+                    : 'slds-is-sorted_asc');
             }
             return {
                 key: col.propertyName,
@@ -441,10 +444,11 @@ export default class NotionWidget extends LightningElement {
                 width: effectiveWidth ? `width: ${effectiveWidth}px;` : '',
                 ariaSort,
                 thClass: classes.join(' '),
-                // Always render an arrow icon; SLDS reveals it on hover when
-                // sortable, and keeps it visible when sorted. Direction
-                // controls which way the arrow points.
-                sortIcon: direction === 'ascending' ? 'utility:arrowup' : 'utility:arrowdown'
+                // SLDS data-table convention: icon-name stays fixed
+                // (`utility:arrowdown`) and SLDS rotates it 180deg via the
+                // `slds-is-sorted_asc` class on the <th>. Switching icon-name
+                // dynamically here cancels out that rotation.
+                sortIcon: 'utility:arrowdown'
             };
         });
     }
