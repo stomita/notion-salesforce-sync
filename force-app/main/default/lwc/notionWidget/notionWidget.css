@@ -3,40 +3,22 @@
 }
 
 .notion-widget-table-wrapper {
+    /* Per CSS spec, setting overflow-x to a non-visible value promotes
+       overflow-y from `visible` to `auto`, which gave us a stray vertical
+       scrollbar even when all rows fit. Explicitly setting overflow-y to
+       hidden keeps the horizontal scrollbar (when the table is wider than
+       the card) without ever spawning a vertical scrollbar — the card
+       grows to fit the rows and the page handles vertical scroll. */
     overflow-x: auto;
-}
-
-.notion-widget-table-wrapper table th .slds-th__action {
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
+    overflow-y: hidden;
 }
 
 .notion-widget-table-wrapper td a + a {
     margin-left: 0;
 }
 
-/* slds-table_fixed-layout sets table-layout: fixed but does not clip cell
-   content. Without overflow:hidden the title link and badge spans escape
-   the cell box and visually overlap adjacent columns. */
-.notion-widget-table-wrapper td {
-    overflow: hidden;
-    vertical-align: top;
-}
-
-/* Title link and the direct text spans (text / number / date) need
-   inline-block + ellipsis to actually truncate inside a fixed-layout cell;
-   plain text inheriting nowrap from slds-truncate alone is not enough
-   because the anchor itself has no width constraint. */
-.notion-widget-table-wrapper td > a,
-.notion-widget-table-wrapper td > span {
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: middle;
-}
+/* SLDS data table pattern handles td truncation natively via
+   <div class="slds-truncate" title="..."> inside each <td role="gridcell">. */
 
 .slds-alert_error {
     background-color: #c23934;
@@ -51,4 +33,31 @@
 .notion-widget-untitled {
     font-style: italic;
     color: #706e6b;
+}
+
+/* Column resize uses SLDS's standard pattern (slds-table_resizable-cols on
+   the table + .slds-resizable / .slds-resizable__handle / .slds-resizable__divider
+   inside each sortable th). SLDS sets up all positioning, padding, hover
+   states, and divider visuals; we only need to wire mousedown on the handle
+   to drive width state. No CSS overrides necessary here. */
+
+/* Wrapper made relative so the refresh-overlay spinner can sit on top of
+   the existing table during sort / refresh without removing the data. */
+.notion-widget-table-wrapper-relative {
+    position: relative;
+}
+
+.notion-widget-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.55);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 2rem;
+    z-index: 2;
+    pointer-events: none;
 }

@@ -71,8 +71,18 @@ export default class NotionWidget extends LightningElement {
     @track sortProperty = null;
     @track sortDirection = null;
 
+    // Session-only column-width overrides keyed by propertyName.
+    // Reset on widget reload; not persisted to metadata.
+    @track resizedWidths = {};
+    _resizeState = null;
+
     connectedCallback() {
         this.loadWidget();
+    }
+
+    disconnectedCallback() {
+        window.removeEventListener('mousemove', this._onResizeMove);
+        window.removeEventListener('mouseup', this._onResizeEnd);
     }
 
     async loadWidget() {
@@ -100,8 +110,10 @@ export default class NotionWidget extends LightningElement {
     }
 
     async loadFirstPage() {
-        // Wipe accumulated rows and pagination state, then fetch page 1.
-        this.rows = [];
+        // Reset pagination state but keep the existing rows visible during the
+        // fetch. Sort / refresh used to wipe the table to an empty spinner
+        // which felt jarring; we now overlay a spinner on top of the previous
+        // data and swap it in only when the new page arrives.
         this.nextCursor = null;
         this.hasMore = false;
         this.loadMoreError = null;
@@ -303,6 +315,38 @@ export default class NotionWidget extends LightningElement {
         this.loadFirstPage();
     }
 
+    // ---- Column resize (session only) ----
+    handleResizeStart = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const propertyName = event.currentTarget.dataset.property;
+        const th = event.currentTarget.closest('th');
+        if (!th) return;
+        this._resizeState = {
+            propertyName,
+            startX: event.clientX,
+            startWidth: th.getBoundingClientRect().width
+        };
+        window.addEventListener('mousemove', this._onResizeMove);
+        window.addEventListener('mouseup', this._onResizeEnd);
+    };
+
+    _onResizeMove = (event) => {
+        if (!this._resizeState) return;
+        const delta = event.clientX - this._resizeState.startX;
+        const newWidth = Math.max(40, Math.round(this._resizeState.startWidth + delta));
+        this.resizedWidths = {
+            ...this.resizedWidths,
+            [this._resizeState.propertyName]: newWidth
+        };
+    };
+
+    _onResizeEnd = () => {
+        window.removeEventListener('mousemove', this._onResizeMove);
+        window.removeEventListener('mouseup', this._onResizeEnd);
+        this._resizeState = null;
+    };
+
     async handleCreate() {
         if (this.isCreating) return;
         try {
@@ -353,6 +397,16 @@ export default class NotionWidget extends LightningElement {
         return this.rows && this.rows.length > 0;
     }
 
+    // Full-screen spinner only on the very first load (no rows yet).
+    // Subsequent sort / refresh shows an overlay spinner on top of the table.
+    get showInitialSpinner() {
+        return this.isLoading && !this.hasData;
+    }
+
+    get showRefreshOverlay() {
+        return this.isLoading && this.hasData;
+    }
+
     get widgetTitle() {
         return this.widgetConfig?.label || this.widgetDeveloperName || 'Notion Widget';
     }
@@ -361,15 +415,36 @@ export default class NotionWidget extends LightningElement {
         return this.columnDefs.map((col) => {
             const isSorted = this.sortProperty === col.propertyName;
             const direction = isSorted ? this.sortDirection : null;
+            const effectiveWidth = this.resizedWidths[col.propertyName] ?? col.width;
+            const ariaSort = col.sortable
+                ? (direction === 'ascending' ? 'ascending'
+                    : direction === 'descending' ? 'descending' : 'none')
+                : null;
+            // SLDS data table th classes — pairs `slds-is-sortable` with
+            // `slds-is-sorted` (+ direction) so the SLDS rule that hides
+            // `.slds-is-sortable__icon` flips on for sorted columns. Also
+            // adds `slds-is-resizable` so the divider handle gets SLDS styling.
+            const classes = ['slds-is-resizable'];
+            if (col.sortable) {
+                classes.push('slds-is-sortable');
+                if (direction === 'ascending') {
+                    classes.push('slds-is-sorted', 'slds-is-sorted_asc');
+                } else if (direction === 'descending') {
+                    classes.push('slds-is-sorted', 'slds-is-sorted_desc');
+                }
+            }
             return {
                 key: col.propertyName,
                 label: col.label || col.propertyName,
                 propertyName: col.propertyName,
                 isSortable: !!col.sortable,
-                width: col.width ? `width: ${col.width}px;` : '',
-                sortIcon: direction === 'ascending' ? 'utility:arrowup'
-                    : direction === 'descending' ? 'utility:arrowdown' : null,
-                hasSortIcon: !!direction
+                width: effectiveWidth ? `width: ${effectiveWidth}px;` : '',
+                ariaSort,
+                thClass: classes.join(' '),
+                // Always render an arrow icon; SLDS reveals it on hover when
+                // sortable, and keeps it visible when sorted. Direction
+                // controls which way the arrow points.
+                sortIcon: direction === 'ascending' ? 'utility:arrowup' : 'utility:arrowdown'
             };
         });
     }

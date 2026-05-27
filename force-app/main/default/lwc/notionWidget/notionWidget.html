@@ -1,26 +1,26 @@
 <template>
     <lightning-card title={widgetTitle} icon-name="custom:custom63">
         <div slot="actions" class="slds-grid slds-grid_vertical-align-center">
-            <template if:true={showNewButton}>
-                <lightning-button
-                    label="New"
-                    icon-name="utility:add"
-                    variant="brand"
-                    onclick={handleCreate}
-                    disabled={createDisabled}
-                    class="slds-m-right_x-small">
-                </lightning-button>
-            </template>
             <lightning-button-icon
                 icon-name="utility:refresh"
                 alternative-text="Refresh"
                 title="Refresh"
+                variant="border-filled"
                 onclick={handleRefresh}
-                disabled={isLoading}>
+                disabled={isLoading}
+                class="slds-m-right_x-small">
             </lightning-button-icon>
+            <template if:true={showNewButton}>
+                <lightning-button
+                    label="New"
+                    variant="neutral"
+                    onclick={handleCreate}
+                    disabled={createDisabled}>
+                </lightning-button>
+            </template>
         </div>
 
-        <template if:true={isLoading}>
+        <template if:true={showInitialSpinner}>
             <div class="slds-is-relative slds-p-around_large">
                 <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
             </div>
@@ -35,26 +35,41 @@
             </div>
         </template>
 
-        <template if:false={isLoading}>
-            <template if:false={hasError}>
-                <template if:true={hasData}>
-                    <div class="notion-widget-table-wrapper">
-                        <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_fixed-layout">
+        <template if:false={hasError}>
+            <template if:true={hasData}>
+                <div class="notion-widget-table-wrapper notion-widget-table-wrapper-relative">
+                    <template if:true={showRefreshOverlay}>
+                        <div class="notion-widget-loading-overlay">
+                            <lightning-spinner alternative-text="Refreshing" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+                    <table class="slds-table slds-table_bordered slds-table_fixed-layout slds-table_resizable-cols" role="grid">
                             <thead>
                                 <tr class="slds-line-height_reset">
                                     <template for:each={headerColumns} for:item="col">
-                                        <th key={col.key} scope="col" style={col.width}>
+                                        <th key={col.key} scope="col" style={col.width} class={col.thClass} aria-label={col.label} aria-sort={col.ariaSort}>
                                             <template if:true={col.isSortable}>
-                                                <a class="slds-th__action slds-text-link_reset" data-property={col.propertyName} onclick={handleSortClick}>
-                                                    <span class="slds-truncate">{col.label}</span>
-                                                    <template if:true={col.hasSortIcon}>
-                                                        <lightning-icon icon-name={col.sortIcon} size="xx-small" class="slds-m-left_xx-small"></lightning-icon>
-                                                    </template>
+                                                <a class="slds-th__action slds-text-link_reset" href="javascript:void(0);" role="button" tabindex="0" data-property={col.propertyName} onclick={handleSortClick}>
+                                                    <span class="slds-assistive-text">Sort by: </span>
+                                                    <div class="slds-grid slds-grid_vertical-align-center slds-has-flexi-truncate">
+                                                        <span class="slds-truncate" title={col.label}>{col.label}</span>
+                                                        <lightning-icon icon-name={col.sortIcon} size="xx-small" class="slds-m-left_xx-small slds-is-sortable__icon"></lightning-icon>
+                                                    </div>
                                                 </a>
                                             </template>
                                             <template if:false={col.isSortable}>
-                                                <div class="slds-truncate" title={col.label}>{col.label}</div>
+                                                <div class="slds-th__action">
+                                                    <div class="slds-grid slds-grid_vertical-align-center slds-has-flexi-truncate">
+                                                        <span class="slds-truncate" title={col.label}>{col.label}</span>
+                                                    </div>
+                                                </div>
                                             </template>
+                                            <div class="slds-resizable">
+                                                <input type="range" class="slds-resizable__input slds-assistive-text" aria-label={col.label} max="1000" min="20" tabindex="-1">
+                                                <span class="slds-resizable__handle" data-property={col.propertyName} onmousedown={handleResizeStart}>
+                                                    <span class="slds-resizable__divider"></span>
+                                                </span>
+                                            </div>
                                         </th>
                                     </template>
                                 </tr>
@@ -63,86 +78,80 @@
                                 <template for:each={rows} for:item="row">
                                     <tr key={row.id} class="slds-hint-parent">
                                         <template for:each={row.cells} for:item="cell">
-                                            <td key={cell.key} data-label={cell.key}>
-                                                <!-- title -->
-                                                <template if:true={cell.isTitle}>
-                                                    <a href={cell.url} target="_blank" rel="noopener" title="Open in Notion" class={cell.linkClass}>{cell.displayValue}</a>
-                                                </template>
-                                                <!-- plain text / number / date / created_by / last_edited_by / formula / rollup -->
-                                                <template if:true={cell.isText}>
-                                                    <span class="slds-truncate" title={cell.displayValue}>{cell.displayValue}</span>
-                                                </template>
-                                                <template if:true={cell.isNumber}>
-                                                    <span class="slds-truncate" title={cell.displayValue}>{cell.displayValue}</span>
-                                                </template>
-                                                <template if:true={cell.isDate}>
-                                                    <span class="slds-truncate" title={cell.displayValue}>{cell.displayValue}</span>
-                                                </template>
-                                                <!-- checkbox -->
-                                                <template if:true={cell.isCheckbox}>
-                                                    <template if:true={cell.boolValue}>
-                                                        <lightning-icon icon-name="utility:check" size="x-small" variant="success" alternative-text="Yes"></lightning-icon>
+                                            <td key={cell.key} role="gridcell" data-label={cell.key}>
+                                                <div class="slds-truncate" title={cell.displayValue}>
+                                                    <!-- title -->
+                                                    <template if:true={cell.isTitle}>
+                                                        <a href={cell.url} target="_blank" rel="noopener" class={cell.linkClass}>{cell.displayValue}</a>
                                                     </template>
-                                                    <template if:false={cell.boolValue}>
-                                                        <span class="slds-text-color_weak">—</span>
-                                                    </template>
-                                                </template>
-                                                <!-- single link (url / email / phone) -->
-                                                <template if:true={cell.isLink}>
-                                                    <template if:true={cell.url}>
-                                                        <a href={cell.url} target="_blank" rel="noopener">{cell.displayValue}</a>
-                                                    </template>
-                                                    <template if:false={cell.url}>
-                                                        <span>{cell.displayValue}</span>
-                                                    </template>
-                                                </template>
-                                                <!-- single badge (select / status) -->
-                                                <template if:true={cell.isBadge}>
-                                                    <template if:true={cell.displayValue}>
-                                                        <span class={cell.badgeClass}>{cell.displayValue}</span>
-                                                    </template>
-                                                </template>
-                                                <!-- multi badge (multi_select) -->
-                                                <template if:true={cell.isMultiBadge}>
-                                                    <template for:each={cell.items} for:item="it">
-                                                        <span key={it.key} class={it.badgeClass} style="margin-right:0.25rem;">{it.displayValue}</span>
-                                                    </template>
-                                                    <template if:true={cell.moreCount}>
-                                                        <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
-                                                    </template>
-                                                </template>
-                                                <!-- relation -->
-                                                <template if:true={cell.isLinkList}>
-                                                    <template for:each={cell.items} for:item="it">
-                                                        <a key={it.key} href={it.url} target="_blank" rel="noopener" class={it.linkClass}>{it.displayValue}</a>
-                                                    </template>
-                                                    <template if:true={cell.moreCount}>
-                                                        <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
-                                                    </template>
-                                                </template>
-                                                <!-- people -->
-                                                <template if:true={cell.isNameList}>
-                                                    <template for:each={cell.items} for:item="it">
-                                                        <span key={it.key} class="slds-m-right_xx-small">{it.displayValue}</span>
-                                                    </template>
-                                                    <template if:true={cell.moreCount}>
-                                                        <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
-                                                    </template>
-                                                </template>
-                                                <!-- files -->
-                                                <template if:true={cell.isFileList}>
-                                                    <template for:each={cell.items} for:item="it">
-                                                        <template if:true={it.url}>
-                                                            <a key={it.key} href={it.url} target="_blank" rel="noopener" class="slds-m-right_xx-small">{it.displayValue}</a>
+                                                    <!-- plain text / number / date / created_by / last_edited_by / formula / rollup -->
+                                                    <template if:true={cell.isText}>{cell.displayValue}</template>
+                                                    <template if:true={cell.isNumber}>{cell.displayValue}</template>
+                                                    <template if:true={cell.isDate}>{cell.displayValue}</template>
+                                                    <!-- checkbox -->
+                                                    <template if:true={cell.isCheckbox}>
+                                                        <template if:true={cell.boolValue}>
+                                                            <lightning-icon icon-name="utility:check" size="x-small" variant="success" alternative-text="Yes"></lightning-icon>
                                                         </template>
-                                                        <template if:false={it.url}>
-                                                            <span key={it.key} class="slds-m-right_xx-small">{it.displayValue}</span>
+                                                        <template if:false={cell.boolValue}>
+                                                            <span class="slds-text-color_weak">—</span>
                                                         </template>
                                                     </template>
-                                                    <template if:true={cell.moreCount}>
-                                                        <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
+                                                    <!-- single link (url / email / phone) -->
+                                                    <template if:true={cell.isLink}>
+                                                        <template if:true={cell.url}>
+                                                            <a href={cell.url} target="_blank" rel="noopener">{cell.displayValue}</a>
+                                                        </template>
+                                                        <template if:false={cell.url}>{cell.displayValue}</template>
                                                     </template>
-                                                </template>
+                                                    <!-- single badge (select / status) -->
+                                                    <template if:true={cell.isBadge}>
+                                                        <template if:true={cell.displayValue}>
+                                                            <span class={cell.badgeClass}>{cell.displayValue}</span>
+                                                        </template>
+                                                    </template>
+                                                    <!-- multi badge (multi_select) -->
+                                                    <template if:true={cell.isMultiBadge}>
+                                                        <template for:each={cell.items} for:item="it">
+                                                            <span key={it.key} class={it.badgeClass} style="margin-right:0.25rem;" title={it.displayValue}>{it.displayValue}</span>
+                                                        </template>
+                                                        <template if:true={cell.moreCount}>
+                                                            <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
+                                                        </template>
+                                                    </template>
+                                                    <!-- relation -->
+                                                    <template if:true={cell.isLinkList}>
+                                                        <template for:each={cell.items} for:item="it">
+                                                            <a key={it.key} href={it.url} target="_blank" rel="noopener" class={it.linkClass} title={it.displayValue}>{it.displayValue}</a>
+                                                        </template>
+                                                        <template if:true={cell.moreCount}>
+                                                            <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
+                                                        </template>
+                                                    </template>
+                                                    <!-- people -->
+                                                    <template if:true={cell.isNameList}>
+                                                        <template for:each={cell.items} for:item="it">
+                                                            <span key={it.key} class="slds-m-right_xx-small" title={it.displayValue}>{it.displayValue}</span>
+                                                        </template>
+                                                        <template if:true={cell.moreCount}>
+                                                            <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
+                                                        </template>
+                                                    </template>
+                                                    <!-- files -->
+                                                    <template if:true={cell.isFileList}>
+                                                        <template for:each={cell.items} for:item="it">
+                                                            <template if:true={it.url}>
+                                                                <a key={it.key} href={it.url} target="_blank" rel="noopener" class="slds-m-right_xx-small" title={it.displayValue}>{it.displayValue}</a>
+                                                            </template>
+                                                            <template if:false={it.url}>
+                                                                <span key={it.key} class="slds-m-right_xx-small" title={it.displayValue}>{it.displayValue}</span>
+                                                            </template>
+                                                        </template>
+                                                        <template if:true={cell.moreCount}>
+                                                            <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
+                                                        </template>
+                                                    </template>
+                                                </div>
                                             </td>
                                         </template>
                                     </tr>
@@ -178,7 +187,8 @@
                     </template>
                 </template>
 
-                <template if:false={hasData}>
+            <template if:false={hasData}>
+                <template if:false={isLoading}>
                     <div class="slds-p-around_medium slds-text-align_center slds-text-color_weak">
                         <lightning-icon icon-name="utility:info" size="small" class="slds-m-right_x-small"></lightning-icon>
                         {noDataMessage}
