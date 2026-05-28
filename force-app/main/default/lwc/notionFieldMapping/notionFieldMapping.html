@@ -84,28 +84,26 @@
                 
                 <div class="slds-grid slds-gutters">
                     <div class="slds-col slds-size_1-of-2">
-                        <lightning-combobox
-                            name="field"
+                        <c-searchable-combobox
                             label="Salesforce Field"
                             value={newMapping.salesforceFieldApiName}
                             placeholder="Select a field"
                             options={availableFields}
                             onchange={handleFieldSelection}
                             required
-                        ></lightning-combobox>
+                        ></c-searchable-combobox>
                     </div>
-                    
+
                     <div class="slds-col slds-size_1-of-2">
                         <template if:false={newMapping.isBodyContent}>
-                            <lightning-combobox
-                                name="property"
+                            <c-searchable-combobox
                                 label="Notion Property"
                                 value={newMapping.notionPropertyName}
                                 placeholder="Select a property"
                                 options={availableProperties}
                                 onchange={handlePropertySelection}
                                 required
-                            ></lightning-combobox>
+                            ></c-searchable-combobox>
                         </template>
                         <template if:true={newMapping.isBodyContent}>
                             <div class="slds-form-element">
@@ -137,7 +135,6 @@
                         ></lightning-button>
                         <lightning-button
                             label="Add Mapping"
-                            variant="brand"
                             onclick={handleAddMapping}
                         ></lightning-button>
                     </lightning-button-group>

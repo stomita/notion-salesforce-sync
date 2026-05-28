@@ -119,15 +119,14 @@
 
                 <!-- Property selection -->
                 <div class="slds-m-bottom_small">
-                    <lightning-combobox
-                        name="property"
+                    <c-searchable-combobox
                         label="Property"
                         value={newFilter.propertyName}
                         placeholder="Select a Notion property"
                         options={propertyOptions}
                         onchange={handlePropertyChange}
                         required
-                    ></lightning-combobox>
+                    ></c-searchable-combobox>
                 </div>
 
                 <!-- Operator selection -->
@@ -172,14 +171,13 @@
                 <template if:true={showNewFilterContextField}>
                     <template if:true={hasContextFields}>
                         <div class="slds-m-bottom_small">
-                            <lightning-combobox
-                                name="contextField"
+                            <c-searchable-combobox
                                 label="Context Record Field"
                                 value={newFilter.contextField}
                                 placeholder="Select a Salesforce field"
                                 options={contextFieldOptions}
                                 onchange={handleContextFieldChange}
-                            ></lightning-combobox>
+                            ></c-searchable-combobox>
                             <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
                                 The filter will use the value from this field on the current record.
                             </div>
@@ -202,7 +200,6 @@
                         ></lightning-button>
                         <lightning-button
                             label="Add Filter"
-                            variant="brand"
                             onclick={handleAddFilter}
                             disabled={cannotAddFilter}
                         ></lightning-button>
