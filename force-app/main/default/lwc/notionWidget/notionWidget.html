@@ -130,11 +130,9 @@
                                                     </template>
                                                     <!-- people -->
                                                     <template if:true={cell.isNameList}>
-                                                        <template for:each={cell.items} for:item="it">
-                                                            <span key={it.key} class="slds-m-right_xx-small" title={it.displayValue}>{it.displayValue}</span>
-                                                        </template>
+                                                        {cell.displayValue}
                                                         <template if:true={cell.moreCount}>
-                                                            <span class="slds-text-color_weak slds-text-body_small">+{cell.moreCount} more</span>
+                                                            <span class="slds-text-color_weak slds-text-body_small">  +{cell.moreCount} more</span>
                                                         </template>
                                                     </template>
                                                     <!-- files -->

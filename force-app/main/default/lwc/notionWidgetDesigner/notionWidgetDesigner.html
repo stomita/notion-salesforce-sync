@@ -1,6 +1,8 @@
 <template>
-    <!-- Loading Overlay -->
-    <template if:true={isLoading}>
+    <!-- Loading Overlay (for non-modal contexts; the modal renders its own
+         positioned spinner inside slds-modal__content so it stays within the
+         dialog rather than overlaying the page behind it). -->
+    <template if:true={showTopLevelSpinner}>
         <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
     </template>
 
@@ -233,7 +235,7 @@
                             ></lightning-combobox>
                         </div>
                         <div class="slds-col slds-size_1-of-3">
-                            <lightning-combobox
+                            <c-searchable-combobox
                                 label="Default Sort Property"
                                 value={editingWidget.defaultSortProperty}
                                 options={sortPropertyOptions}
@@ -241,7 +243,7 @@
                                 onchange={handleInputChange}
                                 placeholder="Select property"
                                 disabled={noNotionProperties}
-                            ></lightning-combobox>
+                            ></c-searchable-combobox>
                         </div>
                         <div class="slds-col slds-size_1-of-3">
                             <lightning-combobox
@@ -264,20 +266,20 @@
                 <div class="slds-card__body slds-card__body_inner">
                     <div class="slds-grid slds-gutters slds-wrap">
                         <div class="slds-col slds-size_1-of-2">
-                            <lightning-combobox
+                            <c-searchable-combobox
                                 label="Context Object"
                                 value={editingWidget.contextObjectApiName}
                                 options={contextObjectOptions}
                                 data-field="contextObjectApiName"
                                 onchange={handleInputChange}
-                                placeholder="(none)"
-                            ></lightning-combobox>
+                                placeholder="(none) — type to search by label or API name"
+                            ></c-searchable-combobox>
                             <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
                                 Set this to enable context field filters and the relation property below.
                             </div>
                         </div>
                         <div class="slds-col slds-size_1-of-2">
-                            <lightning-combobox
+                            <c-searchable-combobox
                                 label="Context Relation Property"
                                 value={editingWidget.contextRelationProperty}
                                 options={relationPropertyOptions}
@@ -285,7 +287,7 @@
                                 onchange={handleInputChange}
                                 placeholder="(none)"
                                 disabled={noNotionProperties}
-                            ></lightning-combobox>
+                            ></c-searchable-combobox>
                             <div class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
                                 When set, the widget acts as a related list: rows are filtered to those whose relation includes the context Notion page, and new pages auto-set this relation.
                             </div>
@@ -373,7 +375,10 @@
                     ></lightning-button-icon>
                     <h2 class="slds-modal__title">Select Notion Database</h2>
                 </header>
-                <div class="slds-modal__content slds-p-around_medium">
+                <div class="slds-modal__content slds-p-around_medium slds-is-relative">
+                    <template if:true={isLoading}>
+                        <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+                    </template>
                     <!-- Search -->
                     <lightning-input
                         type="search"

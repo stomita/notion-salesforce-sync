@@ -1,0 +1,82 @@
+<template>
+    <div class="slds-form-element">
+        <template if:true={label}>
+            <label class="slds-form-element__label" for="combobox-input">
+                <template if:true={required}>
+                    <abbr class="slds-required" title="required">* </abbr>
+                </template>
+                {label}
+            </label>
+        </template>
+        <div class="slds-form-element__control">
+            <div class={comboboxContainerClass}>
+                <div class="slds-combobox_container">
+                    <div class={comboboxClass} aria-expanded={isOpen} aria-haspopup="listbox" role="combobox">
+                        <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                            <input
+                                type="text"
+                                id="combobox-input"
+                                class="slds-input slds-combobox__input"
+                                aria-autocomplete="list"
+                                aria-controls="combobox-listbox"
+                                autocomplete="off"
+                                role="textbox"
+                                placeholder={placeholder}
+                                value={inputValue}
+                                disabled={disabled}
+                                onfocus={handleFocus}
+                                oninput={handleInput}
+                                onkeydown={handleKeydown}
+                                onblur={handleBlur}
+                            />
+                            <lightning-icon
+                                icon-name="utility:down"
+                                size="x-small"
+                                class="slds-input__icon slds-input__icon_right"
+                                alternative-text="Open dropdown"
+                            ></lightning-icon>
+                        </div>
+                        <div
+                            id="combobox-listbox"
+                            class="slds-listbox slds-listbox_vertical slds-dropdown slds-dropdown_fluid slds-dropdown_length-with-icon-7"
+                            role="listbox"
+                            if:true={isOpen}
+                        >
+                            <template if:true={hasMatches}>
+                                <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                    <template for:each={visibleOptions} for:item="opt">
+                                        <li
+                                            key={opt.value}
+                                            role="presentation"
+                                            class="slds-listbox__item"
+                                        >
+                                            <div
+                                                class={opt.itemClass}
+                                                role="option"
+                                                aria-selected={opt.ariaSelected}
+                                                data-value={opt.value}
+                                                onmousedown={handleOptionMouseDown}
+                                            >
+                                                <span class="slds-media__body">
+                                                    <span class="slds-listbox__option-text slds-listbox__option-text_entity">{opt.label}</span>
+                                                </span>
+                                            </div>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </template>
+                            <template if:false={hasMatches}>
+                                <div class="slds-p-around_small slds-text-color_weak slds-text-body_small">
+                                    No matches
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <template if:true={fieldLevelHelp}>
+            <div class="slds-form-element__help">{fieldLevelHelp}</div>
+        </template>
+    </div>
+</template>
