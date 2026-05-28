@@ -212,6 +212,13 @@ export default class NotionWidgetDesigner extends LightningElement {
         return this.currentView === 'selectDatabase';
     }
 
+    // Suppress the top-level loading overlay while the database-selector
+    // modal is open — the modal renders its own positioned spinner so the
+    // top-level one would otherwise appear to "leak" outside the dialog.
+    get showTopLevelSpinner() {
+        return this.isLoading && !this.showDatabaseSelector;
+    }
+
     get hasWidgets() {
         return this.widgets && this.widgets.length > 0;
     }

@@ -86,21 +86,19 @@
                         
                         <div class="slds-grid slds-gutters slds-m-bottom_small">
                             <div class={fieldColumnClass}>
-                                <lightning-combobox
-                                    name="field"
+                                <c-searchable-combobox
                                     label="Salesforce Relationship Field"
                                     value={newMapping.salesforceRelationshipField}
                                     placeholder="Select a relationship field"
                                     options={availableRelationshipFields}
                                     onchange={handleFieldSelection}
                                     required
-                                ></lightning-combobox>
+                                ></c-searchable-combobox>
                             </div>
                             
                             <template if:true={showTargetObjectSelector}>
                                 <div class={targetObjectColumnClass}>
-                                    <lightning-combobox
-                                        name="targetObject"
+                                    <c-searchable-combobox
                                         label="Target Sync Object"
                                         value={newMapping.parentObject}
                                         placeholder="Select target object"
@@ -108,13 +106,12 @@
                                         onchange={handleTargetObjectSelection}
                                         required
                                         disabled={isTargetObjectDisabled}
-                                    ></lightning-combobox>
+                                    ></c-searchable-combobox>
                                 </div>
                             </template>
                             
                             <div class={propertyColumnClass}>
-                                <lightning-combobox
-                                    name="property"
+                                <c-searchable-combobox
                                     label="Notion Relation Property"
                                     value={newMapping.notionRelationPropertyName}
                                     placeholder="Select a relation property"
@@ -122,7 +119,7 @@
                                     onchange={handlePropertySelection}
                                     required
                                     disabled={isNotionPropertyDisabled}
-                                ></lightning-combobox>
+                                ></c-searchable-combobox>
                             </div>
                         </div>
 
@@ -142,7 +139,6 @@
                                 ></lightning-button>
                                 <lightning-button
                                     label="Add Mapping"
-                                    variant="brand"
                                     onclick={handleSaveNewMapping}
                                     disabled={isSaveDisabled}
                                 ></lightning-button>

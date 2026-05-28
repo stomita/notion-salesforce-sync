@@ -105,31 +105,24 @@
                 <template if:true={isConfigurationView}>
                     <div class="slds-p-around_medium">
                         <!-- Back Button and Title -->
-                        <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
-                            <div class="slds-col">
-                                <div class="slds-media slds-media_center">
-                                    <div class="slds-media__figure">
-                                        <lightning-button-icon
-                                            icon-name="utility:back"
-                                            alternative-text="Back"
-                                            onclick={handleBack}
-                                        ></lightning-button-icon>
-                                    </div>
-                                    <div class="slds-media__body">
-                                        <h2 class="slds-text-heading_medium">
-                                            {configurationTitle}
-                                            <template if:true={currentConfiguration}>
-                                                <template if:true={currentConfiguration.isActive}>
-                                                    <lightning-badge label="Active" variant="success" class="slds-m-left_x-small"></lightning-badge>
-                                                </template>
-                                                <template if:false={currentConfiguration.isActive}>
-                                                    <lightning-badge label="Inactive" class="slds-m-left_x-small"></lightning-badge>
-                                                </template>
-                                            </template>
-                                        </h2>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="slds-m-bottom_medium">
+                            <lightning-button
+                                label="Back to List"
+                                icon-name="utility:back"
+                                onclick={handleBack}
+                                variant="base"
+                            ></lightning-button>
+                            <h2 class="slds-text-heading_medium slds-m-top_small">
+                                {configurationTitle}
+                                <template if:true={currentConfiguration}>
+                                    <template if:true={currentConfiguration.isActive}>
+                                        <lightning-badge label="Active" variant="success" class="slds-m-left_x-small"></lightning-badge>
+                                    </template>
+                                    <template if:false={currentConfiguration.isActive}>
+                                        <lightning-badge label="Inactive" class="slds-m-left_x-small"></lightning-badge>
+                                    </template>
+                                </template>
+                            </h2>
                         </div>
 
                         <!-- Configuration Form -->
@@ -148,8 +141,7 @@
                                 
                                 <!-- Salesforce Object Selection (for new configs) -->
                                 <template if:true={showObjectSelection}>
-                                    <lightning-combobox
-                                        name="object"
+                                    <c-searchable-combobox
                                         label="Select Salesforce Object"
                                         value={selectedObject}
                                         placeholder="Choose an object to configure"
@@ -157,7 +149,7 @@
                                         onchange={handleObjectSelection}
                                         required
                                         class="slds-m-bottom_small"
-                                    ></lightning-combobox>
+                                    ></c-searchable-combobox>
                                 </template>
                                 
                                 <!-- Salesforce Object Info (for existing configs) -->
@@ -185,7 +177,6 @@
                                         <lightning-button
                                             label="Browse Databases"
                                             onclick={handleShowDatabaseBrowser}
-                                            variant="brand"
                                         ></lightning-button>
                                     </div>
                                 </div>
