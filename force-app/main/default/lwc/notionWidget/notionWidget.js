@@ -271,6 +271,10 @@ export default class NotionWidget extends LightningElement {
                 break;
             case RENDER_KIND.NAME_LIST:
                 cell.isNameList = true;
+                // People names render as a single comma-separated string;
+                // recompute from the (server-capped) items list so the visible
+                // text always agrees with the `+N more` overflow count below.
+                cell.displayValue = cell.items.map((it) => it.displayValue).join(', ');
                 break;
             case RENDER_KIND.FILE_LIST:
                 cell.isFileList = true;
