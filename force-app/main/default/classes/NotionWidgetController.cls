@@ -156,11 +156,17 @@ public with sharing class NotionWidgetController {
     }
 
     /**
-     * Get widget configuration for designer
+     * Get widget configuration.
+     *
+     * Used by both the widget runtime (notionWidget LWC) at render time and by
+     * the designer when loading an existing config for edit. No admin
+     * permission check here — runtime users only need read access to the
+     * widget metadata, which the `Notion_Widget_User` permission set already
+     * grants. Designer access itself is gated by app / tab visibility on
+     * `Notion_Sync_Admin`.
      */
     @AuraEnabled(cacheable=true)
     public static WidgetConfiguration getWidgetConfiguration(String widgetDeveloperName) {
-        checkAdminPermission();
         try {
             NotionWidget__mdt widget = getWidgetMetadata(widgetDeveloperName);
             if (widget == null) {
