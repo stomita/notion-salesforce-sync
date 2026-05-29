@@ -1,5 +1,6 @@
 import { LightningElement, api, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import notionLogo from '@salesforce/resourceUrl/NotionLogo';
 import getNotionPageInfo from '@salesforce/apex/NotionNavigationController.getNotionPageInfo';
 import syncAndGetNotionPage from '@salesforce/apex/NotionNavigationController.syncAndGetNotionPage';
 
@@ -8,6 +9,10 @@ export default class NotionNavigation extends LightningElement {
     @api objectApiName;
     @api autoRedirect;
     @api showSyncOption;
+
+    get notionLogoUrl() {
+        return notionLogo;
+    }
     
     notionUrl = null;
     loading = true;

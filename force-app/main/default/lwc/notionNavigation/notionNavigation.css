@@ -1,0 +1,7 @@
+/* Notion-N logo shown in place of the default SLDS card icon. Sized to
+   match the standard SLDS card header icon (1.5rem square). */
+.notion-card-icon-img {
+    width: 1.5rem;
+    height: 1.5rem;
+    vertical-align: middle;
+}

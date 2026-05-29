@@ -1,5 +1,11 @@
 <template>
-    <lightning-card title={widgetTitle} icon-name="custom:custom63">
+    <lightning-card>
+        <h2 slot="title" class="slds-card__header-title">
+            <span class="slds-icon_container slds-m-right_x-small notion-card-icon">
+                <img src={notionLogoUrl} alt="Notion" class="notion-card-icon-img"/>
+            </span>
+            <span class="slds-truncate" title={widgetTitle}>{widgetTitle}</span>
+        </h2>
         <div slot="actions" class="slds-grid slds-grid_vertical-align-center">
             <lightning-button-icon
                 icon-name="utility:refresh"
