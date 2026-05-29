@@ -3,7 +3,7 @@
     <apiVersion>59.0</apiVersion>
     <isExposed>true</isExposed>
     <masterLabel>Notion Navigation</masterLabel>
-    <description>Navigate to Notion page for a Salesforce record with sync options</description>
+    <description>Navigate to a Notion page for a Salesforce record. Configure title, navigation style, alignment, and sync behavior in the page editor.</description>
     <targets>
         <target>lightning__FlowScreen</target>
         <target>lightning__RecordPage</target>
@@ -12,11 +12,25 @@
         <targetConfig targets="lightning__FlowScreen">
             <property name="recordId" type="String" label="Record ID" description="The ID of the Salesforce record" required="true"/>
             <property name="objectApiName" type="String" label="Object API Name" description="The API name of the Salesforce object" required="true"/>
-            <property name="autoRedirect" type="Boolean" label="Auto Redirect" description="Automatically redirect to Notion if page exists" default="true"/>
-            <property name="showSyncOption" type="Boolean" label="Show Sync Option" description="Show checkbox to sync before navigating" default="true"/>
+            <property name="autoRedirect" type="Boolean" label="Auto Redirect" description="Automatically redirect to Notion if the page exists" default="true"/>
+            <property name="cardTitle" type="String" label="Card Title" description="Title shown in the component header" default="Notion Navigation"/>
+            <property name="showTitle" type="Boolean" label="Show Title" description="Show the card header with title and icon" default="true"/>
+            <property name="navigationStyle" type="String" label="Navigation Style" description="Render the navigation action as a button or text link" default="button" datasource="button,link"/>
+            <property name="actionLabel" type="String" label="Action Label" description="Label shown on the navigate action" default="Open in Notion"/>
+            <property name="showActionLabel" type="Boolean" label="Show Action Label" description="Show the action label text. When off, only the icon is shown." default="true"/>
+            <property name="actionAlignment" type="String" label="Action Alignment" description="Horizontal alignment of the navigation action" default="left" datasource="left,center,right"/>
+            <property name="syncBeforeNavigate" type="Boolean" label="Sync Before Navigate" description="Sync the record to Notion before navigating. When 'Show Sync Option' is on, this sets the checkbox's initial state." default="false"/>
+            <property name="showSyncOption" type="Boolean" label="Show Sync Option" description="Show a checkbox letting the user opt into syncing before navigating, on each click." default="true"/>
         </targetConfig>
         <targetConfig targets="lightning__RecordPage">
-            <property name="showSyncOption" type="Boolean" label="Show Sync Option" description="Show checkbox to sync before navigating" default="true"/>
+            <property name="cardTitle" type="String" label="Card Title" description="Title shown in the component header" default="Notion Navigation"/>
+            <property name="showTitle" type="Boolean" label="Show Title" description="Show the card header with title and icon" default="true"/>
+            <property name="navigationStyle" type="String" label="Navigation Style" description="Render the navigation action as a button or text link" default="button" datasource="button,link"/>
+            <property name="actionLabel" type="String" label="Action Label" description="Label shown on the navigate action" default="Open in Notion"/>
+            <property name="showActionLabel" type="Boolean" label="Show Action Label" description="Show the action label text. When off, only the icon is shown." default="true"/>
+            <property name="actionAlignment" type="String" label="Action Alignment" description="Horizontal alignment of the navigation action" default="left" datasource="left,center,right"/>
+            <property name="syncBeforeNavigate" type="Boolean" label="Sync Before Navigate" description="Sync the record to Notion before navigating. When 'Show Sync Option' is on, this sets the checkbox's initial state." default="false"/>
+            <property name="showSyncOption" type="Boolean" label="Show Sync Option" description="Show a checkbox letting the user opt into syncing before navigating, on each click." default="true"/>
         </targetConfig>
     </targetConfigs>
 </LightningComponentBundle>

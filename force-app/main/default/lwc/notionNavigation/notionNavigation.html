@@ -1,69 +1,181 @@
 <template>
-    <lightning-card>
-        <h2 slot="title" class="slds-card__header-title">
-            <span class="slds-icon_container slds-m-right_x-small notion-card-icon">
-                <img src={notionLogoUrl} alt="Notion" class="notion-card-icon-img"/>
-            </span>
-            <span class="slds-truncate" title="Notion Navigation">Notion Navigation</span>
-        </h2>
-        <div class="slds-p-horizontal_medium">
-            <!-- Loading State -->
-            <template if:true={isLoading}>
-                <div class="slds-align_absolute-center slds-p-vertical_medium">
-                    <lightning-spinner alternative-text={loadingMessage} size="small"></lightning-spinner>
-                    <span class="slds-m-left_small">{loadingMessage}</span>
-                </div>
-            </template>
-            
-            <!-- Error State -->
-            <template if:true={error}>
-                <div class="slds-text-color_error slds-p-vertical_small">
-                    <lightning-icon icon-name="utility:error" variant="error" size="small"></lightning-icon>
-                    <span class="slds-m-left_small">{error}</span>
-                </div>
-            </template>
-            
-            <!-- Page Exists State -->
-            <template if:true={showNavigateButton}>
-                <div class="slds-p-vertical_small">
-                    <!-- Sync Checkbox -->
+    <!-- With card frame (showTitle=true) -->
+    <template if:true={titleVisible}>
+        <lightning-card>
+            <h2 slot="title" class="slds-card__header-title">
+                <span class="slds-icon_container slds-m-right_x-small notion-card-icon">
+                    <img src={notionLogoUrl} alt="Notion" class="notion-card-icon-img"/>
+                </span>
+                <span class="slds-truncate" title={cardTitle}>{cardTitle}</span>
+            </h2>
+            <div class="slds-p-horizontal_medium">
+                <template lwc:if={isLoading}>
+                    <div class="slds-align_absolute-center slds-p-vertical_medium">
+                        <lightning-spinner alternative-text={loadingMessage} size="small"></lightning-spinner>
+                        <span class="slds-m-left_small">{loadingMessage}</span>
+                    </div>
+                </template>
+                <template lwc:elseif={error}>
+                    <div class="slds-text-color_error slds-p-vertical_small">
+                        <lightning-icon icon-name="utility:error" variant="error" size="small"></lightning-icon>
+                        <span class="slds-m-left_small">{error}</span>
+                    </div>
+                </template>
+                <template lwc:else>
                     <template if:true={showSyncCheckbox}>
                         <div class="slds-p-bottom_small">
-                            <lightning-input 
-                                type="checkbox" 
-                                label="Sync record before navigating" 
-                                checked={syncBeforeNav}
+                            <lightning-input
+                                type="checkbox"
+                                label="Sync record before navigating"
+                                checked={checkboxInitialChecked}
                                 onchange={handleSyncCheckbox}
                                 disabled={syncing}>
                             </lightning-input>
                         </div>
                     </template>
-                    
-                    <!-- Navigate Button -->
-                    <lightning-button
-                        variant="brand"
-                        label="Open in Notion"
-                        icon-name="utility:new_window"
-                        onclick={navigateToNotion}
-                        disabled={syncing}>
-                    </lightning-button>
-                </div>
+                    <template if:true={showNavigateAction}>
+                        <div class={actionContainerClass}>
+                            <template if:true={showButtonWithLabel}>
+                                <lightning-button
+                                    label={actionLabel}
+                                    icon-name="utility:new_window"
+                                    onclick={navigateToNotion}
+                                    disabled={syncing}>
+                                </lightning-button>
+                            </template>
+                            <template if:true={showButtonIconOnly}>
+                                <lightning-button-icon
+                                    icon-name="utility:new_window"
+                                    alternative-text={actionLabel}
+                                    title={actionLabel}
+                                    variant="border-filled"
+                                    onclick={navigateToNotion}
+                                    disabled={syncing}>
+                                </lightning-button-icon>
+                            </template>
+                            <template if:true={isLinkStyle}>
+                                <a href="#" onclick={navigateToNotion} title={actionLabel} class="notion-nav-link">
+                                    <lightning-icon icon-name="utility:new_window" size="xx-small" alternative-text={actionLabel}></lightning-icon>
+                                    <template if:true={actionLabelVisible}>
+                                        <span class="slds-m-left_xx-small">{actionLabel}</span>
+                                    </template>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+                    <template if:true={showCreateAction}>
+                        <div class={actionContainerClass}>
+                            <p class="slds-text-body_regular slds-p-bottom_small">No Notion page found for this record.</p>
+                            <template if:true={showButtonWithLabel}>
+                                <lightning-button
+                                    label={createLabel}
+                                    icon-name="utility:add"
+                                    onclick={createAndNavigate}>
+                                </lightning-button>
+                            </template>
+                            <template if:true={showButtonIconOnly}>
+                                <lightning-button-icon
+                                    icon-name="utility:add"
+                                    alternative-text={createLabel}
+                                    title={createLabel}
+                                    variant="border-filled"
+                                    onclick={createAndNavigate}>
+                                </lightning-button-icon>
+                            </template>
+                            <template if:true={isLinkStyle}>
+                                <a href="#" onclick={createAndNavigate} title={createLabel} class="notion-nav-link">
+                                    <lightning-icon icon-name="utility:add" size="xx-small" alternative-text={createLabel}></lightning-icon>
+                                    <template if:true={actionLabelVisible}>
+                                        <span class="slds-m-left_xx-small">{createLabel}</span>
+                                    </template>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+                </template>
+            </div>
+        </lightning-card>
+    </template>
+
+    <!-- Without card frame (showTitle=false): bare action only -->
+    <template lwc:if={isTitleHidden}>
+        <div class={actionContainerClass}>
+            <template lwc:if={isLoading}>
+                <lightning-spinner alternative-text={loadingMessage} size="small"></lightning-spinner>
             </template>
-            
-            <!-- No Page State -->
-            <template if:true={showCreateButton}>
-                <div class="slds-p-vertical_small">
-                    <p class="slds-text-body_regular slds-p-bottom_small">
-                        No Notion page found for this record.
-                    </p>
-                    <lightning-button
-                        variant="brand"
-                        label="Create Page in Notion"
-                        icon-name="utility:add"
-                        onclick={createAndNavigate}>
-                    </lightning-button>
-                </div>
+            <template lwc:elseif={error}>
+                <span class="slds-text-color_error">
+                    <lightning-icon icon-name="utility:error" variant="error" size="x-small"></lightning-icon>
+                    <span class="slds-m-left_xx-small">{error}</span>
+                </span>
+            </template>
+            <template lwc:else>
+                <template if:true={showSyncCheckbox}>
+                    <div class="slds-p-bottom_x-small">
+                        <lightning-input
+                            type="checkbox"
+                            label="Sync record before navigating"
+                            checked={checkboxInitialChecked}
+                            onchange={handleSyncCheckbox}
+                            disabled={syncing}>
+                        </lightning-input>
+                    </div>
+                </template>
+                <template if:true={showNavigateAction}>
+                    <template if:true={showButtonWithLabel}>
+                        <lightning-button
+                            label={actionLabel}
+                            icon-name="utility:new_window"
+                            onclick={navigateToNotion}
+                            disabled={syncing}>
+                        </lightning-button>
+                    </template>
+                    <template if:true={showButtonIconOnly}>
+                        <lightning-button-icon
+                            icon-name="utility:new_window"
+                            alternative-text={actionLabel}
+                            title={actionLabel}
+                            variant="border-filled"
+                            onclick={navigateToNotion}
+                            disabled={syncing}>
+                        </lightning-button-icon>
+                    </template>
+                    <template if:true={isLinkStyle}>
+                        <a href="#" onclick={navigateToNotion} title={actionLabel} class="notion-nav-link">
+                            <lightning-icon icon-name="utility:new_window" size="xx-small" alternative-text={actionLabel}></lightning-icon>
+                            <template if:true={actionLabelVisible}>
+                                <span class="slds-m-left_xx-small">{actionLabel}</span>
+                            </template>
+                        </a>
+                    </template>
+                </template>
+                <template if:true={showCreateAction}>
+                    <template if:true={showButtonWithLabel}>
+                        <lightning-button
+                            label={createLabel}
+                            icon-name="utility:add"
+                            onclick={createAndNavigate}>
+                        </lightning-button>
+                    </template>
+                    <template if:true={showButtonIconOnly}>
+                        <lightning-button-icon
+                            icon-name="utility:add"
+                            alternative-text={createLabel}
+                            title={createLabel}
+                            variant="border-filled"
+                            onclick={createAndNavigate}>
+                        </lightning-button-icon>
+                    </template>
+                    <template if:true={isLinkStyle}>
+                        <a href="#" onclick={createAndNavigate} title={createLabel} class="notion-nav-link">
+                            <lightning-icon icon-name="utility:add" size="xx-small" alternative-text={createLabel}></lightning-icon>
+                            <template if:true={actionLabelVisible}>
+                                <span class="slds-m-left_xx-small">{createLabel}</span>
+                            </template>
+                        </a>
+                    </template>
+                </template>
             </template>
         </div>
-    </lightning-card>
+    </template>
 </template>

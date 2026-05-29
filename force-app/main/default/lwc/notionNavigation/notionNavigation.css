@@ -5,3 +5,16 @@
     height: 1.5rem;
     vertical-align: middle;
 }
+
+/* Standard SLDS-link styling for the link navigation variant. Keeps the
+   icon vertically centred next to the label. */
+.notion-nav-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.notion-nav-link:hover,
+.notion-nav-link:focus {
+    text-decoration: underline;
+}
