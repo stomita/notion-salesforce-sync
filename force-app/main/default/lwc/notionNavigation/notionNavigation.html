@@ -22,26 +22,35 @@
                     </div>
                 </template>
                 <template lwc:else>
-                    <template if:true={showSyncCheckbox}>
-                        <div class="slds-p-bottom_small">
-                            <lightning-input
-                                type="checkbox"
-                                label="Sync record before navigating"
-                                checked={checkboxInitialChecked}
-                                onchange={handleSyncCheckbox}
-                                disabled={syncing}>
-                            </lightning-input>
-                        </div>
-                    </template>
                     <template if:true={showNavigateAction}>
                         <div class={actionContainerClass}>
                             <template if:true={showButtonWithLabel}>
-                                <lightning-button
-                                    label={actionLabel}
-                                    icon-name="utility:new_window"
-                                    onclick={navigateToNotion}
-                                    disabled={syncing}>
-                                </lightning-button>
+                                <template if:true={showSyncDropdown}>
+                                    <lightning-button-group>
+                                        <lightning-button
+                                            label={actionLabel}
+                                            icon-name="utility:new_window"
+                                            onclick={navigateToNotion}
+                                            disabled={syncing}>
+                                        </lightning-button>
+                                        <lightning-button-menu
+                                            icon-name="utility:down"
+                                            alternative-text="More navigate options"
+                                            menu-alignment="auto"
+                                            onselect={handleSyncMenuSelect}
+                                            disabled={syncing}>
+                                            <lightning-menu-item value="alternate" label={alternateSyncLabel}></lightning-menu-item>
+                                        </lightning-button-menu>
+                                    </lightning-button-group>
+                                </template>
+                                <template if:false={showSyncDropdown}>
+                                    <lightning-button
+                                        label={actionLabel}
+                                        icon-name="utility:new_window"
+                                        onclick={navigateToNotion}
+                                        disabled={syncing}>
+                                    </lightning-button>
+                                </template>
                             </template>
                             <template if:true={showButtonIconOnly}>
                                 <lightning-button-icon
@@ -110,25 +119,34 @@
                 </span>
             </template>
             <template lwc:else>
-                <template if:true={showSyncCheckbox}>
-                    <div class="slds-p-bottom_x-small">
-                        <lightning-input
-                            type="checkbox"
-                            label="Sync record before navigating"
-                            checked={checkboxInitialChecked}
-                            onchange={handleSyncCheckbox}
-                            disabled={syncing}>
-                        </lightning-input>
-                    </div>
-                </template>
                 <template if:true={showNavigateAction}>
                     <template if:true={showButtonWithLabel}>
-                        <lightning-button
-                            label={actionLabel}
-                            icon-name="utility:new_window"
-                            onclick={navigateToNotion}
-                            disabled={syncing}>
-                        </lightning-button>
+                        <template if:true={showSyncDropdown}>
+                            <lightning-button-group>
+                                <lightning-button
+                                    label={actionLabel}
+                                    icon-name="utility:new_window"
+                                    onclick={navigateToNotion}
+                                    disabled={syncing}>
+                                </lightning-button>
+                                <lightning-button-menu
+                                    icon-name="utility:down"
+                                    alternative-text="More navigate options"
+                                    menu-alignment="auto"
+                                    onselect={handleSyncMenuSelect}
+                                    disabled={syncing}>
+                                    <lightning-menu-item value="alternate" label={alternateSyncLabel}></lightning-menu-item>
+                                </lightning-button-menu>
+                            </lightning-button-group>
+                        </template>
+                        <template if:false={showSyncDropdown}>
+                            <lightning-button
+                                label={actionLabel}
+                                icon-name="utility:new_window"
+                                onclick={navigateToNotion}
+                                disabled={syncing}>
+                            </lightning-button>
+                        </template>
                     </template>
                     <template if:true={showButtonIconOnly}>
                         <lightning-button-icon

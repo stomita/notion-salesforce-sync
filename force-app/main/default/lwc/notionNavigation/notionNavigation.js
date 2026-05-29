@@ -36,12 +36,6 @@ export default class NotionNavigation extends LightningElement {
     error = null;
     hasCheckedAutoRedirect = false;
 
-    // Runtime state for the optional sync checkbox. Initialised from
-    // `syncBeforeNavigate` when the component mounts and after the page
-    // loads, so the checkbox's default position follows the designer's
-    // configured default.
-    _syncBeforeNavRuntime = null;
-
     connectedCallback() {
         this.checkNotionPage();
     }
@@ -74,20 +68,37 @@ export default class NotionNavigation extends LightningElement {
         this.error = null;
     }
 
-    handleSyncCheckbox(event) {
-        this._syncBeforeNavRuntime = event.target.checked;
-    }
-
     async navigateToNotion(event) {
         // Stop the anchor's default `#` navigation when in link style.
         if (event && event.preventDefault) {
             event.preventDefault();
         }
         try {
-            if (this.effectiveSyncBeforeNavigate) {
+            // The main action follows the designer-configured default.
+            if (this.syncBeforeNavigate) {
                 await this.syncAndNavigate();
             } else {
                 this.redirectToNotion();
+            }
+        } catch (e) {
+            this.showError(e);
+        }
+    }
+
+    // Dropdown menu attached to the main navigate button. The single
+    // entry in the menu is always the *opposite* action — if the
+    // designer-configured default is "navigate only", the menu offers
+    // "Sync, then open"; if the default is "Sync, then open", the menu
+    // offers "Open without syncing".
+    async handleSyncMenuSelect(event) {
+        if (event?.detail?.value !== 'alternate') return;
+        try {
+            if (this.syncBeforeNavigate) {
+                // Default is sync — alternate is plain navigate.
+                this.redirectToNotion();
+            } else {
+                // Default is plain navigate — alternate is sync-then-navigate.
+                await this.syncAndNavigate();
             }
         } catch (e) {
             this.showError(e);
@@ -208,34 +219,27 @@ export default class NotionNavigation extends LightningElement {
         return this.showSyncOption !== false;
     }
 
-    // When the runtime checkbox is enabled, surface it next to the
-    // navigate action so the user can opt in/out per-click. Hidden in
-    // link style (links don't pair well with a stacked checkbox above
-    // them) and only shown once a Notion page is known to exist.
-    get showSyncCheckbox() {
+    // When the sync option is enabled, the navigate button gets a
+    // chevron dropdown next to it offering the opposite-of-default
+    // action. Hidden in link style and icon-only button style (neither
+    // layout pairs naturally with a chevron dropdown), and only when a
+    // Notion page is known to exist.
+    get showSyncDropdown() {
         return this.syncOptionVisible
-            && this.isButtonStyle
+            && this.showButtonWithLabel
             && this.showNavigateAction;
     }
 
-    // Effective "do sync" decision used by navigateToNotion. When the
-    // checkbox is rendered we follow the user's current selection (or
-    // the designer-configured default if the user hasn't touched it).
-    // When the checkbox is suppressed (showSyncOption=false), we obey
-    // the designer-configured flag directly.
-    get effectiveSyncBeforeNavigate() {
-        if (this.showSyncCheckbox) {
-            return this._syncBeforeNavRuntime !== null
-                ? this._syncBeforeNavRuntime
-                : !!this.syncBeforeNavigate;
-        }
-        return !!this.syncBeforeNavigate;
-    }
-
-    get checkboxInitialChecked() {
-        return this._syncBeforeNavRuntime !== null
-            ? this._syncBeforeNavRuntime
-            : !!this.syncBeforeNavigate;
+    // Label shown on the dropdown menu item — always the alternate of
+    // the designer-configured default. e.g. when `syncBeforeNavigate`
+    // is true the main button syncs and the dropdown says
+    // "<actionLabel> (Without Sync)"; when false it's
+    // "<actionLabel> (With Sync)".
+    get alternateSyncLabel() {
+        const suffix = this.syncBeforeNavigate
+            ? '(Without Sync)'
+            : '(With Sync)';
+        return `${this.actionLabel} ${suffix}`;
     }
 
     get isLinkStyle() {
