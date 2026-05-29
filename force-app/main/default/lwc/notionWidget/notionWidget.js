@@ -1,5 +1,6 @@
 import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import notionLogo from '@salesforce/resourceUrl/NotionLogo';
 import getWidgetData from '@salesforce/apex/NotionWidgetController.getWidgetData';
 import getWidgetConfiguration from '@salesforce/apex/NotionWidgetController.getWidgetConfiguration';
 import createNotionPage from '@salesforce/apex/NotionWidgetController.createNotionPage';
@@ -413,6 +414,10 @@ export default class NotionWidget extends LightningElement {
 
     get widgetTitle() {
         return this.widgetConfig?.label || '';
+    }
+
+    get notionLogoUrl() {
+        return notionLogo;
     }
 
     get headerColumns() {
