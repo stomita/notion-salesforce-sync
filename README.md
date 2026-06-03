@@ -1,3 +1,5 @@
+English | [日本語](./README_ja.md)
+
 # Notion Salesforce Sync
 
 A Salesforce-native integration tool that synchronizes Salesforce data to Notion databases in real-time.
