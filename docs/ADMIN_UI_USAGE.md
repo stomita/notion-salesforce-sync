@@ -2,216 +2,207 @@
 
 ## Overview
 
-The Notion Sync Admin UI is a Lightning Web Component that allows Salesforce administrators to configure synchronization mappings between Salesforce objects and Notion databases without manually editing custom metadata records.
+The Notion Sync Admin UI is a Lightning Web Component that lets Salesforce administrators configure two features of the package without editing custom metadata directly:
 
-## Setup Instructions
+- **Sync**: map Salesforce objects and fields to Notion databases.
+- **Widgets**: configure Notion-database-backed widgets that can be embedded on Lightning pages.
 
-### 1. Deploy the Components
+Both features share the same Admin tab inside the **Notion Sync** app, split into sub-tabs.
 
-Deploy all the new components to your Salesforce org:
+> For end-to-end installation and first-time setup, see [SETUP_GUIDE.md](./SETUP_GUIDE.md). This document is the reference for what each control in the Admin UI does.
 
-```bash
-sf project deploy start --source-dir force-app
-```
+## Accessing the Admin UI
 
-### 2. Access the Notion Sync App
+1. Click the App Launcher (9-dot grid icon).
+2. Search for **Notion Sync** and open the app.
+3. The app includes two top-level tabs:
+   - **Notion Sync Admin** — main configuration interface (Sync / Widgets / Settings sub-tabs).
+   - **Notion Sync Log** — recent sync attempts and their status.
 
-The admin UI is available through a dedicated Lightning App:
+To expose the same tabs in another app, edit it in Setup → **App Manager** → **Navigation Items** and add `Notion Sync Admin` and `Notion Sync Log`.
 
-1. Click the App Launcher (9-dot grid icon)
-2. Search for "Notion Sync"
-3. Click on the Notion Sync app
-4. The app includes two tabs:
-   - **Notion Sync Admin**: Main configuration interface
-   - **Notion Sync Log**: View sync operation history
+## Permission Sets
 
-Alternative method - Add to existing app:
-1. Go to Setup → App Manager
-2. Find your preferred app and click Edit
-3. Select Navigation Items
-4. Add "Notion Sync Admin" and "Notion Sync Log" tabs
-5. Save the changes
+The package ships with three permission sets. Assign each to the users who need it.
 
-### 3. Grant Permissions
-
-The Notion Sync Admin UI requires specific permissions. There are two permission sets:
-
-#### Notion Sync Administrator Permission Set
-This is the main permission set for admin UI access. Assign this to users who need to:
-- Configure sync mappings
-- Browse Notion databases
-- Manage field mappings
-- Test connections
+| Permission Set | Label | Who needs it |
+|---|---|---|
+| `Notion_Sync_Admin` | Notion Sync Administrator | Admins configuring sync mappings and widgets. |
+| `Notion_Integration_User` | Notion Integration User | Users whose record changes should trigger a sync via Flow. |
+| `Notion_Widget_User` | Notion Widget User | End users who only view embedded widgets on Lightning pages. |
 
 To assign:
-1. Go to Setup → Users → Permission Sets
-2. Find "Notion Sync Administrator"
-3. Click on Manage Assignments
-4. Add users who need admin access
 
-This permission set includes:
-- Custom permission: Notion_Sync_Admin
-- Access to Notion API credentials
-- Custom metadata type access
-- Required user permissions (CustomizeApplication, ModifyMetadata)
-- Read-only access to sync logs
+1. Setup → **Permission Sets** → click the permission set name.
+2. **Manage Assignments** → **Add Assignment** → pick users → **Assign**.
 
-#### Notion Integration User Permission Set
-This is for users who only need to trigger syncs via Flow. They don't need admin access.
+The Notion Sync Administrator set includes the custom permission `Notion_Sync_Admin`, access to the Notion External Credential, read access to all custom metadata types in this package, the user permissions required to deploy metadata (Customize Application, Modify Metadata), and read-only access to sync logs.
 
-## Using the Admin UI
+A user can hold more than one set — an admin who also edits records and triggers syncs typically needs both Administrator and Integration User.
 
-### Main View - Sync Configurations
+## Admin UI Layout
 
-When you open the Notion Sync Admin, you'll see:
+The **Notion Sync Admin** tab is organized into three sub-tabs:
 
-1. **Summary Statistics**: 
-   - Configured Objects count
-   - Active Syncs count
-   - Total Field Mappings count
+| Sub-tab | Purpose |
+|---|---|
+| **Sync** | Configure object-to-database mappings, field mappings, and relationships. |
+| **Widgets** | Configure Notion-database-backed widgets that can be embedded on Lightning pages. |
+| **Settings** | Test the Notion connection and view package-level options. |
 
-2. **Configured Objects Table**:
-   - Lists all existing sync configurations
-   - Shows Salesforce object name and API name
-   - Displays Notion database ID (database names coming soon)
-   - Shows Active/Inactive status
-   - Field mappings and relationships count
-   - Edit button for each configuration
+The **Test Connection** action available at the top of the page works in any sub-tab and verifies Named Credential access plus database visibility.
 
-3. **New Sync Configuration Button**: Click to create a new object mapping
+## Sync Sub-tab
 
-### Creating a New Configuration
+### Sync configuration list
 
-1. **Click "New Sync Configuration"**
-2. **Select Salesforce Object**: Choose from the dropdown list
-3. **Configure Basic Settings**:
-   - Set Active status (enabled by default)
-   - Click "Browse Databases" to select a Notion database
-   - Set the Salesforce ID property name (default: "Salesforce_ID")
-4. **Save Initial Configuration**: You can save now and add field mappings later
+The Sync sub-tab shows the existing sync configurations along with summary statistics: configured objects, active syncs, and total field mappings. Each row shows the Salesforce object, the linked Notion database, active state, and counts of field and relationship mappings, with an **Edit** action per row.
 
-### Editing an Existing Configuration
+Click **New Sync Configuration** to create a new mapping.
 
-1. **Click "Edit"** on any configuration in the main table
-2. **Basic Configuration Section**:
-   - Toggle Active status
-   - Change Notion database if needed
-   - Update Salesforce ID property name
+### Creating a sync configuration
 
-3. **Field Mappings Section**:
-   - View existing field mappings
-   - Add new mappings with the field mapping component
-   - Auto-detection suggests compatible Notion property types
-   - Long text fields can be mapped to page body content
+1. Click **New Sync Configuration**.
+2. Pick a Salesforce object from the dropdown.
+3. Toggle **Active** (enabled by default).
+4. Click **Browse Databases** to pick the target Notion database. The database must have already been shared with the integration in Notion.
+5. Pick the **Salesforce ID Property Name** — the Notion text property where the package will store the Salesforce record ID. The property must already exist on the Notion database, so add it first if it's missing.
+6. Save. You can return later to add field mappings.
 
-4. **Relationship Mappings Section**:
-   - Configure parent-child relationships
-   - Map lookup/master-detail fields to Notion relations
+### Editing a sync configuration
 
-5. **Action Buttons**:
-   - **Cancel**: Discard changes (with confirmation if unsaved)
-   - **Test Connection**: Verify Notion API connectivity
-   - **Save**: Deploy configuration to metadata
+Opening an existing configuration exposes three sections:
 
-### Database Browser Modal
+- **Basic Configuration** — toggle active state, change the Notion database, or change the Salesforce ID property name.
+- **Field Mappings** — add mappings between Salesforce fields and Notion properties. The UI auto-suggests a compatible Notion property type per Salesforce field type (see [Auto Type Detection](#auto-type-detection)). Long text areas can be flagged as page body content instead of a property.
+- **Relationship Mappings** — map Salesforce lookup or master-detail fields to Notion relation properties so parent–child structure is preserved on the Notion side.
 
-When clicking "Browse Databases":
-- Modal window shows all accessible Notion databases
-- Search by database name or ID
-- Click to select a database
-- Shows database properties and their types
+Action buttons:
 
-### Navigation
+- **Cancel** — discard changes (with confirmation if there are unsaved edits).
+- **Test Connection** — verify Notion API connectivity.
+- **Save** — deploy the configuration as custom metadata.
 
-- **Back Button**: Return to main configuration list
-- **Tab Navigation**: Switch between Notion Sync Admin and Notion Sync Log
-- **App Launcher**: Access from the 9-dot grid menu
+### Database Browser modal
 
-## Features
+Clicking **Browse Databases** opens a modal listing every Notion database the integration can see. Search by database name or ID, and select one to populate the field. The modal also previews the database's properties and their types.
 
 ### Auto Type Detection
 
-The UI automatically suggests Notion property types based on Salesforce field types:
+The UI suggests Notion property types from the chosen Salesforce field's type:
 
 - STRING → rich_text
 - EMAIL → email
-- NUMBER/CURRENCY → number
-- DATE/DATETIME → date
+- NUMBER / CURRENCY → number
+- DATE / DATETIME → date
 - BOOLEAN → checkbox
 - PICKLIST → select
 - REFERENCE → relation
 
-### Field Mapping
+You can override the suggestion if your Notion schema differs.
 
-- Map any Salesforce field to any Notion property
-- Long text areas can be mapped to page body content
-- Property types can be manually adjusted if needed
+### Sync best practices
 
-### Test Connection
+- Always run **Test Connection** before saving.
+- Ensure at least one Salesforce field maps to a Notion **title** property — every page needs a title.
+- Keep the Salesforce ID property pointing to a text property used only by the package.
+- Start with a handful of fields, verify the sync end-to-end, then expand.
 
-Use the "Test Connection" button to verify:
-- Notion API connectivity
-- Database accessibility
-- Named Credential configuration
+## Widgets Sub-tab
 
-### Notion Sync Log Tab
+The Widgets sub-tab lets administrators create and manage widgets backed by `NotionWidget__mdt`. Each widget can be embedded into a Lightning page using the **Notion Widget** Lightning component in App Builder.
 
-The Notion Sync Log tab provides visibility into sync operations:
+### Widget list
 
-1. **List View**: Shows recent sync attempts sorted by creation date (newest first)
-2. **Record Details**: Click on any log entry to see:
-   - Record ID and Object Type
-   - Operation Type (CREATE/UPDATE/DELETE)
-   - Status (Success/Failed/Retrying)
-   - Notion Page ID (if successful)
-   - Error Message (if failed)
-   - Timestamp
+The list shows the developer name, target Notion database, optional context object, active status, and column/filter counts for every configured widget. Use **Edit** to open a widget, or the trash icon to delete it. Click **New Widget** to create one.
 
-The list view uses a formula field to enable descending date sorting, showing the most recent sync operations first.
+### Creating a widget
 
-## Permission Details
+1. Click **New Widget**.
+2. Enter a **Label** and **Developer Name**. The developer name is what you'll pick in Lightning App Builder.
+3. **Notion Database** — click **Browse** and select the source database. The integration must have access to it (Notion `•••` → **Connections**).
+4. **Context Object** *(optional)* — the Salesforce object the widget will live on (for record pages). Setting this lets the widget filter to pages related to that record.
+5. **Context Relation Property** *(optional)* — the name of the Notion relation property on the target database that links to the context record's Notion page. When set, the widget behaves like a Salesforce related list:
+   - rows are filtered to those whose relation includes the context Notion page;
+   - clicking **New** opens a draft modal with that relation pre-populated.
+6. **Default Sort Property** / **Default Sort Direction** *(optional)* — initial sort applied to the table.
+7. **Page Size** — number of rows per page (default 25, max 100).
+8. **Show New Button** — toggle the inline "New" button that creates Notion pages straight from the widget.
+9. **Is Active** — only active widgets are selectable in App Builder.
+10. **Columns** — pick which Notion properties to display, set their order, and choose their column widths. Reordering persists on save.
+11. **Filters** — add fixed filters (Notion property comparisons) layered on top of the context filter, if any.
+12. Save.
 
-When users don't have the required permission set, they will see a clear message in the UI:
-- "Access Denied" screen with graphical illustration
-- Clear message: "You don't have permission to access the Notion Sync Admin interface"
-- Instructions to contact system administrator
-- Specific request for "Notion Sync Administrator" permission set
+### Embedding a widget on a Lightning page
 
-The permission set checks are performed on all Apex methods to ensure security using the custom permission `Notion_Sync_Admin`.
+1. Open the target page in App Builder (record page, app page, or home page).
+2. From the **Custom** component panel, drag **Notion Widget** onto the page.
+3. With the widget selected, set the **Widget Configuration** property to the developer name of the widget you created. The field is a picklist sourced from active `NotionWidget__mdt` records.
+4. Save and activate the page.
+
+### Widget best practices
+
+- Use a clear, descriptive developer name — admins editing Lightning pages see this in the picklist.
+- For context-bound (related-list-style) widgets, make sure the parent record already has a synced Notion page; otherwise the widget has nothing to anchor against.
+- If the picklist in App Builder is empty, confirm at least one widget has **Is Active = true**.
+
+## Notion Navigation Component
+
+In addition to the Widget, the package ships a **Notion Navigation** Lightning component that opens a record's Notion page directly. It supports record pages and Flow screens and is configured per-instance in App Builder / Flow Builder — not in the Admin UI.
+
+Notable properties:
+
+- **Card Title** / **Show Title** — wrap the action in a Lightning card with a Notion-branded header, or render the action bare.
+- **Navigation Style** — `button` (labelled button) or `link` (inline text link). With `button` you can also hide the label to get an icon-only button.
+- **Action Label** / **Show Action Label** / **Action Alignment** — text shown on the button or link, whether to show it, and its alignment in the card.
+- **Sync Before Navigate** — default sync behavior for the main click: when on, the package syncs the record to Notion before opening; when off, it opens the existing page directly.
+- **Show Sync Option** — when on (and the variant is the labelled button), a chevron dropdown is attached next to the main button. The dropdown offers the **opposite** sync mode (e.g., *Open in Notion (With Sync)* when the default is without-sync), so end users can pick the alternate behavior per click without first toggling state. Turn this off to lock in the designer default and hide the alternate entirely.
+
+The split-button dropdown is only shown alongside the labelled-button variant; the link style and icon-only button render the main action alone.
+
+## Notion Sync Log Tab
+
+The **Notion Sync Log** tab shows recent sync attempts sorted newest first. Click any log row to see:
+
+- Record ID and Object Type
+- Operation Type (CREATE / UPDATE / DELETE)
+- Status (Success / Failed / Retrying)
+- Notion Page ID (on success)
+- Error Message (on failure)
+- Timestamp
+
+The list view uses a formula field to enable descending date sorting.
+
+## Permission Failures
+
+If a user without `Notion_Sync_Admin` opens the Admin UI, they see an "Access Denied" screen instructing them to contact their administrator and request the **Notion Sync Administrator** permission set. The same check is enforced on every Apex method behind the UI using the `Notion_Sync_Admin` custom permission, so the UI cannot be bypassed.
 
 ## Troubleshooting
 
-### Cannot See Notion Databases
+### Cannot see Notion databases
 
-1. Verify Named Credential is configured correctly
-2. Check that the Notion API token has access to databases
-3. Use "Test Connection" to diagnose issues
+- Confirm the Named Credential is configured with a valid API token.
+- Confirm the integration is connected to the database (Notion `•••` → **Connections**).
+- Run **Test Connection** for a precise error.
 
-### Metadata Save Fails
+### Metadata save fails
 
-1. Ensure user has Customize Application permission
-2. Check for duplicate developer names in metadata
-3. Review debug logs for specific errors
+- The user needs Customize Application + Modify Metadata permissions (included in the Notion Sync Administrator set).
+- Developer names must be unique — pick a different one if the save reports a conflict.
+- Check the debug log if the error is unclear.
 
-### Field Mappings Not Working
+### Field mappings don't sync
 
-1. Verify Notion property names match exactly
-2. Ensure property types are compatible
-3. Check that Salesforce fields are accessible
+- Notion property names are case- and whitespace-sensitive — verify they match exactly.
+- Confirm Notion property types are compatible with the Salesforce field types.
+- Confirm field-level security allows the integration user to read the field.
 
-## Best Practices
+### Widget config picklist is empty in App Builder
 
-1. **Test First**: Always test connection before saving
-2. **Map Required Fields**: Ensure all required Notion properties are mapped
-3. **Use Title Property**: At least one field should map to a "title" property
-4. **Unique Identifiers**: Keep the Salesforce ID property for sync tracking
-5. **Start Small**: Begin with a few fields and expand gradually
+- At least one widget must be **Is Active = true**.
+- Re-saving the widget refreshes the picklist if the change isn't visible yet.
 
-## Next Steps
+## Reference
 
-After configuring sync mappings:
-
-1. Set up Flow triggers for the objects (see FLOW_CONFIGURATION.md)
-2. Test sync with a few records
-3. Monitor sync logs for any issues
-4. Scale up to production data volumes
+- [SETUP_GUIDE.md](./SETUP_GUIDE.md) — end-to-end install and configuration walkthrough.
+- [FLOW_CONFIGURATION.md](./FLOW_CONFIGURATION.md) — per-object Flow setup for triggering syncs.
