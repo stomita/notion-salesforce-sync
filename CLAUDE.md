@@ -192,6 +192,26 @@ See `docs/CI_SETUP.md` for detailed setup instructions.
 - **Naming**: Use descriptive English names for classes, methods, variables, and metadata
 - **Comments**: All inline comments and method documentation in English
 
+## Documentation Maintenance — Bilingual (English / Japanese)
+
+This project ships documentation in both English and Japanese. The two trees are kept in sync:
+
+| English (canonical) | Japanese mirror |
+| --- | --- |
+| `README.md` | `README_ja.md` |
+| `docs/*.md` | `docs/ja/*.md` (same filename) |
+
+**When updating any documentation file, you MUST update both the English and Japanese versions in the same change.**
+
+- English is the canonical source. Edit the English file first, then mirror the change in the Japanese file under `docs/ja/` (or `README_ja.md` for the root README).
+- If you add a new doc under `docs/`, add the Japanese counterpart at `docs/ja/<same-filename>.md`.
+- If you delete or rename a doc, do the same on the Japanese side.
+- Keep markdown structure, heading anchors, and code blocks identical between the two versions so cross-references stay valid.
+- Cross-doc links inside `docs/` use relative paths (e.g. `[Foo](./BAR.md)`) — keep them as-is in `docs/ja/` so they resolve to the Japanese sibling. Links from `README_ja.md` to docs must point to `docs/ja/` (not `docs/`).
+- Japanese style: です・ます調, polite and technical. Preserve all proper nouns (Salesforce, Notion, Apex, Lightning, Flow) and code/identifier names verbatim. Use Salesforce-official Japanese terminology (例: Named Credential → 指定ログイン情報, Scratch Org → スクラッチ組織, Custom Metadata Type → カスタムメタデータ型, governor limit → ガバナ制限, field → 項目).
+
+If the change is English-only at the moment of writing (e.g. a quick fix during exploration), explicitly note that the Japanese version still needs to be updated, and propose the Japanese update in the same task before considering the documentation work complete.
+
 ## Claude Code Operational Notes
 
 ### Long-Running Bash Commands
