@@ -6,6 +6,8 @@ A Salesforce-native integration tool that synchronizes Salesforce data to Notion
 
 - 🔄 Real-time synchronization via Flow triggers
 - 🔗 Preserves Salesforce object relationships as Notion relations
+- 📊 Embeddable **Notion Widget** Lightning component that surfaces Notion database rows on record, app, and home pages — with optional related-list behavior
+- 🧭 **Notion Navigation** component that opens a record's Notion page from Salesforce
 - ⚡ Asynchronous processing using Queueable Apex
 - 🛠️ Configuration-driven through Custom Metadata Types
 - 🔒 Secure API integration with Named Credentials
@@ -24,82 +26,16 @@ The synchronous approach maintains user context throughout the process, ensuring
 
 ## Setup
 
-### Prerequisites
+The full installation and configuration walkthrough for administrators — package install, Notion integration, credentials, Sync mappings, Widget configuration, Flow setup, and verification — lives in **[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)**.
 
-1. Salesforce org with API access
-2. Notion workspace with API access
-3. Salesforce CLI (sfdx) installed
+Quick links by topic:
 
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/stomita/notion-salesforce-sync.git
-cd notion-salesforce-sync
-```
-
-2. Deploy to your Salesforce org:
-```bash
-sf project deploy start --source-dir force-app/main
-```
-
-Note: Use `sf` (Salesforce CLI v2) instead of `sfdx` for all commands.
-
-3. Configure Named Credentials for Notion API access:
-
-   a. **Get your Notion API token:**
-   - Go to [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
-   - Click "New integration"
-   - Give it a name (e.g., "Salesforce Sync")
-   - Select the workspace you want to connect
-   - Click "Submit"
-   - Copy the "Internal Integration Token" (starts with `ntn_` or `secret_`)
-
-   b. **Configure API Key in Salesforce:**
-   
-   The External Credential and Named Principal are already deployed with the metadata. You only need to add your API key:
-   
-   - Go to Setup → Security → Named Credentials
-   - Click on "External Credentials" tab
-   - Find "Notion Credential" (already deployed)
-   - Click on "NotionIntegration" principal (already created as Named Principal for org-wide access)
-   - Under Authentication Parameters, click "New"
-   - Add parameter:
-     - Parameter Name: `SecretKey`
-     - Parameter Value: Your Notion API token (the one you copied from step a)
-   - Save
-
-   c. **Assign Permission Set (Required):**
-   - Go to Setup → Permission Sets
-   - Find "Notion Integration User" (already deployed)
-   - Click "Manage Assignments" → "Add Assignment"
-   - Select users who will trigger syncs
-   - Save
-   - This permission set grants access to the Named Principal credential
-
-   d. **Grant integration access to your Notion databases:**
-   - In Notion, go to each database you want to sync
-   - Click the "..." menu → "Add connections"
-   - Select your integration and click "Confirm"
-
-
-4. Set up Custom Metadata records for your sync configuration
-
-## Configuration
-
-### Custom Metadata Types
-
-- **NotionSyncObject__mdt**: Define which Salesforce objects to sync
-- **NotionSyncField__mdt**: Map Salesforce fields to Notion properties
-- **NotionDatabase__mdt**: Store Notion database configurations
-- **NotionRelation__mdt**: Define relationship mappings
-
-### Flow Setup
-
-1. Create a Record-Triggered Flow for each object you want to sync
-2. Configure triggers for Insert, Update, and Delete
-3. Add Action to call the NotionSyncInvocable Apex method
-4. Map the required parameters: recordId, objectType, and operationType
+- **Install + first-time setup**: [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
+- **Admin UI reference (Sync and Widget Designer)**: [docs/ADMIN_UI_USAGE.md](docs/ADMIN_UI_USAGE.md)
+- **Flow trigger configuration**: [docs/FLOW_CONFIGURATION.md](docs/FLOW_CONFIGURATION.md)
+- **Bulk / large data behavior**: [docs/LARGE_DATA_SYNC.md](docs/LARGE_DATA_SYNC.md)
+- **Developer scratch org setup**: [docs/SCRATCH_ORG_SETUP.md](docs/SCRATCH_ORG_SETUP.md)
+- **Packaging (2GP)**: [docs/PACKAGING.md](docs/PACKAGING.md)
 
 ## Development
 
@@ -218,7 +154,7 @@ This error occurs when the user cannot access the Named Credential.
 This indicates the Named Principal credential is not configured.
 
 **Solution:**
-1. The Named Principal should already exist - just add your API key as described in section 3.b
+1. The Named Principal should already exist — add your API key as described in [SETUP_GUIDE.md Step 3.1](docs/SETUP_GUIDE.md#31-register-your-notion-api-key)
 2. Ensure the `SecretKey` parameter contains your valid Notion API token
 3. Verify the "Notion Integration User" permission set is assigned to your user
 
