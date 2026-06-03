@@ -42,8 +42,6 @@ sf package install \
 
 After installation, you should see the **Notion Sync** app available in the App Launcher.
 
-> Looking for a different version? Run `sf package version list --packages 0HogL0000000FVJSA2 --target-dev-hub <devhub> --released` to see all releases.
-
 ---
 
 ## Step 2 — Prepare Notion
